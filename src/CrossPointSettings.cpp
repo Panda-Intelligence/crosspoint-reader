@@ -9,6 +9,8 @@
 #include <string>
 
 #include "fontIds.h"
+#include "ExternalFontIds.h"
+#include "StorageFontRegistry.h"
 
 // Initialize the static instance
 CrossPointSettings CrossPointSettings::instance;
@@ -256,6 +258,16 @@ float CrossPointSettings::getReaderLineCompression() const {
         case WIDE:
           return 1.0f;
       }
+    case NOTOSANS_TC:
+      switch (lineSpacing) {
+        case TIGHT:
+          return 0.90f;
+        case NORMAL:
+        default:
+          return 0.95f;
+        case WIDE:
+          return 1.0f;
+      }
   }
 }
 
@@ -329,6 +341,22 @@ int CrossPointSettings::getReaderFontId() const {
           return OPENDYSLEXIC_12_FONT_ID;
         case EXTRA_LARGE:
           return OPENDYSLEXIC_14_FONT_ID;
+      }
+    case NOTOSANS_TC:
+      switch (fontSize) {
+        case SMALL:
+          return StorageFontRegistry::isTraditionalChineseFontLoaded(SMALL) ? NOTOSANS_TC_12_FONT_ID
+                                                                            : NOTOSANS_12_FONT_ID;
+        case MEDIUM:
+        default:
+          return StorageFontRegistry::isTraditionalChineseFontLoaded(MEDIUM) ? NOTOSANS_TC_14_FONT_ID
+                                                                             : NOTOSANS_14_FONT_ID;
+        case LARGE:
+          return StorageFontRegistry::isTraditionalChineseFontLoaded(LARGE) ? NOTOSANS_TC_16_FONT_ID
+                                                                            : NOTOSANS_16_FONT_ID;
+        case EXTRA_LARGE:
+          return StorageFontRegistry::isTraditionalChineseFontLoaded(EXTRA_LARGE) ? NOTOSANS_TC_18_FONT_ID
+                                                                                   : NOTOSANS_18_FONT_ID;
       }
   }
 }

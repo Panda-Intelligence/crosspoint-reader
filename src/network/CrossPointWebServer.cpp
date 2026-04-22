@@ -13,6 +13,7 @@
 #include "CrossPointSettings.h"
 #include "OpdsServerStore.h"
 #include "SettingsList.h"
+#include "StorageFontRegistry.h"
 #include "WebDAVHandler.h"
 #include "html/FilesPageHtml.generated.h"
 #include "html/HomePageHtml.generated.h"
@@ -160,6 +161,7 @@ void CrossPointWebServer::begin() {
   server->on("/settings", HTTP_GET, [this] { handleSettingsPage(); });
   server->on("/api/settings", HTTP_GET, [this] { handleGetSettings(); });
   server->on("/api/settings", HTTP_POST, [this] { handlePostSettings(); });
+  server->on("/api/fonts", HTTP_GET, [this] { handleGetFontPacks(); });
 
   // OPDS server endpoints
   server->on("/api/opds", HTTP_GET, [this] { handleGetOpdsServers(); });
@@ -422,6 +424,36 @@ void CrossPointWebServer::scanFiles(const char* path, const std::function<void(F
 }
 
 bool CrossPointWebServer::isEpubFile(const String& filename) const { return FsHelpers::hasEpubExtension(filename); }
+
+void CrossPointWebServer::handleGetFontPacks() const {
+  JsonDocument doc;
+  JsonArray packs = doc["packs"].to<JsonArray>();
+
+  struct FontPackInfo {
+    const char* name;
+    const char* path;
+    uint8_t size;
+  };
+
+  constexpr FontPackInfo fontPacks[] = {
+      {"Noto Sans TC 12", "/.mofei/fonts/notosans_tc_12.epf", CrossPointSettings::SMALL},
+      {"Noto Sans TC 14", "/.mofei/fonts/notosans_tc_14.epf", CrossPointSettings::MEDIUM},
+      {"Noto Sans TC 16", "/.mofei/fonts/notosans_tc_16.epf", CrossPointSettings::LARGE},
+      {"Noto Sans TC 18", "/.mofei/fonts/notosans_tc_18.epf", CrossPointSettings::EXTRA_LARGE},
+  };
+
+  for (const auto& pack : fontPacks) {
+    JsonObject obj = packs.add<JsonObject>();
+    obj["name"] = pack.name;
+    obj["path"] = pack.path;
+    obj["installed"] = Storage.exists(pack.path);
+    obj["active"] = StorageFontRegistry::isTraditionalChineseFontLoaded(pack.size);
+  }
+
+  String json;
+  serializeJson(doc, json);
+  server->send(200, "application/json", json);
+}
 
 void CrossPointWebServer::handleFileList() const {
   sendHtmlContent(server.get(), FilesPageHtml, sizeof(FilesPageHtml));

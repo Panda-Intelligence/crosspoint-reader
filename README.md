@@ -165,6 +165,42 @@ Interactive controls:
 - `r`: refresh
 - Mouse click: tap at cursor position
 
+### Traditional Chinese Font Packs
+
+The `mofei` branch supports anti-aliased Traditional Chinese reading fonts through external storage-backed font packs.
+These packs are not embedded into firmware, so they do not inflate the app image size.
+
+Build packs from a Traditional Chinese font file such as `NotoSansTC-Regular.otf`:
+
+```sh
+python3 scripts/build_tc_font_pack.py --font /path/to/NotoSansTC-Regular.otf
+```
+
+This generates:
+
+- `notosans_tc_12.epf`
+- `notosans_tc_14.epf`
+- `notosans_tc_16.epf`
+- `notosans_tc_18.epf`
+
+Install them onto device storage under:
+
+```text
+/.mofei/fonts/
+```
+
+Expected filenames:
+
+```text
+/.mofei/fonts/notosans_tc_12.epf
+/.mofei/fonts/notosans_tc_14.epf
+/.mofei/fonts/notosans_tc_16.epf
+/.mofei/fonts/notosans_tc_18.epf
+```
+
+Once installed, select `Noto Sans TC` in the reader font family setting. If the packs are missing, the firmware falls
+back to built-in `Noto Sans`.
+
 ## Internals
 
 CrossPoint Reader is pretty aggressive about caching data down to the SD card to minimise RAM usage. The ESP32-C3 only
