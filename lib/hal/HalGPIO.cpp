@@ -194,7 +194,11 @@ void HalGPIO::begin() {
   inputMgr.begin();
   SPI.begin(EPD_SCLK, SPI_MISO, EPD_MOSI, EPD_CS);
 
+#if MOFEI_DEVICE
+  _deviceType = DeviceType::MOFEI;
+#else
   _deviceType = detectDeviceTypeWithFingerprint();
+#endif
 
   if (deviceIsX4()) {
     pinMode(BAT_GPIO0, INPUT);
@@ -230,7 +234,8 @@ void HalGPIO::startDeepSleep() {
     inputMgr.update();
   }
   // Arm the wakeup trigger *after* the button is released
-  esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
+  gpio_wakeup_enable(static_cast<gpio_num_t>(InputManager::POWER_BUTTON_PIN), GPIO_INTR_LOW_LEVEL);
+  esp_sleep_enable_gpio_wakeup();
   // Enter Deep Sleep
   esp_deep_sleep_start();
 }
@@ -268,6 +273,9 @@ void HalGPIO::verifyPowerButtonWakeup(uint16_t requiredDurationMs, bool shortPre
 }
 
 bool HalGPIO::isUsbConnected() const {
+  if (deviceIsMofei()) {
+    return false;
+  }
   if (deviceIsX3()) {
     // X3: infer USB/charging via BQ27220 Current() register (0x0C, signed mA).
     // Positive current means charging.
@@ -285,6 +293,13 @@ bool HalGPIO::isUsbConnected() const {
 }
 
 HalGPIO::WakeupReason HalGPIO::getWakeupReason() const {
+#if MOFEI_DEVICE
+  const auto resetReason = esp_reset_reason();
+  if (resetReason == ESP_RST_POWERON) {
+    return WakeupReason::AfterFlash;
+  }
+  return WakeupReason::Other;
+#else
   const auto wakeupCause = esp_sleep_get_wakeup_cause();
   const auto resetReason = esp_reset_reason();
 
@@ -301,4 +316,5 @@ HalGPIO::WakeupReason HalGPIO::getWakeupReason() const {
     return WakeupReason::AfterUSBPower;
   }
   return WakeupReason::Other;
+#endif
 }

@@ -137,6 +137,34 @@ python3 scripts/debugging_monitor.py /dev/cu.usbmodem2101
 ```
 Minor adjustments may be required for Windows.
 
+### Interactive Desktop Simulator
+
+The repo does not expose a PlatformIO simulator target. For an interactive SDL window, use the repo-local wrapper for
+the separate mofei desktop simulator:
+
+```sh
+bin/mofei-sim --build
+bin/mofei-sim
+```
+
+Optional shortcuts:
+
+```sh
+bin/mofei-sim --app weather_clock
+bin/mofei-sim --app study_cards
+bin/mofei-sim --key next
+```
+
+Interactive controls:
+
+- Arrow keys: swipe left/right/up/down
+- `Space` / `Enter`: tap center
+- `PageUp`: previous key
+- `PageDown`: next key
+- `Esc`: home
+- `r`: refresh
+- Mouse click: tap at cursor position
+
 ## Internals
 
 CrossPoint Reader is pretty aggressive about caching data down to the SD card to minimise RAM usage. The ESP32-C3 only

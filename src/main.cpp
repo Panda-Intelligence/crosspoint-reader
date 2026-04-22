@@ -242,7 +242,8 @@ void setup() {
   }
 #endif
 
-  LOG_INF("MAIN", "Hardware detect: %s", gpio.deviceIsX3() ? "X3" : "X4");
+  const char* hardwareLabel = gpio.deviceIsMofei() ? "MOFEI" : (gpio.deviceIsX3() ? "X3" : "X4");
+  LOG_INF("MAIN", "Hardware detect: %s", hardwareLabel);
 
   // SD Card Initialization
   // We need 6 open files concurrently when parsing a new chapter
@@ -294,8 +295,20 @@ void setup() {
   if (HalSystem::isRebootFromPanic()) {
     // If we rebooted from a panic, go to crash report screen to show the panic info
     activityManager.goToCrashReport();
-  } else if (APP_STATE.openEpubPath.empty() || !APP_STATE.lastSleepFromReader ||
-             mappedInputManager.isPressed(MappedInputManager::Button::Back) || APP_STATE.readerActivityLoadCount > 0) {
+  }
+#if MOFEI_DEVICE
+  else {
+    // Mofei boots to the dashboard by default. Reader resume remains available
+    // through package-level flows instead of being the system-wide boot target.
+    if (APP_STATE.readerActivityLoadCount > 0) {
+      APP_STATE.readerActivityLoadCount = 0;
+      APP_STATE.saveToFile();
+    }
+    activityManager.goHome();
+  }
+#else
+  else if (APP_STATE.openEpubPath.empty() || !APP_STATE.lastSleepFromReader ||
+           mappedInputManager.isPressed(MappedInputManager::Button::Back) || APP_STATE.readerActivityLoadCount > 0) {
     // Boot to home screen if no book is open, last sleep was not from reader, back button is held, or reader activity
     // crashed (indicated by readerActivityLoadCount > 0)
     activityManager.goHome();
@@ -307,6 +320,7 @@ void setup() {
     APP_STATE.saveToFile();
     activityManager.goToReader(path);
   }
+#endif
 
   // Ensure we're not still holding the power button before leaving setup
   waitForPowerRelease();

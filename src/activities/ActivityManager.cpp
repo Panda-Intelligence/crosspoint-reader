@@ -6,14 +6,19 @@
 #include "boot_sleep/BootActivity.h"
 #include "boot_sleep/SleepActivity.h"
 #include "browser/OpdsBookBrowserActivity.h"
+#include "desktop/DesktopHubActivity.h"
 #include "home/CrashActivity.h"
+#include "home/DashboardActivity.h"
 #include "home/FileBrowserActivity.h"
 #include "home/HomeActivity.h"
 #include "home/RecentBooksActivity.h"
 #include "network/CrossPointWebServerActivity.h"
+#include "arcade/ArcadeHubActivity.h"
 #include "reader/ReaderActivity.h"
+#include "reader/ReadingHubActivity.h"
 #include "settings/OpdsServerListActivity.h"
 #include "settings/SettingsActivity.h"
+#include "study/StudyHubActivity.h"
 #include "util/FullScreenMessageActivity.h"
 
 void ActivityManager::begin() {
@@ -194,6 +199,22 @@ void ActivityManager::goToReader(std::string path) {
   replaceActivity(std::make_unique<ReaderActivity>(renderer, mappedInput, std::move(path)));
 }
 
+void ActivityManager::goToDesktopHub() {
+  replaceActivity(std::make_unique<DesktopHubActivity>(renderer, mappedInput));
+}
+
+void ActivityManager::goToStudyHub() {
+  replaceActivity(std::make_unique<StudyHubActivity>(renderer, mappedInput));
+}
+
+void ActivityManager::goToReadingHub() {
+  replaceActivity(std::make_unique<ReadingHubActivity>(renderer, mappedInput));
+}
+
+void ActivityManager::goToArcadeHub() {
+  replaceActivity(std::make_unique<ArcadeHubActivity>(renderer, mappedInput));
+}
+
 void ActivityManager::goToSleep() {
   replaceActivity(std::make_unique<SleepActivity>(renderer, mappedInput));
   loop();  // Important: sleep screen must be rendered immediately, the caller will go to sleep right after this returns
@@ -207,7 +228,13 @@ void ActivityManager::goToFullScreenMessage(std::string message, EpdFontFamily::
 
 void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<CrashActivity>(renderer, mappedInput)); }
 
-void ActivityManager::goHome() { replaceActivity(std::make_unique<HomeActivity>(renderer, mappedInput)); }
+void ActivityManager::goHome() {
+#if MOFEI_DEVICE
+  replaceActivity(std::make_unique<DashboardActivity>(renderer, mappedInput));
+#else
+  replaceActivity(std::make_unique<HomeActivity>(renderer, mappedInput));
+#endif
+}
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
   if (pendingActivity) {

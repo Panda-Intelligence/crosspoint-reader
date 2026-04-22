@@ -83,6 +83,10 @@ class ActivityManager {
   void goToRecentBooks();
   void goToBrowser();
   void goToReader(std::string path);
+  void goToDesktopHub();
+  void goToStudyHub();
+  void goToReadingHub();
+  void goToArcadeHub();
   void goToSleep();
   void goToBoot();
   void goToFullScreenMessage(std::string message, EpdFontFamily::Style style = EpdFontFamily::REGULAR);
