@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -7,6 +8,8 @@
 #include <EpdFont.h>
 #include <EpdFontData.h>
 #include <EpdFontFamily.h>
+
+#include "CrossPointSettings.h"
 
 class GfxRenderer;
 
@@ -23,6 +26,7 @@ class StorageFontPack {
   std::unique_ptr<EpdFont> font_;
   std::unique_ptr<EpdFontFamily> family_;
   bool loaded_ = false;
+  void reset();
 
  public:
   bool load(const char* path);
@@ -30,9 +34,18 @@ class StorageFontPack {
   const EpdFontFamily& family() const { return *family_; }
 };
 
+struct TraditionalChineseFontPackInfo {
+  const char* name;
+  const char* path;
+  CrossPointSettings::FONT_SIZE size;
+  int fontId;
+};
+
 namespace StorageFontRegistry {
 
+const std::array<TraditionalChineseFontPackInfo, 4>& getTraditionalChineseFontPacks();
 bool loadTraditionalChineseFonts(GfxRenderer& renderer);
 bool isTraditionalChineseFontLoaded(uint8_t fontSize);
+size_t countLoadedTraditionalChineseFonts();
 
 }  // namespace StorageFontRegistry

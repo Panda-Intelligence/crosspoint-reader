@@ -451,20 +451,7 @@ void CrossPointWebServer::handleGetFontPacks() const {
   JsonDocument doc;
   JsonArray packs = doc["packs"].to<JsonArray>();
 
-  struct FontPackInfo {
-    const char* name;
-    const char* path;
-    uint8_t size;
-  };
-
-  constexpr FontPackInfo fontPacks[] = {
-      {"Noto Sans TC 12", "/.mofei/fonts/notosans_tc_12.epf", CrossPointSettings::SMALL},
-      {"Noto Sans TC 14", "/.mofei/fonts/notosans_tc_14.epf", CrossPointSettings::MEDIUM},
-      {"Noto Sans TC 16", "/.mofei/fonts/notosans_tc_16.epf", CrossPointSettings::LARGE},
-      {"Noto Sans TC 18", "/.mofei/fonts/notosans_tc_18.epf", CrossPointSettings::EXTRA_LARGE},
-  };
-
-  for (const auto& pack : fontPacks) {
+  for (const auto& pack : StorageFontRegistry::getTraditionalChineseFontPacks()) {
     JsonObject obj = packs.add<JsonObject>();
     obj["name"] = pack.name;
     obj["path"] = pack.path;
@@ -515,6 +502,7 @@ void CrossPointWebServer::handleDeleteFontPack() {
     return;
   }
 
+  StorageFontRegistry::loadTraditionalChineseFonts(renderer);
   server->send(200, "text/plain", "Font pack deleted");
 }
 

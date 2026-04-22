@@ -7,6 +7,7 @@
 
 #include "CrossPointSettings.h"
 #include "ExternalFontIds.h"
+#include "FontCacheManager.h"
 #include "GfxRenderer.h"
 
 namespace {
@@ -64,19 +65,24 @@ StorageFontPack tc14Pack;
 StorageFontPack tc16Pack;
 StorageFontPack tc18Pack;
 
-struct PackMeta {
-  CrossPointSettings::FONT_SIZE size;
-  const char* path;
-  int fontId;
+constexpr std::array<TraditionalChineseFontPackInfo, 4> kTraditionalChineseFontPacks = {{
+    {"Noto Sans TC 12", "/.mofei/fonts/notosans_tc_12.epf", CrossPointSettings::SMALL, NOTOSANS_TC_12_FONT_ID},
+    {"Noto Sans TC 14", "/.mofei/fonts/notosans_tc_14.epf", CrossPointSettings::MEDIUM, NOTOSANS_TC_14_FONT_ID},
+    {"Noto Sans TC 16", "/.mofei/fonts/notosans_tc_16.epf", CrossPointSettings::LARGE, NOTOSANS_TC_16_FONT_ID},
+    {"Noto Sans TC 18", "/.mofei/fonts/notosans_tc_18.epf", CrossPointSettings::EXTRA_LARGE, NOTOSANS_TC_18_FONT_ID},
+}};
+
+struct PackRuntime {
+  const TraditionalChineseFontPackInfo* info;
   StorageFontPack* pack;
 };
 
-PackMeta packMeta[] = {
-    {CrossPointSettings::SMALL, "/.mofei/fonts/notosans_tc_12.epf", NOTOSANS_TC_12_FONT_ID, &tc12Pack},
-    {CrossPointSettings::MEDIUM, "/.mofei/fonts/notosans_tc_14.epf", NOTOSANS_TC_14_FONT_ID, &tc14Pack},
-    {CrossPointSettings::LARGE, "/.mofei/fonts/notosans_tc_16.epf", NOTOSANS_TC_16_FONT_ID, &tc16Pack},
-    {CrossPointSettings::EXTRA_LARGE, "/.mofei/fonts/notosans_tc_18.epf", NOTOSANS_TC_18_FONT_ID, &tc18Pack},
-};
+const std::array<PackRuntime, 4> kPackRuntimes = {{
+    {&kTraditionalChineseFontPacks[0], &tc12Pack},
+    {&kTraditionalChineseFontPacks[1], &tc14Pack},
+    {&kTraditionalChineseFontPacks[2], &tc16Pack},
+    {&kTraditionalChineseFontPacks[3], &tc18Pack},
+}};
 
 template <typename T>
 bool readArray(FsFile& file, std::vector<T>& out, size_t count) {
@@ -87,8 +93,23 @@ bool readArray(FsFile& file, std::vector<T>& out, size_t count) {
 }
 }  // namespace
 
-bool StorageFontPack::load(const char* path) {
+void StorageFontPack::reset() {
+  std::vector<uint8_t>().swap(bitmap_);
+  std::vector<EpdGlyph>().swap(glyphs_);
+  std::vector<EpdUnicodeInterval>().swap(intervals_);
+  std::vector<EpdFontGroup>().swap(groups_);
+  std::vector<EpdKernClassEntry>().swap(kernLeftClasses_);
+  std::vector<EpdKernClassEntry>().swap(kernRightClasses_);
+  std::vector<int8_t>().swap(kernMatrix_);
+  std::vector<EpdLigaturePair>().swap(ligaturePairs_);
+  data_ = {};
+  font_.reset();
+  family_.reset();
   loaded_ = false;
+}
+
+bool StorageFontPack::load(const char* path) {
+  reset();
 
   FsFile file;
   if (!Storage.openFileForRead("TCFONT", path, file)) {
@@ -169,28 +190,46 @@ bool StorageFontPack::load(const char* path) {
 
 namespace StorageFontRegistry {
 
+const std::array<TraditionalChineseFontPackInfo, 4>& getTraditionalChineseFontPacks() {
+  return kTraditionalChineseFontPacks;
+}
+
 bool loadTraditionalChineseFonts(GfxRenderer& renderer) {
   Storage.mkdir("/.mofei");
   Storage.mkdir("/.mofei/fonts");
 
   bool anyLoaded = false;
-  for (auto& meta : packMeta) {
-    if (meta.pack->load(meta.path)) {
-      renderer.insertFont(meta.fontId, meta.pack->family());
-      LOG_INF("TCFONT", "Loaded Traditional Chinese font pack: %s", meta.path);
+  for (const auto& runtime : kPackRuntimes) {
+    if (runtime.pack->load(runtime.info->path)) {
+      renderer.insertFont(runtime.info->fontId, runtime.pack->family());
+      LOG_INF("TCFONT", "Loaded Traditional Chinese font pack: %s", runtime.info->path);
       anyLoaded = true;
     } else {
-      LOG_DBG("TCFONT", "Traditional Chinese font pack not found: %s", meta.path);
+      renderer.removeFont(runtime.info->fontId);
+      LOG_DBG("TCFONT", "Traditional Chinese font pack not found: %s", runtime.info->path);
     }
+  }
+  if (auto* cacheManager = renderer.getFontCacheManager()) {
+    cacheManager->clearCache();
   }
   return anyLoaded;
 }
 
 bool isTraditionalChineseFontLoaded(uint8_t fontSize) {
-  for (const auto& meta : packMeta) {
-    if (meta.size == fontSize) return meta.pack->loaded();
+  for (const auto& runtime : kPackRuntimes) {
+    if (runtime.info->size == fontSize) return runtime.pack->loaded();
   }
   return false;
+}
+
+size_t countLoadedTraditionalChineseFonts() {
+  size_t count = 0;
+  for (const auto& runtime : kPackRuntimes) {
+    if (runtime.pack->loaded()) {
+      count++;
+    }
+  }
+  return count;
 }
 
 }  // namespace StorageFontRegistry

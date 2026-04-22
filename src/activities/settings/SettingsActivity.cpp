@@ -13,6 +13,7 @@
 #include "OtaUpdateActivity.h"
 #include "SettingsList.h"
 #include "StatusBarSettingsActivity.h"
+#include "TraditionalChineseFontsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -53,6 +54,14 @@ void SettingsActivity::onEnter() {
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CHECK_UPDATES, SettingAction::CheckForUpdates));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
+#if MOFEI_DEVICE
+  if (!readerSettings.empty()) {
+    readerSettings.insert(readerSettings.begin() + 1,
+                          SettingInfo::Action(StrId::STR_TC_FONT_PACKS, SettingAction::TraditionalChineseFonts));
+  } else {
+    readerSettings.push_back(SettingInfo::Action(StrId::STR_TC_FONT_PACKS, SettingAction::TraditionalChineseFonts));
+  }
+#endif
 
   // Reset selection to first category
   selectedCategoryIndex = 0;
@@ -170,6 +179,10 @@ void SettingsActivity::toggleCurrentSetting() {
     switch (setting.action) {
       case SettingAction::RemapFrontButtons:
         startActivityForResult(std::make_unique<ButtonRemapActivity>(renderer, mappedInput), resultHandler);
+        break;
+      case SettingAction::TraditionalChineseFonts:
+        startActivityForResult(std::make_unique<TraditionalChineseFontsActivity>(renderer, mappedInput),
+                               resultHandler);
         break;
       case SettingAction::CustomiseStatusBar:
         startActivityForResult(std::make_unique<StatusBarSettingsActivity>(renderer, mappedInput), resultHandler);
