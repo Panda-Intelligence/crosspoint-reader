@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <memory>
 
 #include "DailyMazeActivity.h"
 #include "Game2048Activity.h"

@@ -68,7 +68,6 @@ void SokobanActivity::movePlayer(int dr, int dc) {
 
     // Move box
     board[br][bc] = isTarget(br, bc) ? Tile::BoxOnTarget : Tile::Box;
-    board[nr][nc] = isTarget(nr, nc) ? Tile::Floor : Tile::Floor; // Temporary, will be player
   }
 
   // Move player
