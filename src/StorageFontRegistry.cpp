@@ -64,6 +64,41 @@ StorageFontPack tc12Pack;
 StorageFontPack tc14Pack;
 StorageFontPack tc16Pack;
 StorageFontPack tc18Pack;
+StorageFontPack tc12BoldPack;
+StorageFontPack tc12ItalicPack;
+StorageFontPack tc12BoldItalicPack;
+StorageFontPack tc14BoldPack;
+StorageFontPack tc14ItalicPack;
+StorageFontPack tc14BoldItalicPack;
+StorageFontPack tc16BoldPack;
+StorageFontPack tc16ItalicPack;
+StorageFontPack tc16BoldItalicPack;
+StorageFontPack tc18BoldPack;
+StorageFontPack tc18ItalicPack;
+StorageFontPack tc18BoldItalicPack;
+
+struct StorageFontFamilySlot {
+  StorageFontPack* regular;
+  StorageFontPack* bold;
+  StorageFontPack* italic;
+  StorageFontPack* boldItalic;
+  std::unique_ptr<EpdFontFamily> family;
+  bool loaded = false;
+
+  void reset() {
+    regular->reset();
+    bold->reset();
+    italic->reset();
+    boldItalic->reset();
+    family.reset();
+    loaded = false;
+  }
+};
+
+StorageFontFamilySlot tc12Family{&tc12Pack, &tc12BoldPack, &tc12ItalicPack, &tc12BoldItalicPack};
+StorageFontFamilySlot tc14Family{&tc14Pack, &tc14BoldPack, &tc14ItalicPack, &tc14BoldItalicPack};
+StorageFontFamilySlot tc16Family{&tc16Pack, &tc16BoldPack, &tc16ItalicPack, &tc16BoldItalicPack};
+StorageFontFamilySlot tc18Family{&tc18Pack, &tc18BoldPack, &tc18ItalicPack, &tc18BoldItalicPack};
 
 constexpr std::array<TraditionalChineseFontPackInfo, 4> kTraditionalChineseFontPacks = {{
     {"Noto Sans TC 12", "/.mofei/fonts/notosans_tc_12.epf", CrossPointSettings::SMALL, NOTOSANS_TC_12_FONT_ID},
@@ -72,16 +107,44 @@ constexpr std::array<TraditionalChineseFontPackInfo, 4> kTraditionalChineseFontP
     {"Noto Sans TC 18", "/.mofei/fonts/notosans_tc_18.epf", CrossPointSettings::EXTRA_LARGE, NOTOSANS_TC_18_FONT_ID},
 }};
 
+constexpr std::array<TraditionalChineseFontFaceInfo, 16> kTraditionalChineseFontFaces = {{
+    {"Noto Sans TC 12", "/.mofei/fonts/notosans_tc_12.epf", CrossPointSettings::SMALL, EpdFontFamily::REGULAR},
+    {"Noto Sans TC 12 Bold", "/.mofei/fonts/notosans_tc_12_bold.epf", CrossPointSettings::SMALL, EpdFontFamily::BOLD},
+    {"Noto Sans TC 12 Italic", "/.mofei/fonts/notosans_tc_12_italic.epf", CrossPointSettings::SMALL,
+     EpdFontFamily::ITALIC},
+    {"Noto Sans TC 12 Bold Italic", "/.mofei/fonts/notosans_tc_12_bolditalic.epf", CrossPointSettings::SMALL,
+     EpdFontFamily::BOLD_ITALIC},
+    {"Noto Sans TC 14", "/.mofei/fonts/notosans_tc_14.epf", CrossPointSettings::MEDIUM, EpdFontFamily::REGULAR},
+    {"Noto Sans TC 14 Bold", "/.mofei/fonts/notosans_tc_14_bold.epf", CrossPointSettings::MEDIUM, EpdFontFamily::BOLD},
+    {"Noto Sans TC 14 Italic", "/.mofei/fonts/notosans_tc_14_italic.epf", CrossPointSettings::MEDIUM,
+     EpdFontFamily::ITALIC},
+    {"Noto Sans TC 14 Bold Italic", "/.mofei/fonts/notosans_tc_14_bolditalic.epf", CrossPointSettings::MEDIUM,
+     EpdFontFamily::BOLD_ITALIC},
+    {"Noto Sans TC 16", "/.mofei/fonts/notosans_tc_16.epf", CrossPointSettings::LARGE, EpdFontFamily::REGULAR},
+    {"Noto Sans TC 16 Bold", "/.mofei/fonts/notosans_tc_16_bold.epf", CrossPointSettings::LARGE, EpdFontFamily::BOLD},
+    {"Noto Sans TC 16 Italic", "/.mofei/fonts/notosans_tc_16_italic.epf", CrossPointSettings::LARGE,
+     EpdFontFamily::ITALIC},
+    {"Noto Sans TC 16 Bold Italic", "/.mofei/fonts/notosans_tc_16_bolditalic.epf", CrossPointSettings::LARGE,
+     EpdFontFamily::BOLD_ITALIC},
+    {"Noto Sans TC 18", "/.mofei/fonts/notosans_tc_18.epf", CrossPointSettings::EXTRA_LARGE, EpdFontFamily::REGULAR},
+    {"Noto Sans TC 18 Bold", "/.mofei/fonts/notosans_tc_18_bold.epf", CrossPointSettings::EXTRA_LARGE,
+     EpdFontFamily::BOLD},
+    {"Noto Sans TC 18 Italic", "/.mofei/fonts/notosans_tc_18_italic.epf", CrossPointSettings::EXTRA_LARGE,
+     EpdFontFamily::ITALIC},
+    {"Noto Sans TC 18 Bold Italic", "/.mofei/fonts/notosans_tc_18_bolditalic.epf", CrossPointSettings::EXTRA_LARGE,
+     EpdFontFamily::BOLD_ITALIC},
+}};
+
 struct PackRuntime {
   const TraditionalChineseFontPackInfo* info;
-  StorageFontPack* pack;
+  StorageFontFamilySlot* family;
 };
 
 const std::array<PackRuntime, 4> kPackRuntimes = {{
-    {&kTraditionalChineseFontPacks[0], &tc12Pack},
-    {&kTraditionalChineseFontPacks[1], &tc14Pack},
-    {&kTraditionalChineseFontPacks[2], &tc16Pack},
-    {&kTraditionalChineseFontPacks[3], &tc18Pack},
+    {&kTraditionalChineseFontPacks[0], &tc12Family},
+    {&kTraditionalChineseFontPacks[1], &tc14Family},
+    {&kTraditionalChineseFontPacks[2], &tc16Family},
+    {&kTraditionalChineseFontPacks[3], &tc18Family},
 }};
 
 template <typename T>
@@ -104,7 +167,6 @@ void StorageFontPack::reset() {
   std::vector<EpdLigaturePair>().swap(ligaturePairs_);
   data_ = {};
   font_.reset();
-  family_.reset();
   loaded_ = false;
 }
 
@@ -183,7 +245,6 @@ bool StorageFontPack::load(const char* path) {
   data_.ligaturePairCount = static_cast<uint32_t>(ligaturePairs_.size());
 
   font_ = std::make_unique<EpdFont>(&data_);
-  family_ = std::make_unique<EpdFontFamily>(font_.get());
   loaded_ = true;
   return true;
 }
@@ -192,6 +253,10 @@ namespace StorageFontRegistry {
 
 const std::array<TraditionalChineseFontPackInfo, 4>& getTraditionalChineseFontPacks() {
   return kTraditionalChineseFontPacks;
+}
+
+const std::array<TraditionalChineseFontFaceInfo, 16>& getTraditionalChineseFontFaces() {
+  return kTraditionalChineseFontFaces;
 }
 
 const TraditionalChineseFontPackInfo* getTraditionalChineseFontPack(uint8_t fontSize) {
@@ -203,19 +268,45 @@ const TraditionalChineseFontPackInfo* getTraditionalChineseFontPack(uint8_t font
   return nullptr;
 }
 
+const TraditionalChineseFontFaceInfo* getTraditionalChineseFontFace(uint8_t fontSize, EpdFontFamily::Style style) {
+  for (const auto& face : kTraditionalChineseFontFaces) {
+    if (face.size == fontSize && face.style == style) {
+      return &face;
+    }
+  }
+  return nullptr;
+}
+
 bool loadTraditionalChineseFonts(GfxRenderer& renderer) {
   Storage.mkdir("/.mofei");
   Storage.mkdir("/.mofei/fonts");
 
   bool anyLoaded = false;
   for (const auto& runtime : kPackRuntimes) {
-    if (runtime.pack->load(runtime.info->path)) {
-      renderer.insertFont(runtime.info->fontId, runtime.pack->family());
-      LOG_INF("TCFONT", "Loaded Traditional Chinese font pack: %s", runtime.info->path);
+    runtime.family->reset();
+
+    const auto* regular = getTraditionalChineseFontFace(runtime.info->size, EpdFontFamily::REGULAR);
+    const auto* bold = getTraditionalChineseFontFace(runtime.info->size, EpdFontFamily::BOLD);
+    const auto* italic = getTraditionalChineseFontFace(runtime.info->size, EpdFontFamily::ITALIC);
+    const auto* boldItalic = getTraditionalChineseFontFace(runtime.info->size, EpdFontFamily::BOLD_ITALIC);
+
+    if (regular != nullptr && runtime.family->regular->load(regular->path)) {
+      if (bold != nullptr) runtime.family->bold->load(bold->path);
+      if (italic != nullptr) runtime.family->italic->load(italic->path);
+      if (boldItalic != nullptr) runtime.family->boldItalic->load(boldItalic->path);
+
+      runtime.family->family = std::make_unique<EpdFontFamily>(
+          &runtime.family->regular->font(),
+          runtime.family->bold->loaded() ? &runtime.family->bold->font() : nullptr,
+          runtime.family->italic->loaded() ? &runtime.family->italic->font() : nullptr,
+          runtime.family->boldItalic->loaded() ? &runtime.family->boldItalic->font() : nullptr);
+      runtime.family->loaded = true;
+      renderer.insertFont(runtime.info->fontId, *runtime.family->family);
+      LOG_INF("TCFONT", "Loaded Traditional Chinese font family: %s", runtime.info->path);
       anyLoaded = true;
     } else {
       renderer.removeFont(runtime.info->fontId);
-      LOG_DBG("TCFONT", "Traditional Chinese font pack not found: %s", runtime.info->path);
+      LOG_DBG("TCFONT", "Traditional Chinese font family not found: %s", runtime.info->path);
     }
   }
   if (auto* cacheManager = renderer.getFontCacheManager()) {
@@ -229,9 +320,33 @@ bool isTraditionalChineseFontInstalled(uint8_t fontSize) {
   return pack != nullptr && Storage.exists(pack->path);
 }
 
+bool isTraditionalChineseFontFaceInstalled(uint8_t fontSize, EpdFontFamily::Style style) {
+  const auto* face = getTraditionalChineseFontFace(fontSize, style);
+  return face != nullptr && Storage.exists(face->path);
+}
+
 bool isTraditionalChineseFontLoaded(uint8_t fontSize) {
   for (const auto& runtime : kPackRuntimes) {
-    if (runtime.info->size == fontSize) return runtime.pack->loaded();
+    if (runtime.info->size == fontSize) return runtime.family->loaded;
+  }
+  return false;
+}
+
+bool isTraditionalChineseFontFaceLoaded(uint8_t fontSize, EpdFontFamily::Style style) {
+  for (const auto& runtime : kPackRuntimes) {
+    if (runtime.info->size != fontSize) continue;
+    switch (style & 0x03) {
+      case EpdFontFamily::REGULAR:
+        return runtime.family->regular->loaded();
+      case EpdFontFamily::BOLD:
+        return runtime.family->bold->loaded();
+      case EpdFontFamily::ITALIC:
+        return runtime.family->italic->loaded();
+      case EpdFontFamily::BOLD_ITALIC:
+        return runtime.family->boldItalic->loaded();
+      default:
+        return false;
+    }
   }
   return false;
 }
@@ -239,7 +354,27 @@ bool isTraditionalChineseFontLoaded(uint8_t fontSize) {
 size_t countLoadedTraditionalChineseFonts() {
   size_t count = 0;
   for (const auto& runtime : kPackRuntimes) {
-    if (runtime.pack->loaded()) {
+    if (runtime.family->loaded) {
+      count++;
+    }
+  }
+  return count;
+}
+
+size_t countInstalledTraditionalChineseStyles(uint8_t fontSize) {
+  size_t count = 0;
+  for (const auto& face : kTraditionalChineseFontFaces) {
+    if (face.size == fontSize && Storage.exists(face.path)) {
+      count++;
+    }
+  }
+  return count;
+}
+
+size_t countLoadedTraditionalChineseStyles(uint8_t fontSize) {
+  size_t count = 0;
+  for (const auto& face : kTraditionalChineseFontFaces) {
+    if (face.size == fontSize && isTraditionalChineseFontFaceLoaded(fontSize, face.style)) {
       count++;
     }
   }

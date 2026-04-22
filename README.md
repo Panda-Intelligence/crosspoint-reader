@@ -176,12 +176,28 @@ Build packs from a Traditional Chinese font file such as `NotoSansTC-Regular.otf
 python3 scripts/build_tc_font_pack.py --font /path/to/NotoSansTC-Regular.otf
 ```
 
+Optional styled packs can be generated when matching source fonts are available:
+
+```sh
+python3 scripts/build_tc_font_pack.py \
+  --font /path/to/NotoSansTC-Regular.otf \
+  --font-bold /path/to/NotoSansTC-Bold.otf \
+  --font-italic /path/to/NotoSansTC-Italic.otf \
+  --font-bolditalic /path/to/NotoSansTC-BoldItalic.otf
+```
+
 This generates:
 
 - `notosans_tc_12.epf`
 - `notosans_tc_14.epf`
 - `notosans_tc_16.epf`
 - `notosans_tc_18.epf`
+
+If styled fonts are provided, it also generates optional files such as:
+
+- `notosans_tc_12_bold.epf`
+- `notosans_tc_12_italic.epf`
+- `notosans_tc_12_bolditalic.epf`
 
 Install them onto device storage under:
 
@@ -199,7 +215,8 @@ Expected filenames:
 ```
 
 Once installed, select `Noto Sans TC` in the reader font family setting. If the packs are missing, the firmware falls
-back to built-in `Noto Sans`.
+back to built-in `Noto Sans`. When optional styled packs are present, EPUB/TXT bold and italic spans use the matching
+Traditional Chinese font faces instead of falling back to the regular face.
 
 ## Internals
 

@@ -24,14 +24,13 @@ class StorageFontPack {
   std::vector<EpdLigaturePair> ligaturePairs_;
   EpdFontData data_ = {};
   std::unique_ptr<EpdFont> font_;
-  std::unique_ptr<EpdFontFamily> family_;
   bool loaded_ = false;
-  void reset();
 
  public:
+  void reset();
   bool load(const char* path);
   bool loaded() const { return loaded_; }
-  const EpdFontFamily& family() const { return *family_; }
+  const EpdFont& font() const { return *font_; }
 };
 
 struct TraditionalChineseFontPackInfo {
@@ -41,13 +40,26 @@ struct TraditionalChineseFontPackInfo {
   int fontId;
 };
 
+struct TraditionalChineseFontFaceInfo {
+  const char* name;
+  const char* path;
+  CrossPointSettings::FONT_SIZE size;
+  EpdFontFamily::Style style;
+};
+
 namespace StorageFontRegistry {
 
 const std::array<TraditionalChineseFontPackInfo, 4>& getTraditionalChineseFontPacks();
+const std::array<TraditionalChineseFontFaceInfo, 16>& getTraditionalChineseFontFaces();
 const TraditionalChineseFontPackInfo* getTraditionalChineseFontPack(uint8_t fontSize);
+const TraditionalChineseFontFaceInfo* getTraditionalChineseFontFace(uint8_t fontSize, EpdFontFamily::Style style);
 bool loadTraditionalChineseFonts(GfxRenderer& renderer);
 bool isTraditionalChineseFontInstalled(uint8_t fontSize);
+bool isTraditionalChineseFontFaceInstalled(uint8_t fontSize, EpdFontFamily::Style style);
 bool isTraditionalChineseFontLoaded(uint8_t fontSize);
+bool isTraditionalChineseFontFaceLoaded(uint8_t fontSize, EpdFontFamily::Style style);
 size_t countLoadedTraditionalChineseFonts();
+size_t countInstalledTraditionalChineseStyles(uint8_t fontSize);
+size_t countLoadedTraditionalChineseStyles(uint8_t fontSize);
 
 }  // namespace StorageFontRegistry

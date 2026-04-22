@@ -451,12 +451,12 @@ void CrossPointWebServer::handleGetFontPacks() const {
   JsonDocument doc;
   JsonArray packs = doc["packs"].to<JsonArray>();
 
-  for (const auto& pack : StorageFontRegistry::getTraditionalChineseFontPacks()) {
+  for (const auto& pack : StorageFontRegistry::getTraditionalChineseFontFaces()) {
     JsonObject obj = packs.add<JsonObject>();
     obj["name"] = pack.name;
     obj["path"] = pack.path;
-    obj["installed"] = Storage.exists(pack.path);
-    obj["active"] = StorageFontRegistry::isTraditionalChineseFontLoaded(pack.size);
+    obj["installed"] = StorageFontRegistry::isTraditionalChineseFontFaceInstalled(pack.size, pack.style);
+    obj["active"] = StorageFontRegistry::isTraditionalChineseFontFaceLoaded(pack.size, pack.style);
   }
 
   String json;
