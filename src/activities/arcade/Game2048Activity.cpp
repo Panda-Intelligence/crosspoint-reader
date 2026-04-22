@@ -198,33 +198,62 @@ void Game2048Activity::render(RenderLock&&) {
   const int startX = (pageWidth - boardSize) / 2;
   const int startY = gridTop;
 
-  renderer.drawRect(startX, startY, boardSize, boardSize, 2, true);
+  // Rounded outer board border
+  renderer.drawRoundedRect(startX - 2, startY - 2, boardSize + 4, boardSize + 4, 2, 6, true);
 
   for (int r = 0; r < kSize; r++) {
     for (int c = 0; c < kSize; c++) {
       const int x = startX + c * cell;
       const int y = startY + r * cell;
-      renderer.drawRect(x, y, cell, cell, true);
-
       const uint16_t value = grid[r][c];
-      if (value != 0) {
+      constexpr int kPad = 4;
+      constexpr int kRadius = 8;
+      const int tileX = x + kPad;
+      const int tileY = y + kPad;
+      const int tileW = cell - kPad * 2;
+      const int tileH = cell - kPad * 2;
+
+      if (value == 0) {
+        // Empty tile: faint outline only
+        renderer.drawRoundedRect(tileX, tileY, tileW, tileH, 1, kRadius, true);
+      } else {
+        // Gray hierarchy by value: low=LightGray, mid=DarkGray, high=Black+white text
+        Color fillColor;
+        bool whiteText;
+        if (value <= 4) {
+          fillColor = Color::LightGray;
+          whiteText = false;
+        } else if (value <= 32) {
+          fillColor = Color::DarkGray;
+          whiteText = false;
+        } else {
+          fillColor = Color::Black;
+          whiteText = true;
+        }
+        renderer.fillRoundedRect(tileX, tileY, tileW, tileH, kRadius, fillColor);
+        renderer.drawRoundedRect(tileX, tileY, tileW, tileH, 1, kRadius, true);
+
         char buffer[8];
         snprintf(buffer, sizeof(buffer), "%u", value);
-        renderer.drawCenteredText(UI_10_FONT_ID, y + (cell / 2) - 8, buffer, true, EpdFontFamily::BOLD);
+        const int textH = renderer.getTextHeight(UI_10_FONT_ID);
+        renderer.drawCenteredText(UI_10_FONT_ID, tileY + (tileH - textH) / 2, buffer, !whiteText,
+                                  EpdFontFamily::BOLD);
       }
     }
   }
 
-  char scoreBuffer[48];
-  snprintf(scoreBuffer, sizeof(scoreBuffer), "Score: %lu", static_cast<unsigned long>(score));
-  renderer.drawCenteredText(UI_10_FONT_ID, startY + boardSize + 8, scoreBuffer);
+  // Score below board
+  char scoreBuffer[32];
+  snprintf(scoreBuffer, sizeof(scoreBuffer), "Score  %lu", static_cast<unsigned long>(score));
+  renderer.drawCenteredText(UI_10_FONT_ID, startY + boardSize + 8, scoreBuffer, true, EpdFontFamily::BOLD);
 
+  const int statusY = startY + boardSize + 34;
   if (gameOver) {
-    renderer.drawCenteredText(UI_10_FONT_ID, startY + boardSize + 34, "Game over · Press Confirm to restart");
+    renderer.drawCenteredText(UI_10_FONT_ID, statusY, "Game over - Confirm to restart");
   } else if (reached2048) {
-    renderer.drawCenteredText(UI_10_FONT_ID, startY + boardSize + 34, "2048 reached! Keep going");
+    renderer.drawCenteredText(UI_10_FONT_ID, statusY, "2048 reached! Keep going");
   } else {
-    renderer.drawCenteredText(UI_10_FONT_ID, startY + boardSize + 34, "Use arrows to slide tiles");
+    renderer.drawCenteredText(SMALL_FONT_ID, statusY, "Arrows to slide - Confirm to restart");
   }
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Restart", "Left/Up", "Right/Down");

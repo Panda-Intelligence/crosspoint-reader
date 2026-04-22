@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>M4 Monochrome UI Design</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root, [data-theme="light"] {
+      --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+      --text-sm: clamp(0.875rem, 0.8rem + 0.35vw, 1rem);
+      --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+      --text-lg: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
+      --text-xl: clamp(1.5rem, 1.2rem + 1.25vw, 2.25rem);
+      --text-2xl: clamp(2rem, 1.2rem + 2.5vw, 3.5rem);
+      --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem; --space-5: 1.25rem; --space-6: 1.5rem; --space-8: 2rem; --space-10: 2.5rem; --space-12: 3rem;
+      --color-bg: #f2f1ed;
+      --color-surface: #faf9f5;
+      --color-surface-2: #f0eee8;
+      --color-surface-3: #e2dfd7;
+      --color-border: #cfc9bf;
+      --color-divider: #ddd8d0;
+      --color-text: #151515;
+      --color-text-muted: #54524d;
+      --color-text-faint: #8d887f;
+      --color-inverse: #f7f5ef;
+      --radius-sm: 0.375rem; --radius-md: 0.625rem; --radius-lg: 0.95rem; --radius-xl: 1.25rem; --radius-full: 9999px;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.06), 0 8px 20px rgba(0,0,0,.04);
+      --shadow-md: 0 2px 4px rgba(0,0,0,.08), 0 14px 36px rgba(0,0,0,.06);
+      --font-display: 'Instrument Serif', Georgia, serif;
+      --font-body: 'Inter', sans-serif;
+      --content: 1240px;
+    }
+    [data-theme="dark"] {
+      --color-bg: #111111;
+      --color-surface: #171717;
+      --color-surface-2: #1f1f1f;
+      --color-surface-3: #2a2a2a;
+      --color-border: #3a3a3a;
+      --color-divider: #262626;
+      --color-text: #f2efe9;
+      --color-text-muted: #b8b2a8;
+      --color-text-faint: #7f7a73;
+      --color-inverse: #101010;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.24), 0 8px 24px rgba(0,0,0,.26);
+      --shadow-md: 0 2px 4px rgba(0,0,0,.3), 0 18px 40px rgba(0,0,0,.34);
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-font-smoothing: antialiased; }
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      color: var(--color-text);
+      background: var(--color-bg);
+      line-height: 1.55;
+    }
+    img { max-width: 100%; display: block; }
+    .shell { max-width: var(--content); margin: 0 auto; padding: var(--space-6); }
+    .topbar, .section-head, .meta-row, .topline, .bottomline, .split { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); }
+    .topbar { padding-bottom: var(--space-8); }
+    .brand { display:flex; align-items:center; gap: var(--space-3); }
+    .brand-mark { width: 40px; height: 40px; border-radius: 12px; border:1px solid var(--color-border); display:grid; place-items:center; background: var(--color-surface); box-shadow: var(--shadow-sm); }
+    .brand-mark svg { width: 22px; height: 22px; }
+    .eyebrow { font-size: var(--text-xs); letter-spacing: .14em; text-transform: uppercase; color: var(--color-text-muted); }
+    h1,h2,h3,p { margin: 0; }
+    button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+    .toggle { min-width: 44px; min-height: 44px; border-radius: 999px; border:1px solid var(--color-border); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+    .hero { display:grid; grid-template-columns: 1.08fr .92fr; gap: var(--space-8); align-items: end; padding-bottom: var(--space-10); }
+    .hero h1 { font-family: var(--font-display); font-size: clamp(2.7rem, 2rem + 2vw, 4.4rem); line-height: .97; letter-spacing: -.03em; max-width: 10ch; }
+    .hero p { color: var(--color-text-muted); margin-top: var(--space-4); max-width: 58ch; }
+    .hero-card, .card { background: var(--color-surface); border:1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); }
+    .hero-card { padding: var(--space-5); }
+    .meta-row { flex-wrap: wrap; margin-top: var(--space-5); }
+    .meta { min-width: 132px; padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); border:1px solid var(--color-border); background: var(--color-surface-2); }
+    .meta strong { display:block; font-size: var(--text-lg); }
+    .section { padding: var(--space-8) 0; }
+    .section-head { align-items: end; margin-bottom: var(--space-6); }
+    .section-head h2 { font-family: var(--font-display); font-size: var(--text-xl); letter-spacing:-.02em; }
+    .section-head p { color: var(--color-text-muted); max-width: 56ch; }
+    .grid { display:grid; grid-template-columns: repeat(12, 1fr); gap: var(--space-5); }
+    .span-4 { grid-column: span 4; } .span-5 { grid-column: span 5; } .span-7 { grid-column: span 7; } .span-12 { grid-column: span 12; }
+    .card-body { padding: var(--space-5); }
+    .device-wrap { display:grid; gap: 18px; place-items:center; }
+    .device { width: min(100%, 270px); padding: 14px; border-radius: 26px; background: #111; color: #f7f5ef; border:1px solid rgba(255,255,255,.05); box-shadow: 0 24px 48px rgba(0,0,0,.22); }
+    .phone { width: min(100%, 300px); border-radius: 32px; }
+    .screen { min-height: 470px; border-radius: 18px; background: #ece8df; color: #121212; overflow: hidden; border:1px solid rgba(0,0,0,.08); }
+    .screen.phone-screen { min-height: 560px; border-radius: 24px; }
+    .topline, .bottomline { padding: 14px 16px; font-size: 12px; color: #57534d; }
+    .bottomline { border-top:1px solid rgba(0,0,0,.08); }
+    .app { padding: 0 16px 16px; display:grid; gap: 14px; }
+    .badge { display:inline-flex; align-items:center; gap:8px; border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 600; background: rgba(0,0,0,.08); color:#111; }
+    .time { font-size: 60px; font-weight: 700; letter-spacing: -.04em; line-height: .95; }
+    .three { display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .metric { background: rgba(255,255,255,.48); border:1px solid rgba(0,0,0,.08); border-radius: 14px; padding: 10px; }
+    .metric small { display:block; font-size: 11px; color:#5c5953; margin-bottom: 4px; }
+    .todo, .paper, .panel { border:1px solid rgba(0,0,0,.08); border-radius: 16px; background: rgba(255,255,255,.52); }
+    .todo { padding: 12px; display:grid; gap:10px; }
+    .todo-item { display:flex; align-items:center; gap:10px; }
+    .bullet { width: 8px; height: 8px; border-radius: 999px; background:#111; }
+    .calendar { display:grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+    .cal-h, .cal-c { text-align:center; font-size: 11px; padding: 8px 0; border-radius: 10px; }
+    .cal-h { color:#64605a; font-weight:600; }
+    .cal-c.active { background:#111; color:#f6f4ee; }
+    .paper { min-height: 208px; padding: 14px; display:grid; grid-template-rows:auto 1fr auto; gap:12px; }
+    .word { font-size: 34px; font-weight: 700; letter-spacing:-.03em; }
+    .actions { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn { padding: 12px 14px; border-radius: 14px; border:1px solid rgba(0,0,0,.1); text-align:center; font-weight: 600; background:#f7f4ed; }
+    .btn.primary { background:#111; color:#f7f5ef; }
+    .progress { height: 8px; border-radius: 999px; overflow:hidden; background:#d6d1c8; }
+    .progress span { display:block; height:100%; width:63%; background:#111; }
+    .phone-app { padding: 16px; display:grid; gap:14px; }
+    .phone-grid { display:grid; grid-template-columns: 1.1fr .9fr; gap: 12px; }
+    .box { border:1px solid rgba(0,0,0,.08); border-radius: 18px; background: rgba(255,255,255,.56); padding: 14px; }
+    .row { display:flex; justify-content:space-between; gap: 8px; padding: 10px 0; border-bottom:1px solid rgba(0,0,0,.06); font-size: 13px; }
+    .row:last-child { border-bottom:0; }
+    .bars { display:flex; align-items:flex-end; gap:8px; height:90px; margin-top: 14px; }
+    .bars span { flex:1; display:block; background:#111; border-radius: 8px 8px 2px 2px; }
+    .reader { min-height: 360px; padding: 14px; display:grid; gap:10px; }
+    .reader small { color:#67625c; text-transform: uppercase; letter-spacing: .12em; }
+    .lines { display:grid; gap:8px; }
+    .lines span { display:block; height:8px; border-radius:999px; background:#212121; opacity:.86; }
+    .lines span:nth-child(4n) { width:76%; }
+    .lines span:nth-child(3n) { width:92%; }
+    .chips { display:flex; gap:8px; flex-wrap:wrap; }
+    .chips .badge { background:#111; color:#f7f5ef; }
+    .arcade { min-height: 360px; padding: 14px; display:grid; gap:12px; }
+    .tiles { display:grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .tile { aspect-ratio: 1; border-radius: 14px; border:1px solid rgba(0,0,0,.08); display:grid; place-items:center; font-weight:700; background:#f7f4ec; }
+    .sudoku { display:grid; grid-template-columns: repeat(4, 1fr); gap:4px; }
+    .sudoku div { aspect-ratio:1; border:1px solid rgba(0,0,0,.12); border-radius:10px; display:grid; place-items:center; font-size:12px; }
+    .board { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: var(--space-5); }
+    .board .card { padding: var(--space-5); }
+    .swatches { display:flex; gap:10px; flex-wrap:wrap; margin-top: 14px; }
+    .swatch { flex:1; min-width:120px; padding:14px; border-radius:16px; border:1px solid var(--color-border); }
+    .footer { padding: var(--space-10) 0 var(--space-4); color: var(--color-text-muted); font-size: var(--text-sm); }
+    @media (max-width: 1080px) {
+      .hero, .board, .phone-grid, .split { grid-template-columns: 1fr; display:grid; }
+      .span-4, .span-5, .span-7 { grid-column: span 12; }
+    }
+    @media (max-width: 720px) {
+      .shell { padding: var(--space-4); }
+      .section-head { flex-direction: column; align-items:flex-start; }
+      .three { grid-template-columns: 1fr; }
+      .time { font-size: 48px; }
+      .device, .phone { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4.5" y="4.5" width="15" height="15" rx="4"></rect>
+            <path d="M8 15V9l4 4 4-4v6"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="eyebrow">Murphy M4 ecosystem</div>
+          <strong>Monochrome UI Design</strong>
+        </div>
+      </div>
+      <button class="toggle" data-theme-toggle aria-label="Switch theme">◐</button>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <div class="eyebrow">Black and white only</div>
+          <h1>Monochrome interface system for M4 apps.</h1>
+          <p>This version removes the color-accent approach and relies entirely on grayscale hierarchy, stroke weight, spacing, paper-like surfaces, and inversion states. It is meant for current black-and-white E Ink hardware and grayscale product reviews.</p>
+          <div class="meta-row">
+            <div class="meta"><span class="eyebrow">Display logic</span><strong>Monochrome</strong></div>
+            <div class="meta"><span class="eyebrow">Interaction</span><strong>One-thumb</strong></div>
+            <div class="meta"><span class="eyebrow">Contrast</span><strong>High</strong></div>
+          </div>
+        </div>
+        <div class="hero-card">
+          <div class="eyebrow">What changed</div>
+          <p style="margin-top:12px; color:var(--color-text); max-width:44ch;">Primary actions now use black fill, secondary actions use outline, information tiers use three gray levels, and all status cues rely on shape, label, and position instead of color.</p>
+          <div class="swatches">
+            <div class="swatch" style="background:var(--color-bg)"><strong>Paper</strong><div>#F2F1ED</div></div>
+            <div class="swatch" style="background:var(--color-surface-3)"><strong>Gray step</strong><div>Selection layer</div></div>
+            <div class="swatch" style="background:#111; color:#f7f5ef;"><strong>Inversion</strong><div>Primary action</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">System rules</div>
+            <h2>Monochrome design language</h2>
+          </div>
+          <p>The design uses contrast steps, generous spacing, and typography rather than hue to signal focus, action, or completion.</p>
+        </div>
+        <div class="board">
+          <article class="card">
+            <h3>States</h3>
+            <div class="swatches">
+              <div class="swatch" style="background:#111; color:#f7f5ef;"><strong>Primary</strong><div>Filled black</div></div>
+              <div class="swatch" style="background:var(--color-surface-2)"><strong>Secondary</strong><div>Raised gray</div></div>
+              <div class="swatch" style="background:transparent"><strong>Tertiary</strong><div>Outline only</div></div>
+            </div>
+          </article>
+          <article class="card">
+            <h3>Typography</h3>
+            <p style="font-family:var(--font-display); font-size:var(--text-xl); margin-top:12px;">Display serif for calm headers.</p>
+            <p style="color:var(--color-text-muted); margin-top:8px;">Inter handles all reading controls, metrics, menus, and dense companion screens.</p>
+          </article>
+          <article class="card">
+            <h3>Components</h3>
+            <div class="swatches">
+              <div class="btn primary">Primary</div>
+              <div class="btn">Secondary</div>
+              <div class="badge">Tag</div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">App mockups</div>
+            <h2>Core screens in grayscale</h2>
+          </div>
+          <p>All screens below remove teal and use only black, off-white, and layered gray.</p>
+        </div>
+        <div class="grid">
+          <article class="card span-4">
+            <div class="card-body device-wrap">
+              <div>
+                <div class="eyebrow">1. Weather clock</div>
+                <p style="color:var(--color-text-muted); margin-top:8px;">Large time, weather, and commute hints for always-on desk use.</p>
+              </div>
+              <div class="device">
+                <div class="screen">
+                  <div class="topline"><span>Desk mode</span><span>11:24</span></div>
+                  <div class="app">
+                    <span class="badge">Chengdu · Light rain</span>
+                    <div class="time">11:24</div>
+                    <div class="meta-row" style="align-items:end; margin-top:0;">
+                      <div>
+                        <div style="font-size:40px; font-weight:700;">19°</div>
+                        <div style="font-size:12px; color:#5c5953;">Feels like 17°</div>
+                      </div>
+                      <div style="text-align:right; font-size:12px; color:#5c5953;">
+                        <div>AQI 42</div>
+                        <div>H 24° / L 15°</div>
+                      </div>
+                    </div>
+                    <div class="three">
+                      <div class="metric"><small>Rain</small><strong>70%</strong></div>
+                      <div class="metric"><small>Wind</small><strong>8 km/h</strong></div>
+                      <div class="metric"><small>Sunset</small><strong>19:11</strong></div>
+                    </div>
+                    <div class="todo">
+                      <div class="todo-item"><span class="bullet"></span><span>Umbrella recommended</span></div>
+                      <div class="todo-item"><span class="bullet"></span><span>Light traffic to school</span></div>
+                    </div>
+                  </div>
+                  <div class="bottomline"><span>Always-on</span><span>Battery 78%</span></div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card span-4">
+            <div class="card-body device-wrap">
+              <div>
+                <div class="eyebrow">2. Calendar desk</div>
+                <p style="color:var(--color-text-muted); margin-top:8px;">Month grid and today card using inversion and border hierarchy.</p>
+              </div>
+              <div class="device">
+                <div class="screen">
+                  <div class="topline"><span>April 2026</span><span>Thu</span></div>
+                  <div class="app">
+                    <div class="topline" style="padding:0;"><strong>Month</strong><span class="badge">Today 22</span></div>
+                    <div class="calendar">
+                      <div class="cal-h">M</div><div class="cal-h">T</div><div class="cal-h">W</div><div class="cal-h">T</div><div class="cal-h">F</div><div class="cal-h">S</div><div class="cal-h">S</div>
+                      <div class="cal-c">20</div><div class="cal-c">21</div><div class="cal-c active">22</div><div class="cal-c">23</div><div class="cal-c">24</div><div class="cal-c">25</div><div class="cal-c">26</div>
+                      <div class="cal-c">27</div><div class="cal-c">28</div><div class="cal-c">29</div><div class="cal-c">30</div><div class="cal-c">1</div><div class="cal-c">2</div><div class="cal-c">3</div>
+                    </div>
+                    <div class="todo">
+                      <strong>Top 3 today</strong>
+                      <div class="todo-item"><span class="bullet"></span><span>English review · 18:00</span></div>
+                      <div class="todo-item"><span class="bullet"></span><span>Physics worksheet</span></div>
+                      <div class="todo-item"><span class="bullet"></span><span>Mock test countdown · 17 days</span></div>
+                    </div>
+                  </div>
+                  <div class="bottomline"><span>Week 17</span><span>3 events</span></div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card span-4">
+            <div class="card-body device-wrap">
+              <div>
+                <div class="eyebrow">3. Study Cards</div>
+                <p style="color:var(--color-text-muted); margin-top:8px;">Big decision buttons, progress bar, and paper-card metaphor.</p>
+              </div>
+              <div class="device">
+                <div class="screen">
+                  <div class="topline"><span>Deck · CET-6</span><span>46 / 72</span></div>
+                  <div class="app">
+                    <div class="topline" style="padding:0;"><span class="badge">Review</span><span style="font-size:12px; color:#5f5b55;">12 min left</span></div>
+                    <div class="paper">
+                      <div style="font-size:12px; color:#605c56;">Word card</div>
+                      <div>
+                        <div class="word">meticulous</div>
+                        <p style="margin-top:10px; color:#57534d;">adj. showing great attention to detail.</p>
+                      </div>
+                      <div class="progress"><span></span></div>
+                    </div>
+                    <div class="actions">
+                      <div class="btn">Again</div>
+                      <div class="btn primary">Know it</div>
+                    </div>
+                  </div>
+                  <div class="bottomline"><span>Streak 9 days</span><span>Accuracy 81%</span></div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card span-7">
+            <div class="card-body device-wrap">
+              <div style="width:100%;">
+                <div class="eyebrow">4. Companion app</div>
+                <p style="color:var(--color-text-muted); margin-top:8px; max-width:56ch;">Mobile handles OCR, deck creation, sync, and learning reports, but still follows the same monochrome structure.</p>
+              </div>
+              <div class="device phone">
+                <div class="screen phone-screen">
+                  <div class="phone-app">
+                    <div class="topline" style="padding:0;">
+                      <div>
+                        <div class="eyebrow" style="letter-spacing:.08em;">Companion</div>
+                        <strong style="font-size:20px;">Study library</strong>
+                      </div>
+                      <span class="badge">Sync ready</span>
+                    </div>
+                    <div class="phone-grid">
+                      <div style="display:grid; gap:12px;">
+                        <div class="box">
+                          <strong>Card editor</strong>
+                          <p style="font-size:13px; color:#5d5953; margin-top:6px;">OCR import, photo capture, and manual editing.</p>
+                          <div class="swatches" style="margin-top:12px;">
+                            <span class="badge">OCR import</span>
+                            <span class="badge">Photo to card</span>
+                          </div>
+                        </div>
+                        <div class="box">
+                          <strong>Decks</strong>
+                          <div class="row"><span>CET-6 Words</span><span>420 cards</span></div>
+                          <div class="row"><span>Ancient Poems</span><span>96 cards</span></div>
+                          <div class="row"><span>Biology Mistakes</span><span>58 cards</span></div>
+                        </div>
+                      </div>
+                      <div style="display:grid; gap:12px;">
+                        <div class="box">
+                          <strong>Weekly accuracy</strong>
+                          <div class="bars">
+                            <span style="height:44%"></span><span style="height:56%"></span><span style="height:72%"></span><span style="height:68%"></span><span style="height:82%"></span><span style="height:78%"></span><span style="height:88%"></span>
+                          </div>
+                        </div>
+                        <div class="box">
+                          <strong>Quick actions</strong>
+                          <div class="row"><span>Push to M4</span><span>2 devices</span></div>
+                          <div class="row"><span>Homework mode</span><span>On</span></div>
+                          <div class="row"><span>Parent report</span><span>Ready</span></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card span-5">
+            <div class="card-body device-wrap">
+              <div style="width:100%;">
+                <div class="eyebrow">5. Reader Pro</div>
+                <p style="color:var(--color-text-muted); margin-top:8px;">Reading view with unobtrusive controls and soft paper layering.</p>
+              </div>
+              <div class="device">
+                <div class="screen">
+                  <div class="topline"><span>Chapter 4</span><span>Page 118</span></div>
+                  <div class="app">
+                    <div class="panel reader">
+                      <small>The city in quiet rain</small>
+                      <div class="lines">
+                        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                      </div>
+                      <div class="chips"><span class="badge">Font</span><span class="badge">Spacing</span><span class="badge">Night</span></div>
+                    </div>
+                  </div>
+                  <div class="bottomline"><span>68% read</span><span>Serif M</span></div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card span-12">
+            <div class="card-body">
+              <div class="section-head" style="margin-bottom:18px;">
+                <div>
+                  <div class="eyebrow">6. E Ink Arcade</div>
+                  <h2 style="font-size:28px;">Puzzle-first, grayscale-only</h2>
+                </div>
+                <p>The game package uses tile contrast, borders, and negative space instead of color to separate modes and difficulty.</p>
+              </div>
+              <div class="split" style="align-items:center;">
+                <div class="device">
+                  <div class="screen">
+                    <div class="topline"><span>Arcade</span><span>Daily</span></div>
+                    <div class="app">
+                      <div class="panel arcade">
+                        <div class="topline" style="padding:0;"><strong>2048</strong><span class="badge">Best 4096</span></div>
+                        <div class="tiles">
+                          <div class="tile">2</div><div class="tile">4</div><div class="tile"></div><div class="tile">16</div>
+                          <div class="tile"></div><div class="tile">8</div><div class="tile">32</div><div class="tile"></div>
+                          <div class="tile">2</div><div class="tile"></div><div class="tile">64</div><div class="tile">8</div>
+                          <div class="tile"></div><div class="tile"></div><div class="tile">4</div><div class="tile">2</div>
+                        </div>
+                        <div class="sudoku">
+                          <div>1</div><div></div><div>3</div><div>4</div>
+                          <div></div><div>4</div><div></div><div>2</div>
+                          <div>2</div><div></div><div>4</div><div></div>
+                          <div>4</div><div>3</div><div></div><div>1</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="bottomline"><span>6 games</span><span>Offline</span></div>
+                  </div>
+                </div>
+                <div style="flex:1; min-width: 280px;">
+                  <div class="swatches" style="margin-top:0;">
+                    <span class="badge">2048</span>
+                    <span class="badge">Sudoku</span>
+                    <span class="badge">Sokoban</span>
+                    <span class="badge">Word puzzle</span>
+                  </div>
+                  <p style="margin-top:16px; color:var(--color-text-muted); max-width:56ch;">The same monochrome system can scale across study, tools, and play. Filled black marks the current move or primary action, mid-gray indicates selectable surfaces, and outlines preserve structure without introducing visual noise.</p>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">Monochrome-only UI direction for weather, calendar, study cards, reader, companion app, and arcade on the Murphy M4 ecosystem.</footer>
+  </div>
+  <script>
+    (function(){
+      const toggle = document.querySelector('[data-theme-toggle]');
+      const root = document.documentElement;
+      let theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      root.setAttribute('data-theme', theme);
+      toggle.addEventListener('click', function(){
+        theme = theme === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', theme);
+      });
+    })();
+  </script>
+</body>
+</html>
