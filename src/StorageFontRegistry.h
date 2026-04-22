@@ -44,7 +44,9 @@ struct TraditionalChineseFontPackInfo {
 namespace StorageFontRegistry {
 
 const std::array<TraditionalChineseFontPackInfo, 4>& getTraditionalChineseFontPacks();
+const TraditionalChineseFontPackInfo* getTraditionalChineseFontPack(uint8_t fontSize);
 bool loadTraditionalChineseFonts(GfxRenderer& renderer);
+bool isTraditionalChineseFontInstalled(uint8_t fontSize);
 bool isTraditionalChineseFontLoaded(uint8_t fontSize);
 size_t countLoadedTraditionalChineseFonts();
 

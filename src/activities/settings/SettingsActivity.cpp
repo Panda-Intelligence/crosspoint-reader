@@ -12,6 +12,7 @@
 #include "OpdsServerListActivity.h"
 #include "OtaUpdateActivity.h"
 #include "SettingsList.h"
+#include "StorageFontRegistry.h"
 #include "StatusBarSettingsActivity.h"
 #include "TraditionalChineseFontsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
@@ -20,6 +21,35 @@
 
 const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_DISPLAY, StrId::STR_CAT_READER,
                                                               StrId::STR_CAT_CONTROLS, StrId::STR_CAT_SYSTEM};
+
+namespace {
+std::string traditionalChineseFontStatus() {
+  if (StorageFontRegistry::isTraditionalChineseFontLoaded(SETTINGS.fontSize)) {
+    return tr(STR_LOADED);
+  }
+  if (StorageFontRegistry::isTraditionalChineseFontInstalled(SETTINGS.fontSize)) {
+    return tr(STR_INSTALLED);
+  }
+  return tr(STR_MISSING);
+}
+
+std::string readerFontValueText(const SettingInfo& setting) {
+  const uint8_t value = SETTINGS.*(setting.valuePtr);
+  std::string valueText = I18N.get(setting.enumValues[value]);
+  if (setting.valuePtr == &CrossPointSettings::fontFamily &&
+      value == CrossPointSettings::FONT_FAMILY::NOTOSANS_TC) {
+    valueText += " [";
+    valueText += traditionalChineseFontStatus();
+    valueText += "]";
+  }
+  return valueText;
+}
+
+std::string tcFontPackSummary() {
+  return std::to_string(StorageFontRegistry::countLoadedTraditionalChineseFonts()) + "/" +
+         std::to_string(StorageFontRegistry::getTraditionalChineseFontPacks().size());
+}
+}  // namespace
 
 void SettingsActivity::onEnter() {
   Activity::onEnter();
@@ -251,19 +281,27 @@ void SettingsActivity::render(RenderLock&&) {
           const bool value = SETTINGS.*(setting.valuePtr);
           valueText = value ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
         } else if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
-          const uint8_t value = SETTINGS.*(setting.valuePtr);
-          valueText = I18N.get(setting.enumValues[value]);
+          valueText = readerFontValueText(setting);
         } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
           valueText = std::to_string(SETTINGS.*(setting.valuePtr));
+        } else if (setting.type == SettingType::ACTION &&
+                   setting.action == SettingAction::TraditionalChineseFonts) {
+          valueText = tcFontPackSummary();
         }
         return valueText;
       },
       true);
 
   // Draw help text
-  const auto confirmLabel = (selectedSettingIndex == 0)
-                                ? I18N.get(categoryNames[(selectedCategoryIndex + 1) % categoryCount])
-                                : tr(STR_TOGGLE);
+  const char* confirmLabel = tr(STR_TOGGLE);
+  if (selectedSettingIndex == 0) {
+    confirmLabel = I18N.get(categoryNames[(selectedCategoryIndex + 1) % categoryCount]);
+  } else if (selectedSettingIndex > 0) {
+    const auto& selectedSetting = settings[selectedSettingIndex - 1];
+    if (selectedSetting.type == SettingType::ACTION) {
+      confirmLabel = tr(STR_SELECT);
+    }
+  }
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), confirmLabel, tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 

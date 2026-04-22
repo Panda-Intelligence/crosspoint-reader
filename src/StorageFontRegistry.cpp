@@ -194,6 +194,15 @@ const std::array<TraditionalChineseFontPackInfo, 4>& getTraditionalChineseFontPa
   return kTraditionalChineseFontPacks;
 }
 
+const TraditionalChineseFontPackInfo* getTraditionalChineseFontPack(uint8_t fontSize) {
+  for (const auto& pack : kTraditionalChineseFontPacks) {
+    if (pack.size == fontSize) {
+      return &pack;
+    }
+  }
+  return nullptr;
+}
+
 bool loadTraditionalChineseFonts(GfxRenderer& renderer) {
   Storage.mkdir("/.mofei");
   Storage.mkdir("/.mofei/fonts");
@@ -213,6 +222,11 @@ bool loadTraditionalChineseFonts(GfxRenderer& renderer) {
     cacheManager->clearCache();
   }
   return anyLoaded;
+}
+
+bool isTraditionalChineseFontInstalled(uint8_t fontSize) {
+  const auto* pack = getTraditionalChineseFontPack(fontSize);
+  return pack != nullptr && Storage.exists(pack->path);
 }
 
 bool isTraditionalChineseFontLoaded(uint8_t fontSize) {
