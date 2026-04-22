@@ -146,29 +146,33 @@ void SokobanActivity::render(RenderLock&&) {
 
       switch (board[r][c]) {
         case Tile::Wall:
-          renderer.fillRect(x, y, cell, cell, true);
+          renderer.fillRoundedRect(x + 1, y + 1, cell - 2, cell - 2, 4, Color::Black);
           break;
         case Tile::Target:
-          renderer.drawRect(x, y, cell, cell, true);
-          renderer.fillRect(x + cell / 3, y + cell / 3, cell / 3, cell / 3, true);
+          renderer.drawRoundedRect(x + 2, y + 2, cell - 4, cell - 4, 1, 4, true);
+          renderer.fillRoundedRect(x + cell / 2 - 4, y + cell / 2 - 4, 8, 8, 4, Color::DarkGray);
           break;
-        case Tile::Box:
-          renderer.drawRect(x + 2, y + 2, cell - 4, cell - 4, 2, true);
-          renderer.drawLine(x + 2, y + 2, x + cell - 2, y + cell - 2, 1, true);
-          renderer.drawLine(x + cell - 2, y + 2, x + 2, y + cell - 2, 1, true);
+        case Tile::Box: {
+          renderer.fillRoundedRect(x + 3, y + 3, cell - 6, cell - 6, 5, Color::LightGray);
+          renderer.drawRoundedRect(x + 3, y + 3, cell - 6, cell - 6, 1, 5, true);
+          const int bm = 6;
+          renderer.drawLine(x + bm, y + bm, x + cell - bm, y + cell - bm, 1, true);
+          renderer.drawLine(x + cell - bm, y + bm, x + bm, y + cell - bm, 1, true);
           break;
+        }
         case Tile::BoxOnTarget:
-          renderer.fillRect(x + 2, y + 2, cell - 4, cell - 4, true);
-          renderer.drawRect(x + 4, y + 4, cell - 8, cell - 8, false);
+          renderer.fillRoundedRect(x + 3, y + 3, cell - 6, cell - 6, 5, Color::Black);
+          renderer.drawRoundedRect(x + 5, y + 5, cell - 10, cell - 10, 1, 4, false);
           break;
         case Tile::Player:
-        case Tile::PlayerOnTarget:
-          renderer.drawRect(x, y, cell, cell, true);
-          renderer.fillRect(x + 4, y + 4, cell - 8, cell - 8, true);
+        case Tile::PlayerOnTarget: {
+          const int pr = (cell - 8) / 2;
+          renderer.fillRoundedRect(x + cell / 2 - pr, y + cell / 2 - pr, pr * 2, pr * 2, pr, Color::Black);
           if (board[r][c] == Tile::PlayerOnTarget) {
-            renderer.drawRect(x + 6, y + 6, cell - 12, cell - 12, false);
+            renderer.fillRoundedRect(x + cell / 2 - pr / 2, y + cell / 2 - pr / 2, pr, pr, pr / 2, Color::White);
           }
           break;
+        }
         case Tile::Floor:
         default:
           // Just empty space
@@ -177,14 +181,14 @@ void SokobanActivity::render(RenderLock&&) {
     }
   }
 
-  char status[48];
+  char status[32];
   snprintf(status, sizeof(status), "Moves: %d", moveCount);
-  renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 4, status);
+  renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 4, status, true, EpdFontFamily::BOLD);
 
   if (completed) {
-    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 32, "All boxes placed! Press Confirm to restart");
+    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 30, "All placed! Confirm to restart");
   } else {
-    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 32, "Push all $ to . positions");
+    renderer.drawCenteredText(SMALL_FONT_ID, gridBottom + 30, "Push boxes onto target dots");
   }
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Restart", "Left/Up", "Right/Down");
