@@ -888,7 +888,7 @@ if args.pack_output:
 
     with open(args.pack_output, "wb") as f:
         header = struct.pack(
-            "<4sHHIIIIIIIhhhBBB5x",
+            "<4sHHIIIIIIIIhhhBBB5x",
             b"EPF2",
             2,
             flags,
