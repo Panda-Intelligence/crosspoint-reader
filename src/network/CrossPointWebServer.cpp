@@ -88,8 +88,12 @@ bool isProtectedItemName(const String& name) {
 }
 
 bool isFontPackPath(const String& path) { return path == "/.mofei/fonts"; }
+bool isReadLaterPath(const String& path) { return path == "/.mofei/reading/read_later"; }
+bool isStudyStatePath(const String& path) { return path == "/.mofei/study"; }
 
 bool hasFontPackExtension(const String& fileName) { return fileName.endsWith(".epf"); }
+bool hasReadLaterExtension(const String& fileName) { return fileName.endsWith(".txt") || fileName.endsWith(".md"); }
+bool hasStudyStateExtension(const String& fileName) { return fileName.endsWith(".json"); }
 
 bool validateFontPackFile(const String& filePath) {
   FsFile file;
@@ -101,6 +105,26 @@ bool validateFontPackFile(const String& filePath) {
                   memcmp(magic, "EPF2", sizeof(magic)) == 0;
   file.close();
   return ok;
+}
+
+bool validateStudyStateFile(const String& filePath) {
+  if (!Storage.exists(filePath.c_str())) {
+    return false;
+  }
+
+  const String json = Storage.readFile(filePath.c_str());
+  if (json.isEmpty()) {
+    return false;
+  }
+
+  JsonDocument doc;
+  if (deserializeJson(doc, json)) {
+    return false;
+  }
+
+  return doc["dueToday"].is<JsonVariantConst>() || doc["completedToday"].is<JsonVariantConst>() ||
+         doc["correctToday"].is<JsonVariantConst>() || doc["wrongToday"].is<JsonVariantConst>() ||
+         doc["streakDays"].is<JsonVariantConst>();
 }
 }  // namespace
 
@@ -685,6 +709,7 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     esp_task_wdt_reset();
 
     state.fileName = upload.filename;
+    state.finalFileName = state.fileName;
     state.size = 0;
     state.success = false;
     state.error = "";
@@ -720,10 +745,25 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
       return;
     }
 
+    if (isReadLaterPath(state.path) && !hasReadLaterExtension(state.fileName)) {
+      state.error = "Read Later imports must be .txt or .md files";
+      LOG_DBG("WEB", "[UPLOAD] Rejected non-text Read Later upload: %s", state.fileName.c_str());
+      return;
+    }
+
+    if (isStudyStatePath(state.path)) {
+      if (!hasStudyStateExtension(state.fileName)) {
+        state.error = "Study state import must be a .json file";
+        LOG_DBG("WEB", "[UPLOAD] Rejected non-JSON study state upload: %s", state.fileName.c_str());
+        return;
+      }
+      state.finalFileName = "state.json";
+    }
+
     // Create file path
     String filePath = state.path;
     if (!filePath.endsWith("/")) filePath += "/";
-    filePath += state.fileName;
+    filePath += state.finalFileName;
 
     // Check if file already exists - SD operations can be slow
     esp_task_wdt_reset();
@@ -801,7 +841,7 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
         // Clear epub cache to prevent stale metadata issues when overwriting files
         String filePath = state.path;
         if (!filePath.endsWith("/")) filePath += "/";
-        filePath += state.fileName;
+        filePath += state.finalFileName;
         clearEpubCacheIfNeeded(filePath);
 
         if (isFontPackPath(state.path) && !validateFontPackFile(filePath)) {
@@ -809,6 +849,11 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
           state.success = false;
           state.error = "Uploaded file is not a valid EPF2 font pack";
           LOG_DBG("WEB", "[UPLOAD] Deleted invalid font pack: %s", filePath.c_str());
+        } else if (isStudyStatePath(state.path) && !validateStudyStateFile(filePath)) {
+          Storage.remove(filePath.c_str());
+          state.success = false;
+          state.error = "Uploaded file is not a valid study state JSON";
+          LOG_DBG("WEB", "[UPLOAD] Deleted invalid study state import: %s", filePath.c_str());
         }
       }
     }
@@ -829,7 +874,7 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
 
 void CrossPointWebServer::handleUploadPost(UploadState& state) const {
   if (state.success) {
-    server->send(200, "text/plain", "File uploaded successfully: " + state.fileName);
+    server->send(200, "text/plain", "File uploaded successfully: " + state.finalFileName);
   } else {
     const String error = state.error.isEmpty() ? "Unknown error during upload" : state.error;
     server->send(400, "text/plain", error);

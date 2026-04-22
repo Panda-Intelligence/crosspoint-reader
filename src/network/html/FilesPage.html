@@ -279,6 +279,29 @@
       margin: 10px 0;
       width: 100%;
     }
+    .upload-destination {
+      margin-bottom: 12px;
+    }
+    .upload-destination label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--title-color);
+      font-weight: 600;
+    }
+    .upload-destination select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: var(--card-bg);
+      color: var(--font-color);
+    }
+    .import-hint {
+      margin: 0 0 12px 0;
+      color: var(--label-color);
+      font-size: 0.9em;
+      line-height: 1.5;
+    }
     .upload-form input[type="file"]::file-selector-button {
       background-color: #27ae60;
       color: white;
@@ -1520,6 +1543,15 @@
     <h3>📤 Upload file</h3>
     <div class="upload-form">
       <p class="file-info">Select a file to upload to <strong id="uploadPathDisplay"></strong></p>
+      <div class="upload-destination">
+        <label for="uploadDestination">Destination</label>
+        <select id="uploadDestination" onchange="updateUploadDestinationUI(); validateFile();">
+          <option value="current">Current folder</option>
+          <option value="readLater">Read Later</option>
+          <option value="studyState">Study State</option>
+        </select>
+      </div>
+      <p class="import-hint" id="uploadDestinationHint"></p>
       <input type="file" id="fileInput" onchange="validateFile()" multiple>
       <div class="picker-columns" id="pickerColumns">
         <div class="convert-options" id="convertOptions" style="display:none;">
@@ -1736,6 +1768,8 @@
 <script>
   // get current path from query parameter
   const currentPath = decodeURIComponent(new URLSearchParams(window.location.search).get('path') || '/');
+  const READ_LATER_IMPORT_PATH = '/.mofei/reading/read_later';
+  const STUDY_STATE_IMPORT_PATH = '/.mofei/study';
 
   if (currentPath !== '/') {
     const leaf = currentPath.split('/').filter(Boolean).pop();
@@ -1972,7 +2006,8 @@
     const logContainer = document.getElementById('log-container');
     if (logContainer) logContainer.innerHTML = '';
 
-    document.getElementById('uploadPathDisplay').textContent = currentPath === '/' ? '/ 🏠' : currentPath;
+    document.getElementById('uploadDestination').value = 'current';
+    updateUploadDestinationUI();
     document.getElementById('uploadModal').classList.add('open');
   }
 
@@ -2013,6 +2048,8 @@
     const fileInput = document.getElementById('fileInput');
     fileInput.value = '';
     fileInput.classList.remove('has-files');
+    document.getElementById('uploadDestination').value = 'current';
+    updateUploadDestinationUI();
     const uploadBtn = document.getElementById('uploadBtn');
     uploadBtn.disabled = true;
     uploadBtn.style.display = 'block';
@@ -2933,36 +2970,104 @@
     const uploadBtn = document.getElementById('uploadBtn');
     const files = fileInput.files;
     const convertOptions = document.getElementById('convertOptions');
+    const destination = document.getElementById('uploadDestination').value;
     fileInput.classList.toggle('has-files', files.length > 0);
 
     // Show/hide convert options based on file selection
     if (files.length > 0) {
-      convertOptions.style.display = 'block';
+      convertOptions.style.display = destination === 'current' ? 'block' : 'none';
     } else {
       clearImagePicker();
     }
 
     if (files.length > 0) {
+      if (destination === 'readLater') {
+        const invalid = Array.from(files).find(file => {
+          const lower = file.name.toLowerCase();
+          return !(lower.endsWith('.txt') || lower.endsWith('.md'));
+        });
+        if (invalid) {
+          uploadBtn.disabled = true;
+          alert(`Read Later import only accepts .txt or .md files: ${invalid.name}`);
+          return;
+        }
+      }
+
+      if (destination === 'studyState') {
+        if (files.length !== 1) {
+          uploadBtn.disabled = true;
+          alert('Study State import accepts exactly one .json file.');
+          return;
+        }
+        if (!files[0].name.toLowerCase().endsWith('.json')) {
+          uploadBtn.disabled = true;
+          alert('Study State import only accepts a .json file.');
+          return;
+        }
+      }
+
       // If advanced settings is expanded and single EPUB, show image picker
       const advancedContent = document.getElementById('advancedSettingsContent');
       const convertEnabled = document.getElementById('convertBeforeUpload').checked;
-      if (advancedContent.classList.contains('visible') && files.length === 1 && convertEnabled && files[0].name.toLowerCase().endsWith('.epub')) {
+      if (destination === 'current' && advancedContent.classList.contains('visible') && files.length === 1 &&
+          convertEnabled && files[0].name.toLowerCase().endsWith('.epub')) {
         showImagePicker(files[0]).catch(err => console.error('Image picker error:', err));
       }
 
       // If multiple files with conversion, inform user about batch mode
-      if (files.length > 1 && convertEnabled) {
+      if (destination === 'current' && files.length > 1 && convertEnabled) {
         const epubCount = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.epub')).length;
         if (epubCount > 0) {
           console.log(`Batch mode: ${epubCount} EPUB(s) will use auto settings`);
         }
       }
 
-      updateBatchModeUI(files.length > 1);
+      updateBatchModeUI(destination === 'current' && files.length > 1);
       uploadBtn.disabled = false;
     } else {
       updateBatchModeUI(false);
       uploadBtn.disabled = true;
+    }
+  }
+
+  function getUploadTargetPath() {
+    const destination = document.getElementById('uploadDestination').value;
+    if (destination === 'readLater') return READ_LATER_IMPORT_PATH;
+    if (destination === 'studyState') return STUDY_STATE_IMPORT_PATH;
+    return currentPath;
+  }
+
+  function updateUploadDestinationUI() {
+    const destination = document.getElementById('uploadDestination').value;
+    const pathDisplay = document.getElementById('uploadPathDisplay');
+    const hint = document.getElementById('uploadDestinationHint');
+    const convertOptions = document.getElementById('convertOptions');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const convertCheckbox = document.getElementById('convertBeforeUpload');
+
+    if (destination === 'readLater') {
+      pathDisplay.textContent = READ_LATER_IMPORT_PATH;
+      hint.textContent = 'Imports local articles for the Read Later app. Accepted file types: .txt, .md.';
+      convertCheckbox.checked = false;
+      convertOptions.style.display = 'none';
+      clearImagePicker();
+      uploadBtn.textContent = 'Import';
+      uploadBtn.classList.remove('optimize');
+    } else if (destination === 'studyState') {
+      pathDisplay.textContent = STUDY_STATE_IMPORT_PATH + '/state.json';
+      hint.textContent = 'Imports one study progress snapshot. Accepted file type: .json.';
+      convertCheckbox.checked = false;
+      convertOptions.style.display = 'none';
+      clearImagePicker();
+      uploadBtn.textContent = 'Import';
+      uploadBtn.classList.remove('optimize');
+    } else {
+      pathDisplay.textContent = currentPath === '/' ? '/ 🏠' : currentPath;
+      hint.textContent = 'Standard file upload into the current folder.';
+      if (document.getElementById('fileInput').files.length > 0) {
+        convertOptions.style.display = 'block';
+      }
+      uploadBtn.textContent = convertCheckbox.checked ? 'Optimize & Upload' : 'Upload';
     }
   }
 
@@ -4542,7 +4647,7 @@ function uploadFileWebSocket(file, onProgress, onComplete, onError) {
     ws.onopen = function() {
       console.log('[WS] Connected, starting upload:', file.name);
       // Send start message: START:<filename>:<size>:<path>
-      ws.send(`START:${file.name}:${file.size}:${currentPath}`);
+      ws.send(`START:${file.name}:${file.size}:${getUploadTargetPath()}`);
     };
 
     ws.onmessage = async function(event) {
@@ -4645,7 +4750,7 @@ function uploadFileHTTP(file, onProgress, onComplete, onError) {
 
     const xhr = new XMLHttpRequest();
     currentUploadXhr = xhr;
-    xhr.open('POST', '/upload?path=' + encodeURIComponent(currentPath), true);
+    xhr.open('POST', '/upload?path=' + encodeURIComponent(getUploadTargetPath()), true);
 
     xhr.upload.onprogress = function(e) {
       if (e.lengthComputable && onProgress) {
@@ -4707,7 +4812,7 @@ function uploadFile() {
 
   let currentIndex = 0;
   const failedFiles = [];
-  let useWebSocket = true; // Try WebSocket first
+  let useWebSocket = document.getElementById('uploadDestination').value === 'current'; // App imports use HTTP validation
 
   // Check if we should use batch logging mode
   const epubFilesToConvert = files.filter(f => f.name.toLowerCase().endsWith('.epub') && convertEnabled);

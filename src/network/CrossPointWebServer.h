@@ -34,6 +34,7 @@ class CrossPointWebServer {
     FsFile file;
     String fileName;
     String path = "/";
+    String finalFileName;
     size_t size = 0;
     bool success = false;
     String error = "";
