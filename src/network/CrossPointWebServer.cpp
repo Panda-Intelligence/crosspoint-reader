@@ -15,10 +15,13 @@
 #include "SettingsList.h"
 #include "StorageFontRegistry.h"
 #include "WebDAVHandler.h"
+#include "html/FontsPageHtml.generated.h"
 #include "html/FilesPageHtml.generated.h"
 #include "html/HomePageHtml.generated.h"
 #include "html/SettingsPageHtml.generated.h"
 #include "html/js/jszip_minJs.generated.h"
+
+extern GfxRenderer renderer;
 
 namespace {
 // Folders/files to hide from the web interface file browser
@@ -159,9 +162,11 @@ void CrossPointWebServer::begin() {
 
   // Settings endpoints
   server->on("/settings", HTTP_GET, [this] { handleSettingsPage(); });
+  server->on("/fonts", HTTP_GET, [this] { handleFontsPage(); });
   server->on("/api/settings", HTTP_GET, [this] { handleGetSettings(); });
   server->on("/api/settings", HTTP_POST, [this] { handlePostSettings(); });
   server->on("/api/fonts", HTTP_GET, [this] { handleGetFontPacks(); });
+  server->on("/api/fonts/reload", HTTP_POST, [this] { handleReloadFontPacks(); });
 
   // OPDS server endpoints
   server->on("/api/opds", HTTP_GET, [this] { handleGetOpdsServers(); });
@@ -453,6 +458,15 @@ void CrossPointWebServer::handleGetFontPacks() const {
   String json;
   serializeJson(doc, json);
   server->send(200, "application/json", json);
+}
+
+void CrossPointWebServer::handleReloadFontPacks() {
+  const bool loaded = StorageFontRegistry::loadTraditionalChineseFonts(renderer);
+  if (!loaded) {
+    server->send(400, "text/plain", "No Traditional Chinese font packs found under /.mofei/fonts/");
+    return;
+  }
+  server->send(200, "text/plain", "Traditional Chinese font packs reloaded");
 }
 
 void CrossPointWebServer::handleFileList() const {
@@ -1122,6 +1136,11 @@ void CrossPointWebServer::handleDelete() const {
 void CrossPointWebServer::handleSettingsPage() const {
   sendHtmlContent(server.get(), SettingsPageHtml, sizeof(SettingsPageHtml));
   LOG_DBG("WEB", "Served settings page");
+}
+
+void CrossPointWebServer::handleFontsPage() const {
+  sendHtmlContent(server.get(), FontsPageHtml, sizeof(FontsPageHtml));
+  LOG_DBG("WEB", "Served fonts page");
 }
 
 void CrossPointWebServer::handleGetSettings() const {

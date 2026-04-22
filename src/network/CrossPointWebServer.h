@@ -105,9 +105,11 @@ class CrossPointWebServer {
 
   // Settings handlers
   void handleSettingsPage() const;
+  void handleFontsPage() const;
   void handleGetSettings() const;
   void handlePostSettings();
   void handleGetFontPacks() const;
+  void handleReloadFontPacks();
 
   // OPDS server handlers
   void handleGetOpdsServers() const;

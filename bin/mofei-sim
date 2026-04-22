@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SIM_DIR="$ROOT_DIR/../mofei/simulator"
+
+if [[ ! -d "$SIM_DIR" ]]; then
+  echo "error: simulator directory not found at $SIM_DIR" >&2
+  exit 1
+fi
+
+APP_NAME=""
+SEND_KEY=""
+REBUILD=0
+PASS_ARGS=()
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/mofei-sim [--build] [--app APP_ID] [--key next|prev|home] [--] [extra simulator args]
+
+Examples:
+  bin/mofei-sim
+  bin/mofei-sim --build
+  bin/mofei-sim --app weather_clock
+  bin/mofei-sim --app study_cards
+  bin/mofei-sim --key next
+
+Interactive controls in the SDL window:
+  Arrow keys   swipe left/right/up/down
+  Space/Enter  tap center
+  PageUp       previous key
+  PageDown     next key
+  Esc          home
+  r            refresh
+  Mouse click  tap at cursor position
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --build)
+      REBUILD=1
+      shift
+      ;;
+    --app)
+      APP_NAME="${2:-}"
+      if [[ -z "$APP_NAME" ]]; then
+        echo "error: --app requires a value" >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    --key)
+      SEND_KEY="${2:-}"
+      if [[ -z "$SEND_KEY" ]]; then
+        echo "error: --key requires a value" >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      PASS_ARGS+=("$@")
+      break
+      ;;
+    *)
+      PASS_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if ! command -v sdl2-config >/dev/null 2>&1; then
+  echo "error: sdl2-config not found. Install SDL2 development files first." >&2
+  exit 1
+fi
+
+if [[ "$REBUILD" -eq 1 || ! -x "$SIM_DIR/mofei_sim" ]]; then
+  make -C "$SIM_DIR"
+fi
+
+cd "$SIM_DIR"
+
+if [[ -n "$APP_NAME" ]]; then
+  export MOFEI_SIM_LAUNCH_APP="$APP_NAME"
+fi
+
+if [[ -n "$SEND_KEY" ]]; then
+  export MOFEI_SIM_SEND_KEY="$SEND_KEY"
+fi
+
+exec ./mofei_sim "${PASS_ARGS[@]}"

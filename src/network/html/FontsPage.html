@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fonts - CrossPoint Reader</title>
+  <style>
+    :root {
+      --font-color: #333;
+      --bg: #f5f5f5;
+      --title-color: #2c3e50;
+      --card-bg: #FFF;
+      --label-color: #7f8c8d;
+      --border-color: #eee;
+      --accent-color: rgb(110, 154, 130);
+      --accent-hover-color: #5a8c73;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --font-color: #f5f5f5;
+        --bg: #333;
+        --title-color: #ecf0f1;
+        --card-bg: #444;
+        --label-color: #bdc3c7;
+        --border-color: #555;
+        color-scheme: dark;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: var(--bg);
+      color: var(--font-color);
+    }
+    h1 {
+      color: var(--title-color);
+      border-bottom: 2px solid var(--accent-color);
+      padding-bottom: 10px;
+    }
+    .nav-links {
+      margin: 20px 0;
+      display: flex;
+      gap: 10px;
+    }
+    .nav-links a {
+      padding: 10px 20px;
+      color: var(--font-color);
+      text-decoration: none;
+      border-radius: 4px;
+    }
+    .nav-links a.active {
+      background-color: var(--accent-color);
+      color: white;
+    }
+    .nav-links a:not(.active):hover {
+      background-color: var(--accent-hover-color);
+      color: white;
+    }
+    .card {
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 15px 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .pack-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .pack-row:last-child { border-bottom: none; }
+    .pack-meta { flex: 1; min-width: 0; }
+    .pack-name { font-weight: 600; color: var(--title-color); }
+    .pack-path { font-size: 0.9em; color: var(--label-color); word-break: break-all; }
+    .status {
+      padding: 4px 10px;
+      border-radius: 999px;
+      color: white;
+      font-size: 0.85em;
+      align-self: center;
+      white-space: nowrap;
+    }
+    .installed { background: #27ae60; }
+    .missing { background: #c0392b; }
+    .upload-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    input[type="file"]::file-selector-button,
+    button {
+      background: var(--accent-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 10px 16px;
+      cursor: pointer;
+    }
+    button:hover,
+    input[type="file"]::file-selector-button:hover {
+      background: var(--accent-hover-color);
+    }
+    #message {
+      display: none;
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 6px;
+    }
+    #message.error { background: #f8d7da; color: #721c24; display: block; }
+    #message.success { background: #d4edda; color: #155724; display: block; }
+    .hint {
+      color: var(--label-color);
+      font-size: 0.92em;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <h1>Fonts</h1>
+
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/files">File Manager</a>
+    <a href="/fonts" class="active">Fonts</a>
+    <a href="/settings">Settings</a>
+  </div>
+
+  <div class="card">
+    <h2>Traditional Chinese Font Packs</h2>
+    <p class="hint">
+      Upload generated <code>.epf</code> files for <strong>Noto Sans TC</strong>.
+      Files will be stored under <code>/.mofei/fonts/</code>. After upload, click reload to activate them.
+    </p>
+    <div class="upload-row">
+      <input type="file" id="fontFiles" accept=".epf" multiple />
+      <button onclick="uploadFonts()">Upload Packs</button>
+      <button onclick="reloadFonts()">Reload Fonts</button>
+    </div>
+    <div id="message"></div>
+  </div>
+
+  <div class="card">
+    <h2>Installed Packs</h2>
+    <div id="packs">Loading…</div>
+  </div>
+
+  <script>
+    function showMessage(text, isError = false) {
+      const box = document.getElementById('message');
+      box.textContent = text;
+      box.className = isError ? 'error' : 'success';
+    }
+
+    async function loadFonts() {
+      const container = document.getElementById('packs');
+      try {
+        const resp = await fetch('/api/fonts');
+        if (!resp.ok) throw new Error('Failed to load font pack status');
+        const data = await resp.json();
+        if (!data.packs || data.packs.length === 0) {
+          container.innerHTML = '<p class="hint">No font packs configured.</p>';
+          return;
+        }
+        container.innerHTML = data.packs.map(pack => `
+          <div class="pack-row">
+            <div class="pack-meta">
+              <div class="pack-name">${pack.name}</div>
+              <div class="pack-path">${pack.path}</div>
+            </div>
+            <span class="status ${pack.active ? 'installed' : (pack.installed ? 'installed' : 'missing')}">
+              ${pack.active ? 'Loaded' : (pack.installed ? 'Installed' : 'Missing')}
+            </span>
+          </div>
+        `).join('');
+      } catch (err) {
+        container.innerHTML = `<p class="hint">Failed to load font status: ${err.message}</p>`;
+      }
+    }
+
+    async function uploadFonts() {
+      const input = document.getElementById('fontFiles');
+      const files = Array.from(input.files || []);
+      if (files.length === 0) {
+        showMessage('Select one or more .epf files first', true);
+        return;
+      }
+
+      for (const file of files) {
+        const form = new FormData();
+        form.append('file', file);
+        const resp = await fetch('/upload?path=' + encodeURIComponent('/.mofei/fonts'), {
+          method: 'POST',
+          body: form,
+        });
+        if (!resp.ok) {
+          showMessage(`Upload failed for ${file.name}: ${await resp.text()}`, true);
+          return;
+        }
+      }
+
+      showMessage('Font packs uploaded successfully');
+      input.value = '';
+      await loadFonts();
+    }
+
+    async function reloadFonts() {
+      const resp = await fetch('/api/fonts/reload', { method: 'POST' });
+      if (!resp.ok) {
+        showMessage(await resp.text(), true);
+        return;
+      }
+      showMessage('Fonts reloaded');
+      await loadFonts();
+    }
+
+    loadFonts();
+  </script>
+</body>
+</html>
