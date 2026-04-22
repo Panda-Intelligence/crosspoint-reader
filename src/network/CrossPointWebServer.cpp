@@ -86,6 +86,22 @@ bool isProtectedItemName(const String& name) {
   }
   return false;
 }
+
+bool isFontPackPath(const String& path) { return path == "/.mofei/fonts"; }
+
+bool hasFontPackExtension(const String& fileName) { return fileName.endsWith(".epf"); }
+
+bool validateFontPackFile(const String& filePath) {
+  FsFile file;
+  if (!Storage.openFileForRead("WEBFONT", filePath, file)) {
+    return false;
+  }
+  char magic[4] = {};
+  const bool ok = file.read(magic, sizeof(magic)) == static_cast<int>(sizeof(magic)) &&
+                  memcmp(magic, "EPF2", sizeof(magic)) == 0;
+  file.close();
+  return ok;
+}
 }  // namespace
 
 // File listing page template - now using generated headers:
@@ -167,6 +183,7 @@ void CrossPointWebServer::begin() {
   server->on("/api/settings", HTTP_POST, [this] { handlePostSettings(); });
   server->on("/api/fonts", HTTP_GET, [this] { handleGetFontPacks(); });
   server->on("/api/fonts/reload", HTTP_POST, [this] { handleReloadFontPacks(); });
+  server->on("/api/fonts/delete", HTTP_POST, [this] { handleDeleteFontPack(); });
 
   // OPDS server endpoints
   server->on("/api/opds", HTTP_GET, [this] { handleGetOpdsServers(); });
@@ -469,6 +486,38 @@ void CrossPointWebServer::handleReloadFontPacks() {
   server->send(200, "text/plain", "Traditional Chinese font packs reloaded");
 }
 
+void CrossPointWebServer::handleDeleteFontPack() {
+  if (!server->hasArg("plain")) {
+    server->send(400, "text/plain", "Missing JSON body");
+    return;
+  }
+
+  JsonDocument doc;
+  const DeserializationError err = deserializeJson(doc, server->arg("plain"));
+  if (err) {
+    server->send(400, "text/plain", String("Invalid JSON: ") + err.c_str());
+    return;
+  }
+
+  String path = doc["path"] | "";
+  if (!path.startsWith("/.mofei/fonts/") || !hasFontPackExtension(path)) {
+    server->send(400, "text/plain", "Invalid font pack path");
+    return;
+  }
+
+  if (!Storage.exists(path.c_str())) {
+    server->send(404, "text/plain", "Font pack not found");
+    return;
+  }
+
+  if (!Storage.remove(path.c_str())) {
+    server->send(500, "text/plain", "Failed to delete font pack");
+    return;
+  }
+
+  server->send(200, "text/plain", "Font pack deleted");
+}
+
 void CrossPointWebServer::handleFileList() const {
   sendHtmlContent(server.get(), FilesPageHtml, sizeof(FilesPageHtml));
 }
@@ -677,6 +726,12 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     LOG_DBG("WEB", "[UPLOAD] START: %s to path: %s", state.fileName.c_str(), state.path.c_str());
     LOG_DBG("WEB", "[UPLOAD] Free heap: %d bytes", ESP.getFreeHeap());
 
+    if (isFontPackPath(state.path) && !hasFontPackExtension(state.fileName)) {
+      state.error = "Only .epf font packs may be uploaded into /.mofei/fonts";
+      LOG_DBG("WEB", "[UPLOAD] Rejected non-font upload into font pack directory: %s", state.fileName.c_str());
+      return;
+    }
+
     // Create file path
     String filePath = state.path;
     if (!filePath.endsWith("/")) filePath += "/";
@@ -760,6 +815,13 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
         if (!filePath.endsWith("/")) filePath += "/";
         filePath += state.fileName;
         clearEpubCacheIfNeeded(filePath);
+
+        if (isFontPackPath(state.path) && !validateFontPackFile(filePath)) {
+          Storage.remove(filePath.c_str());
+          state.success = false;
+          state.error = "Uploaded file is not a valid EPF2 font pack";
+          LOG_DBG("WEB", "[UPLOAD] Deleted invalid font pack: %s", filePath.c_str());
+        }
       }
     }
   } else if (upload.status == UPLOAD_FILE_ABORTED) {

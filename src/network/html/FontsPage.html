@@ -86,6 +86,11 @@
     }
     .installed { background: #27ae60; }
     .missing { background: #c0392b; }
+    .pack-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
     .upload-row {
       display: flex;
       gap: 12px;
@@ -172,9 +177,12 @@
               <div class="pack-name">${pack.name}</div>
               <div class="pack-path">${pack.path}</div>
             </div>
-            <span class="status ${pack.active ? 'installed' : (pack.installed ? 'installed' : 'missing')}">
-              ${pack.active ? 'Loaded' : (pack.installed ? 'Installed' : 'Missing')}
-            </span>
+            <div class="pack-actions">
+              <span class="status ${pack.active ? 'installed' : (pack.installed ? 'installed' : 'missing')}">
+                ${pack.active ? 'Loaded' : (pack.installed ? 'Installed' : 'Missing')}
+              </span>
+              ${pack.installed ? `<button onclick="deleteFontPack('${pack.path}')">Delete</button>` : ''}
+            </div>
           </div>
         `).join('');
       } catch (err) {
@@ -215,6 +223,20 @@
         return;
       }
       showMessage('Fonts reloaded');
+      await loadFonts();
+    }
+
+    async function deleteFontPack(path) {
+      const resp = await fetch('/api/fonts/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path }),
+      });
+      if (!resp.ok) {
+        showMessage(await resp.text(), true);
+        return;
+      }
+      showMessage('Font pack deleted');
       await loadFonts();
     }
 
