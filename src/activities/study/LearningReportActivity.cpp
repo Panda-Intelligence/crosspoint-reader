@@ -2,6 +2,8 @@
 
 #include <I18n.h>
 
+#include <algorithm>
+
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -29,18 +31,25 @@ void LearningReportActivity::render(RenderLock&&) {
 
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Learning Report");
 
-  char accuracyBuffer[32];
   const int total = state.correctToday + state.wrongToday;
   const int accuracy = total > 0 ? (state.correctToday * 100 / total) : 0;
-  snprintf(accuracyBuffer, sizeof(accuracyBuffer), "Accuracy: %d%%", accuracy);
+  const int completion = state.dueToday > 0 ? (state.completedToday * 100 / state.dueToday) : 0;
+  const int wrongRate = total > 0 ? (state.wrongToday * 100 / total) : 0;
+  const int masteryScore = std::clamp(accuracy + (completion / 2) - (wrongRate / 3), 0, 100);
 
-  char summaryBuffer[48];
-  snprintf(summaryBuffer, sizeof(summaryBuffer), "Done %u of %u · streak %u", state.completedToday, state.dueToday,
-           state.streakDays);
+  char line1[48];
+  snprintf(line1, sizeof(line1), "Done %u / %u (%d%%)", state.completedToday, state.dueToday, completion);
+  char line2[48];
+  snprintf(line2, sizeof(line2), "Accuracy %d%% · Wrong %u", accuracy, state.wrongToday);
+  char line3[48];
+  snprintf(line3, sizeof(line3), "Mastery score %d · Streak %u", masteryScore, state.streakDays);
 
-  renderer.drawCenteredText(UI_12_FONT_ID, pageHeight / 2 - 50, accuracyBuffer, true, EpdFontFamily::BOLD);
-  renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 5, summaryBuffer);
-  renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 35, "Detailed analytics come later");
+  const int startY = metrics.topPadding + metrics.headerHeight + 24;
+  renderer.drawCenteredText(UI_12_FONT_ID, startY, "Today", true, EpdFontFamily::BOLD);
+  renderer.drawCenteredText(UI_10_FONT_ID, startY + 42, line1);
+  renderer.drawCenteredText(UI_10_FONT_ID, startY + 78, line2);
+  renderer.drawCenteredText(UI_10_FONT_ID, startY + 114, line3);
+  renderer.drawCenteredText(SMALL_FONT_ID, pageHeight - metrics.buttonHintsHeight - 14, "Companion app shows full charts");
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Done", "", "");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

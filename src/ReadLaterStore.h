@@ -1,11 +1,13 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
 struct ReadLaterItem {
   std::string filename;
   std::string path;
+  size_t bytes = 0;
 };
 
 class ReadLaterStore {
@@ -17,7 +19,7 @@ class ReadLaterStore {
 
   const std::vector<ReadLaterItem>& getItems() const { return items; }
   void refresh();
-  bool ensureSeedFile();
+  bool ensureReadLaterDirectory();
 };
 
 #define READ_LATER_STORE ReadLaterStore::getInstance()

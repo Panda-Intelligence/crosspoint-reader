@@ -3,6 +3,7 @@
 #include <I18n.h>
 
 #include "CalendarActivity.h"
+#include "ClockFocusActivity.h"
 #include "WeatherClockActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -54,6 +55,8 @@ void DesktopHubActivity::loop() {
         activityManager.replaceActivity(std::make_unique<CalendarActivity>(renderer, mappedInput));
         break;
       case 2:
+        activityManager.replaceActivity(std::make_unique<ClockFocusActivity>(renderer, mappedInput));
+        break;
       default:
         requestUpdate();
         break;

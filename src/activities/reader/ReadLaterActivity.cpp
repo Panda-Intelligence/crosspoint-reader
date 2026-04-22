@@ -6,6 +6,16 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 
+std::string ReadLaterActivity::sizeLabel(const size_t bytes) const {
+  if (bytes < 1024) {
+    return std::to_string(bytes) + " B";
+  }
+  if (bytes < 1024 * 1024) {
+    return std::to_string(bytes / 1024) + " KB";
+  }
+  return std::to_string(bytes / (1024 * 1024)) + " MB";
+}
+
 void ReadLaterActivity::onEnter() {
   Activity::onEnter();
   READ_LATER_STORE.refresh();
@@ -21,19 +31,25 @@ void ReadLaterActivity::loop() {
 
   const int itemCount = static_cast<int>(READ_LATER_STORE.getItems().size());
 
-  buttonNavigator.onNextRelease([this, itemCount] {
-    selectedIndex = ButtonNavigator::nextIndex(selectedIndex, itemCount);
-    requestUpdate();
-  });
+  if (itemCount > 0) {
+    buttonNavigator.onNextRelease([this, itemCount] {
+      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, itemCount);
+      requestUpdate();
+    });
 
-  buttonNavigator.onPreviousRelease([this, itemCount] {
-    selectedIndex = ButtonNavigator::previousIndex(selectedIndex, itemCount);
-    requestUpdate();
-  });
+    buttonNavigator.onPreviousRelease([this, itemCount] {
+      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, itemCount);
+      requestUpdate();
+    });
+  }
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
     if (!READ_LATER_STORE.getItems().empty()) {
       activityManager.goToReader(READ_LATER_STORE.getItems()[selectedIndex].path);
+    } else {
+      READ_LATER_STORE.refresh();
+      selectedIndex = 0;
+      requestUpdate();
     }
   }
 }
@@ -49,19 +65,23 @@ void ReadLaterActivity::render(RenderLock&&) {
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Read Later");
 
   if (items.empty()) {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 20, "No local articles");
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 20, "Import flow comes next");
+    const int centerY = pageHeight / 2;
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY - 42, "No local articles yet");
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY - 8, "Send articles from companion/web");
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + 26, "Target path: /.mofei/reading/read_later");
+    renderer.drawCenteredText(SMALL_FONT_ID, centerY + 58, "Press Open to refresh");
   } else {
     GUI.drawList(
         renderer,
         Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, pageWidth,
-             pageHeight - (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
-                           metrics.verticalSpacing * 2)},
+             pageHeight -
+                 (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)},
         static_cast<int>(items.size()), selectedIndex, [&items](int index) { return items[index].filename; },
-        [](int) { return std::string("Open in reader"); });
+        [this, &items](int index) { return "Size: " + sizeLabel(items[index].bytes); });
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Open", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels =
+      mappedInput.mapLabels(tr(STR_BACK), items.empty() ? "Refresh" : "Open", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

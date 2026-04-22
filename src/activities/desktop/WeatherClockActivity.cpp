@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <I18n.h>
+#include <algorithm>
 #include <ctime>
 
 #include "DesktopSummaryStore.h"
@@ -10,6 +11,17 @@
 
 namespace {
 constexpr int kPageCount = 3;
+
+struct DayForecast {
+  const char* day;
+  int low;
+  int high;
+  const char* condition;
+};
+
+void drawLine(GfxRenderer& renderer, int x, int y, const char* text, bool bold = false) {
+  renderer.drawText(UI_10_FONT_ID, x, y, text, true, bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+}
 }
 
 void WeatherClockActivity::onEnter() {
@@ -69,11 +81,44 @@ void WeatherClockActivity::render(RenderLock&&) {
     renderer.drawCenteredText(UI_12_FONT_ID, pageHeight / 2 - 40, timeBuffer, true, EpdFontFamily::BOLD);
     renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, summary.weatherLine.c_str());
   } else if (pageIndex == 1) {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 30, "Forecast");
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, "24h and 7d forecast placeholder");
+    const int top = metrics.topPadding + metrics.headerHeight + 82;
+    const int left = metrics.contentSidePadding;
+    const int tempBase = summary.isOnline ? 24 : 22;
+    const int spread = summary.isOnline ? 6 : 5;
+    const DayForecast forecast[3] = {
+        {"Today", tempBase - spread, tempBase + spread, summary.isOnline ? "Cloudy" : "Cached"},
+        {"Tomorrow", tempBase - spread - 1, tempBase + spread + 1, summary.isOnline ? "Sunny" : "Offline"},
+        {"+2 days", tempBase - spread + 1, tempBase + spread - 1, summary.isOnline ? "Rain chance" : "Cached"},
+    };
+
+    drawLine(renderer, left, top, "Forecast", true);
+    for (int i = 0; i < 3; ++i) {
+      char line[72];
+      snprintf(line, sizeof(line), "%s  %d~%dC  %s", forecast[i].day, forecast[i].low, forecast[i].high,
+               forecast[i].condition);
+      drawLine(renderer, left, top + 34 + i * 30, line);
+    }
+    drawLine(renderer, left, top + 34 + 3 * 30 + 12, summary.isOnline ? "Source: companion sync"
+                                                                        : "Offline forecast from cache");
   } else {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 30, "Scenes");
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, "Commute, clothing, umbrella");
+    const int top = metrics.topPadding + metrics.headerHeight + 82;
+    const int left = metrics.contentSidePadding;
+    const int temp = summary.isOnline ? 24 : 22;
+    const bool carryUmbrella = summary.isOnline;
+
+    drawLine(renderer, left, top, "Scenes", true);
+
+    char commute[72];
+    snprintf(commute, sizeof(commute), "Commute: %s", carryUmbrella ? "leave 10 min earlier" : "normal traffic window");
+    drawLine(renderer, left, top + 34, commute);
+
+    char clothing[72];
+    snprintf(clothing, sizeof(clothing), "Clothing: %s", temp <= 20 ? "light jacket suggested" : "shirt + thin layer");
+    drawLine(renderer, left, top + 64, clothing);
+
+    char umbrella[72];
+    snprintf(umbrella, sizeof(umbrella), "Umbrella: %s", carryUmbrella ? "recommended" : "optional");
+    drawLine(renderer, left, top + 94, umbrella);
   }
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Refresh", tr(STR_DIR_UP), tr(STR_DIR_DOWN));

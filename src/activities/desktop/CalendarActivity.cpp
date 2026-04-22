@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <I18n.h>
+#include <algorithm>
 #include <ctime>
 
 #include "DesktopSummaryStore.h"
@@ -10,6 +11,15 @@
 
 namespace {
 constexpr int kPageCount = 3;
+
+const char* weekdayLabel(int weekday) {
+  static const char* kLabels[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+  return kLabels[std::clamp(weekday, 0, 6)];
+}
+
+void drawLine(GfxRenderer& renderer, int x, int y, const char* text, bool bold = false) {
+  renderer.drawText(UI_10_FONT_ID, x, y, text, true, bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+}
 }
 
 void CalendarActivity::onEnter() {
@@ -65,11 +75,40 @@ void CalendarActivity::render(RenderLock&&) {
     renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 35, summary.todayPrimary.c_str());
     renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 5, summary.todaySecondary.c_str());
   } else if (pageIndex == 1) {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 20, "Week View");
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 20, "Weekly plan placeholder");
+    const int top = metrics.topPadding + metrics.headerHeight + 84;
+    const int left = metrics.contentSidePadding;
+    drawLine(renderer, left, top, "Week View", true);
+
+    const int todayWeekday = localTm.tm_wday;  // 0=Sun
+    for (int i = 0; i < 7; ++i) {
+      const int weekday = (todayWeekday + i) % 7;
+      char line[64];
+      snprintf(line, sizeof(line), "%s  %s", weekdayLabel(weekday), (i == 0) ? "Today tasks" : "Open slots");
+      drawLine(renderer, left, top + 32 + i * 24, line, i == 0);
+    }
   } else {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 20, "Month View");
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 20, "Month progress placeholder");
+    const int top = metrics.topPadding + metrics.headerHeight + 84;
+    const int left = metrics.contentSidePadding;
+    drawLine(renderer, left, top, "Month View", true);
+
+    const int monthDay = localTm.tm_mday;
+    const int monthProgress = std::clamp((monthDay * 100) / 31, 0, 100);
+    const int barWidth = pageWidth - left * 2;
+    const int fillWidth = (barWidth * monthProgress) / 100;
+    const int barY = top + 34;
+
+    renderer.drawRect(left, barY, barWidth, 18);
+    if (fillWidth > 2) {
+      renderer.fillRect(left + 1, barY + 1, fillWidth - 2, 16);
+    }
+
+    char progressLine[64];
+    snprintf(progressLine, sizeof(progressLine), "Month progress: %d%%", monthProgress);
+    drawLine(renderer, left, barY + 36, progressLine, true);
+
+    char countLine[64];
+    snprintf(countLine, sizeof(countLine), "Day %d of 31 · %s", monthDay, monthDay >= 24 ? "near month end" : "in progress");
+    drawLine(renderer, left, barY + 66, countLine);
   }
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Refresh", tr(STR_DIR_UP), tr(STR_DIR_DOWN));

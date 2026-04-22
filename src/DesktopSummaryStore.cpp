@@ -10,6 +10,7 @@ DesktopSummaryStore DesktopSummaryStore::instance;
 void DesktopSummaryStore::refresh() {
   const bool connected = WiFi.status() == WL_CONNECTED;
   const std::string lastSsid = WIFI_STORE.getLastConnectedSsid();
+  state.isOnline = connected;
 
   if (connected) {
     state.city = lastSsid.empty() ? "Online" : lastSsid;

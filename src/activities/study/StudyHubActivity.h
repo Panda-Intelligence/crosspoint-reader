@@ -6,6 +6,10 @@
 class StudyHubActivity final : public Activity {
   ButtonNavigator buttonNavigator;
   int selectedIndex = 0;
+  int importedDeckCount = 0;
+  bool hasStudyStateFile = false;
+
+  void refreshImportStatus();
 
  public:
   explicit StudyHubActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)

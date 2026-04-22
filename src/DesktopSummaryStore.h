@@ -3,6 +3,7 @@
 #include <string>
 
 struct DesktopSummaryState {
+  bool isOnline = false;
   std::string city = "Offline";
   std::string weatherLine = "No weather data";
   std::string todayPrimary = "No events";

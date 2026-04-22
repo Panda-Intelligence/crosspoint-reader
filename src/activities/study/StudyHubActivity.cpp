@@ -1,7 +1,9 @@
 #include "StudyHubActivity.h"
 
+#include <HalStorage.h>
 #include <I18n.h>
 
+#include "DeckImportStatusActivity.h"
 #include "LearningReportActivity.h"
 #include "StudyCardsTodayActivity.h"
 #include "StudyStateStore.h"
@@ -9,6 +11,8 @@
 
 namespace {
 constexpr int kItemCount = 3;
+constexpr char kStudyDir[] = "/.mofei/study";
+constexpr char kStudyStateFile[] = "/.mofei/study/state.json";
 
 const char* itemLabel(int index) {
   switch (index) {
@@ -23,9 +27,27 @@ const char* itemLabel(int index) {
 }
 }  // namespace
 
+void StudyHubActivity::refreshImportStatus() {
+  importedDeckCount = 0;
+  hasStudyStateFile = Storage.exists(kStudyStateFile);
+
+  const auto files = Storage.listFiles(kStudyDir);
+  for (const auto& file : files) {
+    const String fileName = file;
+    if (!fileName.endsWith(".json")) {
+      continue;
+    }
+    if (fileName == "state.json") {
+      continue;
+    }
+    importedDeckCount++;
+  }
+}
+
 void StudyHubActivity::onEnter() {
   Activity::onEnter();
   STUDY_STATE.loadFromFile();
+  refreshImportStatus();
   selectedIndex = 0;
   requestUpdate();
 }
@@ -56,7 +78,7 @@ void StudyHubActivity::loop() {
         break;
       case 2:
       default:
-        requestUpdate();
+        activityManager.replaceActivity(std::make_unique<DeckImportStatusActivity>(renderer, mappedInput));
         break;
     }
   }
@@ -74,10 +96,10 @@ void StudyHubActivity::render(RenderLock&&) {
   GUI.drawList(
       renderer,
       Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, pageWidth,
-           pageHeight - (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
-                         metrics.verticalSpacing * 2)},
+           pageHeight -
+               (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)},
       kItemCount, selectedIndex, [](int index) { return std::string(itemLabel(index)); },
-      [&state](int index) {
+      [this, &state](int index) {
         switch (index) {
           case 0:
             return std::string("Review due cards: ") + std::to_string(state.dueToday - state.completedToday);
@@ -85,7 +107,9 @@ void StudyHubActivity::render(RenderLock&&) {
             return std::string("Progress and mastery");
           case 2:
           default:
-            return std::string("Sync decks from companion");
+            return importedDeckCount > 0
+                       ? ("Imported decks: " + std::to_string(importedDeckCount))
+                       : (hasStudyStateFile ? std::string("Study state ready") : std::string("No deck imported yet"));
         }
       });
 
