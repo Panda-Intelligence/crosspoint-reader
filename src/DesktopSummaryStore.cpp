@@ -4,6 +4,7 @@
 #include <WiFi.h>
 
 #include "WifiCredentialStore.h"
+#include "StudyStateStore.h"
 
 DesktopSummaryStore DesktopSummaryStore::instance;
 
@@ -24,7 +25,9 @@ void DesktopSummaryStore::refresh() {
 
   state.todaySecondary = connected ? "Sync calendar from companion" : "Calendar available offline";
 
-  // Placeholder study counters until the study package lands.
-  state.dueCards = 0;
-  state.studyDone = 0;
+  // Pull live study counters from StudyStateStore
+  const auto& study = STUDY_STATE.getState();
+  const int remaining = static_cast<int>(study.dueToday) - static_cast<int>(study.completedToday);
+  state.dueCards = remaining > 0 ? remaining : 0;
+  state.studyDone = static_cast<int>(study.completedToday);
 }

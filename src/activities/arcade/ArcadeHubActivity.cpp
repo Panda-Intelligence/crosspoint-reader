@@ -8,6 +8,7 @@
 
 #include "DailyMazeActivity.h"
 #include "Game2048Activity.h"
+#include "MemoryGameActivity.h"
 #include "SokobanActivity.h"
 #include "SudokuActivity.h"
 #include "components/UITheme.h"
@@ -76,6 +77,8 @@ void ArcadeHubActivity::loop() {
       activityManager.replaceActivity(std::make_unique<SudokuActivity>(renderer, mappedInput));
     } else if (selectedIndex == 2) {
       activityManager.replaceActivity(std::make_unique<SokobanActivity>(renderer, mappedInput));
+    } else if (selectedIndex == 3) {
+      activityManager.replaceActivity(std::make_unique<MemoryGameActivity>(renderer, mappedInput));
     } else if (selectedIndex == 5) {
       activityManager.replaceActivity(std::make_unique<DailyMazeActivity>(renderer, mappedInput));
     } else {

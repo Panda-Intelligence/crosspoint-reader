@@ -82,8 +82,10 @@ void CalendarActivity::render(RenderLock&&) {
     const int todayWeekday = localTm.tm_wday;  // 0=Sun
     for (int i = 0; i < 7; ++i) {
       const int weekday = (todayWeekday + i) % 7;
+      const int futureDay = localTm.tm_mday + i;
       char line[64];
-      snprintf(line, sizeof(line), "%s  %s", weekdayLabel(weekday), (i == 0) ? "Today tasks" : "Open slots");
+      snprintf(line, sizeof(line), "%s  %s", weekdayLabel(weekday),
+               (i == 0) ? "Today" : (futureDay <= 31 ? "Free" : "Next month"));
       drawLine(renderer, left, top + 32 + i * 24, line, i == 0);
     }
   } else {
@@ -92,7 +94,14 @@ void CalendarActivity::render(RenderLock&&) {
     drawLine(renderer, left, top, "Month View", true);
 
     const int monthDay = localTm.tm_mday;
-    const int monthProgress = std::clamp((monthDay * 100) / 31, 0, 100);
+    // Compute days-in-month via mktime: advance to month+1 day 0 = last day of current month
+    struct tm lastDayTm = localTm;
+    lastDayTm.tm_mday = 0;
+    lastDayTm.tm_mon += 1;
+    mktime(&lastDayTm);
+    const int daysInMonth = lastDayTm.tm_mday;
+
+    const int monthProgress = daysInMonth > 0 ? std::clamp((monthDay * 100) / daysInMonth, 0, 100) : 0;
     const int barWidth = pageWidth - left * 2;
     const int fillWidth = (barWidth * monthProgress) / 100;
     const int barY = top + 34;
@@ -107,7 +116,8 @@ void CalendarActivity::render(RenderLock&&) {
     drawLine(renderer, left, barY + 36, progressLine, true);
 
     char countLine[64];
-    snprintf(countLine, sizeof(countLine), "Day %d of 31 · %s", monthDay, monthDay >= 24 ? "near month end" : "in progress");
+    snprintf(countLine, sizeof(countLine), "Day %d of %d · %s", monthDay, daysInMonth,
+             monthDay >= daysInMonth - 7 ? "near month end" : "in progress");
     drawLine(renderer, left, barY + 66, countLine);
   }
 
