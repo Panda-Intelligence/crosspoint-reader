@@ -100,23 +100,44 @@ void DeckImportStatusActivity::render(RenderLock&&) {
 
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Deck Import Status");
 
+  const int pad = metrics.contentSidePadding;
+  const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+
   if (deckEntries.empty()) {
-    const int centerY = pageHeight / 2;
-    renderer.drawCenteredText(UI_10_FONT_ID, centerY - 36, "No imported deck file");
-    renderer.drawCenteredText(UI_10_FONT_ID, centerY, "Copy .json decks to /.mofei/study");
-    if (hasStudyStateFile) {
-      renderer.drawCenteredText(SMALL_FONT_ID, centerY + 30, "Study state exists");
-    } else {
-      renderer.drawCenteredText(SMALL_FONT_ID, centerY + 30, "state.json not found");
-    }
+    // Styled empty-state card
+    const int cardH = 130;
+    const int cardY = (pageHeight - cardH) / 2 - 16;
+    renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
+
+    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 16, "No deck files found", true, EpdFontFamily::BOLD);
+    renderer.drawLine(pad + 16, cardY + 46, pageWidth - pad - 16, cardY + 46, true);
+
+    constexpr int bulletR = 3;
+    const int bx = pad + 16;
+    const int tx = bx + bulletR * 2 + 6;
+    renderer.fillRoundedRect(bx, cardY + 58, bulletR * 2, bulletR * 2, bulletR, Color::Black);
+    renderer.drawText(SMALL_FONT_ID, tx, cardY + 54, "Copy .json decks to /.mofei/study");
+    renderer.fillRoundedRect(bx, cardY + 82, bulletR * 2, bulletR * 2, bulletR, Color::Black);
+    renderer.drawText(SMALL_FONT_ID, tx, cardY + 78,
+                      hasStudyStateFile ? "Study state: ready" : "state.json not found");
+    renderer.fillRoundedRect(bx, cardY + 106, bulletR * 2, bulletR * 2, bulletR, Color::Black);
+    renderer.drawText(SMALL_FONT_ID, tx, cardY + 102, "Press Refresh after copying");
   } else {
+    const int listH = pageHeight - (contentTop + metrics.buttonHintsHeight + metrics.verticalSpacing + 24);
     GUI.drawList(
-        renderer,
-        Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, pageWidth,
-             pageHeight -
-                 (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)},
-        static_cast<int>(deckEntries.size()), selectedIndex, [this](int index) { return deckEntries[index].filename; },
+        renderer, Rect{0, contentTop, pageWidth, listH},
+        static_cast<int>(deckEntries.size()), selectedIndex,
+        [this](int index) { return deckEntries[index].filename; },
         [this](int index) { return "Size: " + sizeLabel(deckEntries[index].bytes); });
+
+    // Summary below list
+    const int badgeY = pageHeight - metrics.buttonHintsHeight - 22;
+    char countStr[48];
+    snprintf(countStr, sizeof(countStr), "%d deck%s  %s",
+             static_cast<int>(deckEntries.size()),
+             deckEntries.size() == 1 ? "" : "s",
+             hasStudyStateFile ? "| state ready" : "| no state file");
+    renderer.drawCenteredText(SMALL_FONT_ID, badgeY, countStr);
   }
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Refresh", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
