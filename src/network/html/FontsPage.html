@@ -76,6 +76,47 @@
     .pack-meta { flex: 1; min-width: 0; }
     .pack-name { font-weight: 600; color: var(--title-color); }
     .pack-path { font-size: 0.9em; color: var(--label-color); word-break: break-all; }
+    .group-card {
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+    .group-card:last-child {
+      margin-bottom: 0;
+    }
+    .group-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .group-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--title-color);
+    }
+    .group-summary {
+      font-size: 0.88em;
+      color: var(--label-color);
+    }
+    .style-list {
+      margin-top: 6px;
+    }
+    .style-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+      border-top: 1px dashed var(--border-color);
+    }
+    .style-row:first-child {
+      border-top: none;
+    }
+    .style-name {
+      font-weight: 600;
+    }
     .status {
       padding: 4px 10px;
       border-radius: 999px;
@@ -123,6 +164,10 @@
       font-size: 0.92em;
       line-height: 1.5;
     }
+    .inline-code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.95em;
+    }
   </style>
 </head>
 <body>
@@ -142,6 +187,13 @@
       Files will be stored under <code>/.mofei/fonts/</code>. Optional bold, italic, and bold-italic packs are
       supported with names like <code>notosans_tc_16_bold.epf</code>. After upload, click reload to activate them.
     </p>
+    <p class="hint">
+      Expected style filenames per size:
+      <span class="inline-code">regular</span>,
+      <span class="inline-code">_bold</span>,
+      <span class="inline-code">_italic</span>,
+      <span class="inline-code">_bolditalic</span>.
+    </p>
     <div class="upload-row">
       <input type="file" id="fontFiles" accept=".epf" multiple />
       <button onclick="uploadFonts()">Upload Packs</button>
@@ -152,6 +204,7 @@
 
   <div class="card">
     <h2>Installed Packs</h2>
+    <p class="hint" id="summary">Loading coverage…</p>
     <div id="packs">Loading…</div>
   </div>
 
@@ -164,29 +217,77 @@
 
     async function loadFonts() {
       const container = document.getElementById('packs');
+      const summary = document.getElementById('summary');
       try {
         const resp = await fetch('/api/fonts');
         if (!resp.ok) throw new Error('Failed to load font pack status');
         const data = await resp.json();
         if (!data.packs || data.packs.length === 0) {
+          summary.textContent = 'No font packs configured.';
           container.innerHTML = '<p class="hint">No font packs configured.</p>';
           return;
         }
-        container.innerHTML = data.packs.map(pack => `
-          <div class="pack-row">
-            <div class="pack-meta">
-              <div class="pack-name">${pack.name}</div>
-              <div class="pack-path">${pack.path}</div>
+
+        const styleLabel = (name) => {
+          if (name.includes('Bold Italic')) return 'Bold Italic';
+          if (name.includes('Italic')) return 'Italic';
+          if (name.includes('Bold')) return 'Bold';
+          return 'Regular';
+        };
+
+        const sizeLabel = (name) => {
+          const match = name.match(/(\d{2})/);
+          return match ? match[1] : 'Unknown';
+        };
+
+        const grouped = new Map();
+        data.packs.forEach(pack => {
+          const size = sizeLabel(pack.name);
+          if (!grouped.has(size)) grouped.set(size, []);
+          grouped.get(size).push(pack);
+        });
+
+        const totalLoaded = data.packs.filter(pack => pack.active).length;
+        summary.textContent = `${totalLoaded}/${data.packs.length} styled packs currently loaded.`;
+
+        container.innerHTML = Array.from(grouped.entries()).sort((a, b) => Number(a[0]) - Number(b[0])).map(([size, packs]) => {
+          const installedCount = packs.filter(pack => pack.installed).length;
+          const loadedCount = packs.filter(pack => pack.active).length;
+          const rows = packs
+            .slice()
+            .sort((a, b) => {
+              const order = { 'Regular': 0, 'Bold': 1, 'Italic': 2, 'Bold Italic': 3 };
+              return order[styleLabel(a.name)] - order[styleLabel(b.name)];
+            })
+            .map(pack => `
+              <div class="style-row">
+                <div class="pack-meta">
+                  <div class="style-name">${styleLabel(pack.name)}</div>
+                  <div class="pack-path">${pack.path}</div>
+                </div>
+                <div class="pack-actions">
+                  <span class="status ${pack.active ? 'installed' : (pack.installed ? 'installed' : 'missing')}">
+                    ${pack.active ? 'Loaded' : (pack.installed ? 'Installed' : 'Missing')}
+                  </span>
+                  ${pack.installed ? `<button onclick="deleteFontPack('${pack.path}')">Delete</button>` : ''}
+                </div>
+              </div>
+            `).join('');
+
+          return `
+            <div class="group-card">
+              <div class="group-header">
+                <div>
+                  <div class="group-title">${size}px Family</div>
+                  <div class="group-summary">${loadedCount}/4 loaded, ${installedCount}/4 installed</div>
+                </div>
+              </div>
+              <div class="style-list">${rows}</div>
             </div>
-            <div class="pack-actions">
-              <span class="status ${pack.active ? 'installed' : (pack.installed ? 'installed' : 'missing')}">
-                ${pack.active ? 'Loaded' : (pack.installed ? 'Installed' : 'Missing')}
-              </span>
-              ${pack.installed ? `<button onclick="deleteFontPack('${pack.path}')">Delete</button>` : ''}
-            </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       } catch (err) {
+        summary.textContent = 'Font coverage unavailable.';
         container.innerHTML = `<p class="hint">Failed to load font status: ${err.message}</p>`;
       }
     }
