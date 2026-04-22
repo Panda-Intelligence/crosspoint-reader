@@ -138,6 +138,43 @@
       align-items: center;
       flex-wrap: wrap;
     }
+    .drop-zone {
+      border: 2px dashed var(--border-color);
+      border-radius: 8px;
+      padding: 18px;
+      margin-top: 14px;
+      text-align: center;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+    .drop-zone.dragover {
+      border-color: var(--accent-color);
+      background: rgba(110, 154, 130, 0.08);
+    }
+    .drop-zone strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--title-color);
+    }
+    .file-preview {
+      margin-top: 14px;
+    }
+    .file-preview-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+      border-top: 1px dashed var(--border-color);
+    }
+    .file-preview-item:first-child {
+      border-top: none;
+    }
+    .file-name {
+      font-weight: 600;
+      word-break: break-all;
+    }
+    .warning {
+      color: #b45309;
+    }
     input[type="file"]::file-selector-button,
     button {
       background: var(--accent-color);
@@ -199,6 +236,11 @@
       <button onclick="uploadFonts()">Upload Packs</button>
       <button onclick="reloadFonts()">Reload Fonts</button>
     </div>
+    <div class="drop-zone" id="dropZone">
+      <strong>Drop .epf files here</strong>
+      <span class="hint">Supported names: <code>notosans_tc_12.epf</code>, <code>notosans_tc_12_bold.epf</code>, <code>_italic</code>, <code>_bolditalic</code>.</span>
+    </div>
+    <div class="file-preview hint" id="filePreview">No files selected.</div>
     <div id="message"></div>
   </div>
 
@@ -209,10 +251,63 @@
   </div>
 
   <script>
+    let selectedFiles = [];
+
+    const SUPPORTED_FILENAME = /^notosans_tc_(12|14|16|18)(?:_(bold|italic|bolditalic))?\.epf$/i;
+
     function showMessage(text, isError = false) {
       const box = document.getElementById('message');
       box.textContent = text;
       box.className = isError ? 'error' : 'success';
+    }
+
+    function describeFile(file) {
+      const match = file.name.match(SUPPORTED_FILENAME);
+      if (!match) {
+        return { valid: false, label: 'Unsupported filename' };
+      }
+      const size = match[1];
+      const style = (match[2] || 'regular').toLowerCase();
+      const styleLabel = {
+        regular: 'Regular',
+        bold: 'Bold',
+        italic: 'Italic',
+        bolditalic: 'Bold Italic',
+      }[style];
+      return { valid: true, label: `${size}px ${styleLabel}` };
+    }
+
+    function renderSelectedFiles() {
+      const preview = document.getElementById('filePreview');
+      if (selectedFiles.length === 0) {
+        preview.innerHTML = 'No files selected.';
+        return;
+      }
+      preview.innerHTML = selectedFiles.map(file => {
+        const info = describeFile(file);
+        return `
+          <div class="file-preview-item">
+            <div>
+              <div class="file-name">${file.name}</div>
+              <div class="hint ${info.valid ? '' : 'warning'}">${info.label}</div>
+            </div>
+            <div class="hint">${Math.round(file.size / 1024)} KB</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function syncInputFiles() {
+      const input = document.getElementById('fontFiles');
+      const dt = new DataTransfer();
+      selectedFiles.forEach(file => dt.items.add(file));
+      input.files = dt.files;
+    }
+
+    function setSelectedFiles(files) {
+      selectedFiles = Array.from(files);
+      syncInputFiles();
+      renderSelectedFiles();
     }
 
     async function loadFonts() {
@@ -293,14 +388,18 @@
     }
 
     async function uploadFonts() {
-      const input = document.getElementById('fontFiles');
-      const files = Array.from(input.files || []);
-      if (files.length === 0) {
+      if (selectedFiles.length === 0) {
         showMessage('Select one or more .epf files first', true);
         return;
       }
 
-      for (const file of files) {
+      const invalid = selectedFiles.filter(file => !describeFile(file).valid);
+      if (invalid.length > 0) {
+        showMessage(`Unsupported filename: ${invalid[0].name}`, true);
+        return;
+      }
+
+      for (const file of selectedFiles) {
         const form = new FormData();
         form.append('file', file);
         const resp = await fetch('/upload?path=' + encodeURIComponent('/.mofei/fonts'), {
@@ -314,7 +413,9 @@
       }
 
       showMessage('Font packs uploaded successfully');
-      input.value = '';
+      selectedFiles = [];
+      syncInputFiles();
+      renderSelectedFiles();
       await loadFonts();
     }
 
@@ -342,6 +443,28 @@
       await loadFonts();
     }
 
+    document.getElementById('fontFiles').addEventListener('change', (event) => {
+      setSelectedFiles(event.target.files || []);
+    });
+
+    const dropZone = document.getElementById('dropZone');
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropZone.classList.add('dragover');
+      });
+    });
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropZone.classList.remove('dragover');
+      });
+    });
+    dropZone.addEventListener('drop', (event) => {
+      setSelectedFiles(event.dataTransfer.files || []);
+    });
+
+    renderSelectedFiles();
     loadFonts();
   </script>
 </body>
