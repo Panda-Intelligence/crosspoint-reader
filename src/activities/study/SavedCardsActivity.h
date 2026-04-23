@@ -7,8 +7,10 @@ class SavedCardsActivity final : public Activity {
   ButtonNavigator buttonNavigator;
   int selectedIndex = 0;
   bool showingBack = false;
+  int deckIndex = 0;
 
   int itemCount() const;
+  int deckCount() const;
 
  public:
   explicit SavedCardsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)

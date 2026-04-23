@@ -3,18 +3,53 @@
 #include <I18n.h>
 
 #include <algorithm>
+#include <vector>
 
 #include "StudyReviewQueueStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
 int SavedCardsActivity::itemCount() const {
-  return static_cast<int>(STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Saved).size());
+  const auto& cards = STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Saved);
+  if (cards.empty()) {
+    return 0;
+  }
+
+  std::vector<std::string> decks;
+  for (const auto& card : cards) {
+    if (std::find(decks.begin(), decks.end(), card.deckName) == decks.end()) {
+      decks.push_back(card.deckName);
+    }
+  }
+  if (decks.empty()) {
+    return 0;
+  }
+
+  const std::string activeDeck = decks[std::clamp(deckIndex, 0, static_cast<int>(decks.size()) - 1)];
+  int count = 0;
+  for (const auto& card : cards) {
+    if (card.deckName == activeDeck) {
+      count++;
+    }
+  }
+  return count;
+}
+
+int SavedCardsActivity::deckCount() const {
+  const auto& cards = STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Saved);
+  std::vector<std::string> decks;
+  for (const auto& card : cards) {
+    if (std::find(decks.begin(), decks.end(), card.deckName) == decks.end()) {
+      decks.push_back(card.deckName);
+    }
+  }
+  return static_cast<int>(decks.size());
 }
 
 void SavedCardsActivity::onEnter() {
   Activity::onEnter();
   STUDY_REVIEW_QUEUE.loadFromFile();
+  deckIndex = 0;
   selectedIndex = 0;
   showingBack = false;
   requestUpdate();
@@ -28,6 +63,19 @@ void SavedCardsActivity::loop() {
       return;
     }
     finish();
+    return;
+  }
+
+  if (mappedInput.wasPressed(MappedInputManager::Button::Left) && !showingBack && deckCount() > 0) {
+    deckIndex = (deckIndex - 1 + deckCount()) % deckCount();
+    selectedIndex = 0;
+    requestUpdate();
+    return;
+  }
+  if (mappedInput.wasPressed(MappedInputManager::Button::Right) && !showingBack && deckCount() > 0) {
+    deckIndex = (deckIndex + 1) % deckCount();
+    selectedIndex = 0;
+    requestUpdate();
     return;
   }
 
@@ -87,11 +135,26 @@ void SavedCardsActivity::render(RenderLock&&) {
     renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, "Use Save during Study Cards");
     renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, "Saved cards stay here");
   } else {
-    const auto& card = cards[std::clamp(selectedIndex, 0, static_cast<int>(cards.size()) - 1)];
+    std::vector<std::string> decks;
+    for (const auto& item : cards) {
+      if (std::find(decks.begin(), decks.end(), item.deckName) == decks.end()) {
+        decks.push_back(item.deckName);
+      }
+    }
+    const std::string activeDeck = decks[std::clamp(deckIndex, 0, static_cast<int>(decks.size()) - 1)];
+
+    std::vector<const StudyQueuedCard*> filteredCards;
+    for (const auto& item : cards) {
+      if (item.deckName == activeDeck) {
+        filteredCards.push_back(&item);
+      }
+    }
+
+    const auto& card = *filteredCards[std::clamp(selectedIndex, 0, static_cast<int>(filteredCards.size()) - 1)];
     char meta[40];
-    snprintf(meta, sizeof(meta), "%d/%d  Saved", selectedIndex + 1, static_cast<int>(cards.size()));
+    snprintf(meta, sizeof(meta), "%d/%d  Saved", selectedIndex + 1, static_cast<int>(filteredCards.size()));
     renderer.drawText(SMALL_FONT_ID, pad, contentTop, meta);
-    const std::string deckLabel = renderer.truncatedText(SMALL_FONT_ID, card.deckName.c_str(), pageWidth / 2);
+    const std::string deckLabel = renderer.truncatedText(SMALL_FONT_ID, activeDeck.c_str(), pageWidth / 2);
     renderer.drawText(SMALL_FONT_ID, pageWidth - pad - renderer.getTextWidth(SMALL_FONT_ID, deckLabel.c_str()),
                       contentTop, deckLabel.c_str());
 
@@ -117,7 +180,7 @@ void SavedCardsActivity::render(RenderLock&&) {
   }
 
   const auto labels =
-      mappedInput.mapLabels(tr(STR_BACK), showingBack ? "Remove" : "Flip", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+      mappedInput.mapLabels(tr(STR_BACK), showingBack ? "Remove" : "Flip", "Deck -", "Deck +");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }
