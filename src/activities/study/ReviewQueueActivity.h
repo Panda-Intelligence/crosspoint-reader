@@ -8,6 +8,7 @@ class ReviewQueueActivity final : public Activity {
   int queueIndex = 0;
   int cardIndex = 0;
   bool showingBack = false;
+  bool confirmingClear = false;
 
   void switchQueue(int delta);
   void moveCard(int delta);

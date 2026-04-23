@@ -56,6 +56,7 @@ void ReviewQueueActivity::switchQueue(const int delta) {
   queueIndex = (queueIndex + delta + kQueueCount) % kQueueCount;
   cardIndex = 0;
   showingBack = false;
+  confirmingClear = false;
   requestUpdate();
 }
 
@@ -66,6 +67,7 @@ void ReviewQueueActivity::moveCard(const int delta) {
   }
   cardIndex = (cardIndex + delta + size) % size;
   showingBack = false;
+  confirmingClear = false;
   requestUpdate();
 }
 
@@ -75,11 +77,17 @@ void ReviewQueueActivity::onEnter() {
   queueIndex = 0;
   cardIndex = 0;
   showingBack = false;
+  confirmingClear = false;
   requestUpdate();
 }
 
 void ReviewQueueActivity::loop() {
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
+    if (confirmingClear) {
+      confirmingClear = false;
+      requestUpdate();
+      return;
+    }
     if (showingBack) {
       showingBack = false;
       requestUpdate();
@@ -90,11 +98,29 @@ void ReviewQueueActivity::loop() {
   }
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Left)) {
+    if (confirmingClear) {
+      confirmingClear = false;
+      requestUpdate();
+      return;
+    }
     switchQueue(-1);
     return;
   }
   if (mappedInput.wasPressed(MappedInputManager::Button::Right)) {
+    if (confirmingClear) {
+      STUDY_REVIEW_QUEUE.clearQueue(queueKind(queueIndex));
+      cardIndex = 0;
+      confirmingClear = false;
+      requestUpdate();
+      return;
+    }
     switchQueue(1);
+    return;
+  }
+
+  if (mappedInput.wasPressed(MappedInputManager::Button::Down) && !showingBack && currentQueueSize() > 0) {
+    confirmingClear = true;
+    requestUpdate();
     return;
   }
 
@@ -102,6 +128,11 @@ void ReviewQueueActivity::loop() {
   buttonNavigator.onPreviousRelease([this] { moveCard(-1); });
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
+    if (confirmingClear) {
+      confirmingClear = false;
+      requestUpdate();
+      return;
+    }
     const StudyQueueKind kind = queueKind(queueIndex);
     if (!showingBack) {
       if (currentQueueSize() > 0) {
@@ -180,8 +211,10 @@ void ReviewQueueActivity::render(RenderLock&&) {
       const char* action = queueKind(queueIndex) == StudyQueueKind::Saved ? "Saved card - Confirm closes"
                                                                           : "Confirm marks Done";
       renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, action);
+    } else if (confirmingClear) {
+      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Right clears queue, Left cancels");
     } else {
-      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Confirm to reveal");
+      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Confirm reveal  Down clear queue");
     }
   }
 

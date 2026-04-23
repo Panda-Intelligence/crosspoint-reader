@@ -36,6 +36,7 @@ class StudyReviewQueueStore {
   void recordLater(const StudyCard& card);
   void recordSaved(const StudyCard& card);
   bool removeAt(StudyQueueKind kind, int index);
+  void clearQueue(StudyQueueKind kind);
 
   const std::vector<StudyQueuedCard>& getCards(StudyQueueKind kind) const { return queue(kind); }
   int getAgainCount() const { return static_cast<int>(againCards.size()); }

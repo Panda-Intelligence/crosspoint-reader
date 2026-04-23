@@ -160,3 +160,9 @@ bool StudyReviewQueueStore::removeAt(const StudyQueueKind kind, const int index)
   saveToFile();
   return true;
 }
+
+void StudyReviewQueueStore::clearQueue(const StudyQueueKind kind) {
+  auto& target = mutableQueue(kind);
+  target.clear();
+  saveToFile();
+}
