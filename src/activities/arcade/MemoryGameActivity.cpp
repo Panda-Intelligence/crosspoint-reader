@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 
+#include "ArcadeProgressStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -65,6 +66,9 @@ void MemoryGameActivity::tryFlip(int index) {
       states[firstFlipped] = CardState::Matched;
       matchedPairs++;
       firstFlipped = -1;
+      if (matchedPairs == kPairs) {
+        ARCADE_PROGRESS.recordWin(ArcadeGameId::Memory);
+      }
     } else {
       // No match: schedule a hide after kFlipFailShowMs
       flipFailMs = millis();
@@ -91,6 +95,8 @@ void MemoryGameActivity::syncFlipReset() {
 
 void MemoryGameActivity::onEnter() {
   Activity::onEnter();
+  ARCADE_PROGRESS.loadFromFile();
+  ARCADE_PROGRESS.recordSessionStart();
   initCards();
   requestUpdate();
 }
@@ -159,34 +165,42 @@ void MemoryGameActivity::render(RenderLock&&) {
   const int gridWidth = cellW * kCols;
   const int startX = (pageWidth - gridWidth) / 2;
 
+  constexpr int kCardPad = 5;
+  constexpr int kCardRadius = 8;
+
   for (int row = 0; row < kRows; row++) {
     for (int col = 0; col < kCols; col++) {
       const int idx = row * kCols + col;
-      const int x = startX + col * cellW;
-      const int y = gridTop + row * cellH;
+      const int x = startX + col * cellW + kCardPad;
+      const int y = gridTop + row * cellH + kCardPad;
+      const int cw = cellW - kCardPad * 2;
+      const int ch = cellH - kCardPad * 2;
       const bool isCursor = (idx == cursorIndex);
       const CardState st = states[idx];
 
-      // Outer border — double if cursor
-      renderer.drawRect(x + 2, y + 2, cellW - 4, cellH - 4, true);
-      if (isCursor) {
-        renderer.drawRect(x + 4, y + 4, cellW - 8, cellH - 8, true);
-      }
-
-      if (st == CardState::Hidden) {
-        // Draw a small cross-hatch to indicate face-down
-        renderer.drawLine(x + cellW / 4, y + cellH / 4, x + 3 * cellW / 4, y + 3 * cellH / 4, 1, true);
-        renderer.drawLine(x + 3 * cellW / 4, y + cellH / 4, x + cellW / 4, y + 3 * cellH / 4, 1, true);
-      } else if (st == CardState::Matched) {
-        // Solid fill to show matched
-        renderer.fillRect(x + 6, y + 6, cellW - 12, cellH - 12, true);
-        // Symbol in inverted (white on black)
+      if (st == CardState::Matched) {
+        // Matched: DarkGray fill, white symbol
+        renderer.fillRoundedRect(x, y, cw, ch, kCardRadius, Color::DarkGray);
+        renderer.drawRoundedRect(x, y, cw, ch, 1, kCardRadius, true);
         const char* sym = kSymbols[cards[idx]];
-        renderer.drawCenteredText(UI_12_FONT_ID, y + cellH / 2 - 12, sym, false, EpdFontFamily::BOLD);
+        renderer.drawCenteredText(UI_12_FONT_ID, y + (ch - 20) / 2, sym, false, EpdFontFamily::BOLD);
+      } else if (st == CardState::Flipped) {
+        // Flipped: LightGray fill, black symbol
+        renderer.fillRoundedRect(x, y, cw, ch, kCardRadius, Color::LightGray);
+        renderer.drawRoundedRect(x, y, cw, ch, isCursor ? 2 : 1, kCardRadius, true);
+        const char* sym = kSymbols[cards[idx]];
+        renderer.drawCenteredText(UI_12_FONT_ID, y + (ch - 20) / 2, sym, true, EpdFontFamily::BOLD);
       } else {
-        // Flipped: show symbol
-        const char* sym = kSymbols[cards[idx]];
-        renderer.drawCenteredText(UI_12_FONT_ID, y + cellH / 2 - 12, sym, true, EpdFontFamily::BOLD);
+        // Hidden: outline only; thicker border if cursor
+        renderer.drawRoundedRect(x, y, cw, ch, isCursor ? 2 : 1, kCardRadius, true);
+        if (isCursor) {
+          // Inner ring to indicate focus
+          renderer.drawRoundedRect(x + 3, y + 3, cw - 6, ch - 6, 1, kCardRadius - 2, true);
+        } else {
+          // Cross-hatch on hidden card
+          renderer.drawLine(x + cw / 4, y + ch / 4, x + 3 * cw / 4, y + 3 * ch / 4, 1, true);
+          renderer.drawLine(x + 3 * cw / 4, y + ch / 4, x + cw / 4, y + 3 * ch / 4, 1, true);
+        }
       }
     }
   }

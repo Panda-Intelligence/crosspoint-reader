@@ -5,44 +5,17 @@
 
 #include <algorithm>
 
+#include "StudyDeckStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
 namespace {
-constexpr char kStudyDir[] = "/.mofei/study";
 constexpr char kStudyStateFile[] = "/.mofei/study/state.json";
-
-bool hasJsonSuffix(const std::string& name) {
-  constexpr const char* suffix = ".json";
-  constexpr size_t suffixLen = 5;
-  return name.size() >= suffixLen && name.compare(name.size() - suffixLen, suffixLen, suffix) == 0;
-}
 }  // namespace
 
 void DeckImportStatusActivity::refreshDeckEntries() {
-  deckEntries.clear();
   hasStudyStateFile = Storage.exists(kStudyStateFile);
-
-  const auto files = Storage.listFiles(kStudyDir);
-  for (const auto& file : files) {
-    const std::string filename = file.c_str();
-    if (!hasJsonSuffix(filename) || filename == "state.json") {
-      continue;
-    }
-
-    size_t bytes = 0;
-    FsFile deckFile;
-    const std::string path = std::string(kStudyDir) + "/" + filename;
-    if (Storage.openFileForRead("SDS", path.c_str(), deckFile)) {
-      bytes = deckFile.size();
-      deckFile.close();
-    }
-
-    deckEntries.push_back({filename, bytes});
-  }
-
-  std::sort(deckEntries.begin(), deckEntries.end(),
-            [](const DeckEntry& a, const DeckEntry& b) { return a.filename < b.filename; });
+  STUDY_DECKS.refresh();
 }
 
 std::string DeckImportStatusActivity::sizeLabel(const size_t bytes) const {
@@ -68,22 +41,27 @@ void DeckImportStatusActivity::loop() {
     return;
   }
 
+  const auto& deckEntries = STUDY_DECKS.getDeckSummaries();
+
   if (!deckEntries.empty()) {
     buttonNavigator.onNextRelease([this] {
-      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, static_cast<int>(deckEntries.size()));
+      selectedIndex =
+          ButtonNavigator::nextIndex(selectedIndex, static_cast<int>(STUDY_DECKS.getDeckSummaries().size()));
       requestUpdate();
     });
 
     buttonNavigator.onPreviousRelease([this] {
-      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, static_cast<int>(deckEntries.size()));
+      selectedIndex =
+          ButtonNavigator::previousIndex(selectedIndex, static_cast<int>(STUDY_DECKS.getDeckSummaries().size()));
       requestUpdate();
     });
   }
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
     refreshDeckEntries();
-    if (!deckEntries.empty()) {
-      selectedIndex = std::min(selectedIndex, static_cast<int>(deckEntries.size()) - 1);
+    const auto& refreshedDeckEntries = STUDY_DECKS.getDeckSummaries();
+    if (!refreshedDeckEntries.empty()) {
+      selectedIndex = std::min(selectedIndex, static_cast<int>(refreshedDeckEntries.size()) - 1);
     } else {
       selectedIndex = 0;
     }
@@ -102,6 +80,7 @@ void DeckImportStatusActivity::render(RenderLock&&) {
 
   const int pad = metrics.contentSidePadding;
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  const auto& deckEntries = STUDY_DECKS.getDeckSummaries();
 
   if (deckEntries.empty()) {
     // Styled empty-state card
@@ -127,14 +106,23 @@ void DeckImportStatusActivity::render(RenderLock&&) {
     GUI.drawList(
         renderer, Rect{0, contentTop, pageWidth, listH},
         static_cast<int>(deckEntries.size()), selectedIndex,
-        [this](int index) { return deckEntries[index].filename; },
-        [this](int index) { return "Size: " + sizeLabel(deckEntries[index].bytes); });
+        [](int index) {
+          const auto& entry = STUDY_DECKS.getDeckSummaries()[index];
+          return entry.valid ? entry.title : (entry.filename + "  ! error");
+        },
+        [this](int index) {
+          const auto& entry = STUDY_DECKS.getDeckSummaries()[index];
+          if (!entry.valid) {
+            return "Invalid deck  |  " + sizeLabel(entry.bytes);
+          }
+          return std::to_string(entry.cardCount) + " cards  |  " + sizeLabel(entry.bytes);
+        });
 
     // Summary below list
     const int badgeY = pageHeight - metrics.buttonHintsHeight - 22;
     char countStr[48];
     snprintf(countStr, sizeof(countStr), "%d deck%s  %s",
-             static_cast<int>(deckEntries.size()),
+             STUDY_DECKS.getDeckCount(),
              deckEntries.size() == 1 ? "" : "s",
              hasStudyStateFile ? "| state ready" : "| no state file");
     renderer.drawCenteredText(SMALL_FONT_ID, badgeY, countStr);

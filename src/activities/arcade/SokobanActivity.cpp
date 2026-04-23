@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 
+#include "ArcadeProgressStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -89,10 +90,13 @@ void SokobanActivity::checkWin() {
     }
   }
   completed = true;
+  ARCADE_PROGRESS.recordWin(ArcadeGameId::Sokoban);
 }
 
 void SokobanActivity::onEnter() {
   Activity::onEnter();
+  ARCADE_PROGRESS.loadFromFile();
+  ARCADE_PROGRESS.recordSessionStart();
   loadLevel();
   requestUpdate();
 }

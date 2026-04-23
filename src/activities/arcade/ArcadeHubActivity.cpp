@@ -6,11 +6,13 @@
 #include <array>
 #include <memory>
 
+#include "ArcadeChallengesActivity.h"
 #include "DailyMazeActivity.h"
 #include "Game2048Activity.h"
 #include "MemoryGameActivity.h"
 #include "SokobanActivity.h"
 #include "SudokuActivity.h"
+#include "WordPuzzleActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -79,8 +81,12 @@ void ArcadeHubActivity::loop() {
       activityManager.replaceActivity(std::make_unique<SokobanActivity>(renderer, mappedInput));
     } else if (selectedIndex == 3) {
       activityManager.replaceActivity(std::make_unique<MemoryGameActivity>(renderer, mappedInput));
+    } else if (selectedIndex == 4) {
+      activityManager.replaceActivity(std::make_unique<WordPuzzleActivity>(renderer, mappedInput));
     } else if (selectedIndex == 5) {
       activityManager.replaceActivity(std::make_unique<DailyMazeActivity>(renderer, mappedInput));
+    } else if (selectedIndex == 6) {
+      activityManager.replaceActivity(std::make_unique<ArcadeChallengesActivity>(renderer, mappedInput));
     } else {
       showingDetail = true;
       requestUpdate();

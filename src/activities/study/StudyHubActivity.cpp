@@ -5,12 +5,15 @@
 
 #include "DeckImportStatusActivity.h"
 #include "LearningReportActivity.h"
+#include "ReviewQueueActivity.h"
+#include "StudyDeckStore.h"
+#include "StudyReviewQueueStore.h"
 #include "StudyCardsTodayActivity.h"
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
 
 namespace {
-constexpr int kItemCount = 3;
+constexpr int kItemCount = 4;
 constexpr char kStudyDir[] = "/.mofei/study";
 constexpr char kStudyStateFile[] = "/.mofei/study/state.json";
 
@@ -21,6 +24,8 @@ const char* itemLabel(int index) {
     case 1:
       return "Learning Report";
     case 2:
+      return "Review Queue";
+    case 3:
     default:
       return "Deck Import Status";
   }
@@ -28,20 +33,15 @@ const char* itemLabel(int index) {
 }  // namespace
 
 void StudyHubActivity::refreshImportStatus() {
-  importedDeckCount = 0;
   hasStudyStateFile = Storage.exists(kStudyStateFile);
-
-  const auto files = Storage.listFiles(kStudyDir);
-  for (const auto& file : files) {
-    const String fileName = file;
-    if (!fileName.endsWith(".json")) {
-      continue;
-    }
-    if (fileName == "state.json") {
-      continue;
-    }
-    importedDeckCount++;
-  }
+  STUDY_DECKS.refresh();
+  importedDeckCount = STUDY_DECKS.getDeckCount();
+  importedCardCount = static_cast<int>(STUDY_DECKS.getCards().size());
+  deckErrorCount = STUDY_DECKS.getErrorCount();
+  STUDY_REVIEW_QUEUE.loadFromFile();
+  againQueueCount = STUDY_REVIEW_QUEUE.getAgainCount();
+  laterQueueCount = STUDY_REVIEW_QUEUE.getLaterCount();
+  savedQueueCount = STUDY_REVIEW_QUEUE.getSavedCount();
 }
 
 void StudyHubActivity::onEnter() {
@@ -77,6 +77,9 @@ void StudyHubActivity::loop() {
         activityManager.replaceActivity(std::make_unique<LearningReportActivity>(renderer, mappedInput));
         break;
       case 2:
+        activityManager.replaceActivity(std::make_unique<ReviewQueueActivity>(renderer, mappedInput));
+        break;
+      case 3:
       default:
         activityManager.replaceActivity(std::make_unique<DeckImportStatusActivity>(renderer, mappedInput));
         break;
@@ -102,14 +105,21 @@ void StudyHubActivity::render(RenderLock&&) {
       [this, &state](int index) {
         switch (index) {
           case 0:
-            return std::string("Review due cards: ") + std::to_string(state.dueToday - state.completedToday);
+            if (importedCardCount <= 0) {
+              return std::string("Import deck files to start");
+            }
+            return "Cards: " + std::to_string(importedCardCount) + "  Again: " + std::to_string(againQueueCount);
           case 1:
-            return std::string("Progress and mastery");
+            return "Later: " + std::to_string(laterQueueCount) + "  Saved: " + std::to_string(savedQueueCount);
           case 2:
+            return "Again: " + std::to_string(againQueueCount) + "  Total: " +
+                   std::to_string(againQueueCount + laterQueueCount + savedQueueCount);
+          case 3:
           default:
-            return importedDeckCount > 0
-                       ? ("Imported decks: " + std::to_string(importedDeckCount))
-                       : (hasStudyStateFile ? std::string("Study state ready") : std::string("No deck imported yet"));
+            if (importedDeckCount > 0) {
+              return "Decks: " + std::to_string(importedDeckCount) + "  Errors: " + std::to_string(deckErrorCount);
+            }
+            return hasStudyStateFile ? std::string("Study state ready") : std::string("No deck imported yet");
         }
       });
 

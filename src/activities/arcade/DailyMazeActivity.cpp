@@ -4,6 +4,7 @@
 
 #include <array>
 
+#include "ArcadeProgressStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -62,12 +63,15 @@ void DailyMazeActivity::movePlayer(const int rowDelta, const int colDelta) {
   stepCount++;
   if (playerPos.row == exitPos.row && playerPos.col == exitPos.col) {
     completed = true;
+    ARCADE_PROGRESS.recordWin(ArcadeGameId::DailyMaze);
   }
   requestUpdate();
 }
 
 void DailyMazeActivity::onEnter() {
   Activity::onEnter();
+  ARCADE_PROGRESS.loadFromFile();
+  ARCADE_PROGRESS.recordSessionStart();
   loadMaze();
   requestUpdate();
 }
@@ -114,23 +118,33 @@ void DailyMazeActivity::render(RenderLock&&) {
   const int gridWidth = cell * kCols;
   const int startX = (pageWidth - gridWidth) / 2;
 
+  constexpr int kWallRadius = 3;
+
   for (int row = 0; row < kRows; row++) {
     for (int col = 0; col < kCols; col++) {
       const int x = startX + col * cell;
       const int y = gridTop + row * cell;
 
       if (mazeRows[row][col] == '#') {
-        renderer.fillRect(x, y, cell, cell, true);
+        // Wall: solid rounded rect
+        renderer.fillRoundedRect(x + 1, y + 1, cell - 2, cell - 2, kWallRadius, Color::Black);
       } else {
-        renderer.drawRect(x, y, cell, cell, true);
+        // Floor: faint outline
+        renderer.drawRoundedRect(x + 1, y + 1, cell - 2, cell - 2, 1, kWallRadius, true);
       }
 
       if (row == exitPos.row && col == exitPos.col) {
-        renderer.fillRect(x + cell / 3, y + cell / 3, std::max(2, cell / 3), std::max(2, cell / 3), true);
+        // Exit: bold filled square marker
+        const int m = std::max(3, cell / 4);
+        renderer.fillRoundedRect(x + (cell - m) / 2, y + (cell - m) / 2, m, m, 2, Color::Black);
       }
 
       if (row == playerPos.row && col == playerPos.col) {
-        renderer.fillRect(x + 2, y + 2, cell - 4, cell - 4, false);
+        // Player: filled circle (white on black floor)
+        const int pr = (cell - 6) / 2;
+        renderer.fillRoundedRect(x + cell / 2 - pr, y + cell / 2 - pr, pr * 2, pr * 2, pr, Color::Black);
+        // White inner dot so player stands out against dark walls in debug views
+        renderer.fillRoundedRect(x + cell / 2 - pr / 2, y + cell / 2 - pr / 2, pr, pr, pr / 2, Color::White);
       }
     }
   }

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include "ArcadeProgressStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -26,6 +27,8 @@ void SudokuActivity::loadPuzzle() {
   board = kPuzzle;
   cursorRow = 0;
   cursorCol = 0;
+  hasConflicts = false;
+  completed = false;
   refreshStatus();
 }
 
@@ -102,6 +105,8 @@ void SudokuActivity::cycleCellValue() {
 
 void SudokuActivity::onEnter() {
   Activity::onEnter();
+  ARCADE_PROGRESS.loadFromFile();
+  ARCADE_PROGRESS.recordSessionStart();
   loadPuzzle();
   requestUpdate();
 }
@@ -117,6 +122,9 @@ void SudokuActivity::loop() {
       loadPuzzle();
     } else {
       cycleCellValue();
+      if (completed) {
+        ARCADE_PROGRESS.recordWin(ArcadeGameId::Sudoku);
+      }
     }
     requestUpdate();
     return;
@@ -150,7 +158,8 @@ void SudokuActivity::render(RenderLock&&) {
   const int startX = (pageWidth - boardSize) / 2;
   const int startY = gridTop;
 
-  renderer.drawRect(startX, startY, boardSize, boardSize, 2, true);
+  // Rounded outer board border
+  renderer.drawRoundedRect(startX - 2, startY - 2, boardSize + 4, boardSize + 4, 2, 6, true);
 
   for (int r = 0; r < kSize; r++) {
     for (int c = 0; c < kSize; c++) {
@@ -158,31 +167,48 @@ void SudokuActivity::render(RenderLock&&) {
       const int y = startY + r * cell;
       const bool cursor = (r == cursorRow && c == cursorCol);
       const bool conflict = isConflictAt(r, c);
+      const bool editable = isEditable(r, c);
+      constexpr int kCellPad = 2;
+      constexpr int kCellRadius = 4;
+      const int cx = x + kCellPad;
+      const int cy = y + kCellPad;
+      const int cw = cell - kCellPad * 2;
+      const int ch = cell - kCellPad * 2;
 
-      renderer.drawRect(x, y, cell, cell, true);
-      if (cursor) {
-        renderer.drawRect(x + 1, y + 1, cell - 2, cell - 2, true);
+      if (conflict) {
+        // Conflict: Black fill, white text
+        renderer.fillRoundedRect(cx, cy, cw, ch, kCellRadius, Color::Black);
+      } else if (cursor) {
+        // Cursor: DarkGray fill
+        renderer.fillRoundedRect(cx, cy, cw, ch, kCellRadius, Color::DarkGray);
+        renderer.drawRoundedRect(cx, cy, cw, ch, 1, kCellRadius, true);
+      } else {
+        renderer.drawRoundedRect(cx, cy, cw, ch, 1, kCellRadius, true);
       }
 
       const uint8_t value = board[r][c];
       if (value != 0) {
         char text[2] = {static_cast<char>('0' + value), '\0'};
-        if (conflict) {
-          renderer.fillRect(x + 4, y + 4, cell - 8, cell - 8, true);
-          renderer.drawCenteredText(UI_10_FONT_ID, y + (cell / 2) - 8, text, false, EpdFontFamily::BOLD);
+        const int textY = y + (cell / 2) - 8;
+        if (conflict || cursor) {
+          // Inverted text for cursor/conflict
+          renderer.drawCenteredText(UI_10_FONT_ID, textY, text, false, EpdFontFamily::BOLD);
         } else {
-          renderer.drawCenteredText(UI_10_FONT_ID, y + (cell / 2) - 8, text, true,
-                                    isEditable(r, c) ? EpdFontFamily::REGULAR : EpdFontFamily::BOLD);
+          renderer.drawCenteredText(UI_10_FONT_ID, textY, text, true,
+                                    editable ? EpdFontFamily::REGULAR : EpdFontFamily::BOLD);
         }
       }
     }
   }
 
+  // Thick rounded 3x3 box dividers drawn on top
   for (int i = 3; i < kSize; i += 3) {
-    const int pos = startX + i * cell;
-    renderer.drawLine(pos, startY, pos, startY + boardSize, 2, true);
-    const int rowPos = startY + i * cell;
-    renderer.drawLine(startX, rowPos, startX + boardSize, rowPos, 2, true);
+    const int vx = startX + i * cell - 1;
+    renderer.drawLine(vx, startY, vx, startY + boardSize, 2, true);
+    renderer.drawLine(vx + 1, startY, vx + 1, startY + boardSize, 1, true);
+    const int hy = startY + i * cell - 1;
+    renderer.drawLine(startX, hy, startX + boardSize, hy, 2, true);
+    renderer.drawLine(startX, hy + 1, startX + boardSize, hy + 1, 1, true);
   }
 
   if (completed) {

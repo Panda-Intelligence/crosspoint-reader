@@ -1,19 +1,12 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
 #include "../Activity.h"
 #include "util/ButtonNavigator.h"
 
 class DeckImportStatusActivity final : public Activity {
-  struct DeckEntry {
-    std::string filename;
-    size_t bytes = 0;
-  };
-
   ButtonNavigator buttonNavigator;
-  std::vector<DeckEntry> deckEntries;
   int selectedIndex = 0;
   bool hasStudyStateFile = false;
 

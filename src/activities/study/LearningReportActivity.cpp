@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include "StudyReviewQueueStore.h"
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -11,6 +12,7 @@
 void LearningReportActivity::onEnter() {
   Activity::onEnter();
   STUDY_STATE.loadFromFile();
+  STUDY_REVIEW_QUEUE.loadFromFile();
   requestUpdate();
 }
 
@@ -100,8 +102,9 @@ void LearningReportActivity::render(RenderLock&&) {
   snprintf(rows[0].value, sizeof(rows[0].value), "%u / %u  (%d%%)", state.completedToday, state.dueToday, completion);
   rows[1].label = "Accuracy";
   snprintf(rows[1].value, sizeof(rows[1].value), "%d%%  (%u wrong)", accuracy, state.wrongToday);
-  rows[2].label = "Mastery score";
-  snprintf(rows[2].value, sizeof(rows[2].value), "%d / 100", masteryScore);
+  rows[2].label = "Review queue";
+  snprintf(rows[2].value, sizeof(rows[2].value), "A%d L%d S%d", STUDY_REVIEW_QUEUE.getAgainCount(),
+           STUDY_REVIEW_QUEUE.getLaterCount(), STUDY_REVIEW_QUEUE.getSavedCount());
 
   const int rowH = 28;
   for (int i = 0; i < 3; i++) {
@@ -116,8 +119,10 @@ void LearningReportActivity::render(RenderLock&&) {
   char streakStr[24];
   snprintf(streakStr, sizeof(streakStr), "Streak %u days", state.streakDays);
   renderer.drawText(SMALL_FONT_ID, pad, statusY, streakStr);
-  renderer.drawText(SMALL_FONT_ID, pageWidth - pad - renderer.getTextWidth(SMALL_FONT_ID, "Companion shows full charts"),
-                    statusY, "Companion shows full charts");
+  char masteryStr[28];
+  snprintf(masteryStr, sizeof(masteryStr), "Mastery %d/100", masteryScore);
+  renderer.drawText(SMALL_FONT_ID, pageWidth - pad - renderer.getTextWidth(SMALL_FONT_ID, masteryStr), statusY,
+                    masteryStr);
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Done", "", "");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

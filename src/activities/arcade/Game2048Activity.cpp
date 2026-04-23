@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 
+#include "ArcadeProgressStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -119,6 +120,7 @@ bool Game2048Activity::move(const Direction direction) {
     score += gainedScore;
     for (int r = 0; r < kSize; r++) {
       for (int c = 0; c < kSize; c++) {
+        ARCADE_PROGRESS.record2048Tile(grid[r][c]);
         if (grid[r][c] >= 2048) {
           reached2048 = true;
         }
@@ -150,6 +152,8 @@ bool Game2048Activity::canMove() const {
 
 void Game2048Activity::onEnter() {
   Activity::onEnter();
+  ARCADE_PROGRESS.loadFromFile();
+  ARCADE_PROGRESS.recordSessionStart();
   resetGame();
   requestUpdate();
 }
