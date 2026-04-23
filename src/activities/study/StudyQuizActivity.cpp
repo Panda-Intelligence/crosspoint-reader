@@ -10,6 +10,10 @@
 #include "fontIds.h"
 
 namespace {
+const char* modeLabel(const StudyQuizActivity::QuizMode mode) {
+  return mode == StudyQuizActivity::QuizMode::TwoChoice ? "Two Choice" : "True / False";
+}
+
 void drawOptionButton(GfxRenderer& renderer, int x, int y, int w, int h, const std::string& text, bool selected,
                       bool reveal, bool correct) {
   if (reveal && correct) {
@@ -44,7 +48,13 @@ void StudyQuizActivity::loadQuestion() {
   selectedOption = 0;
   showingResult = false;
   answerCorrect = false;
-  correctOption = questionIndex % 2;
+  if (mode == QuizMode::TwoChoice) {
+    correctOption = questionIndex % 2;
+    truthPromptMatches = false;
+  } else {
+    truthPromptMatches = (questionIndex % 2) == 0;
+    correctOption = truthPromptMatches ? 0 : 1;
+  }
 }
 
 void StudyQuizActivity::onEnter() {
@@ -72,6 +82,14 @@ void StudyQuizActivity::loop() {
   }
 
   if (!showingResult) {
+    if (mappedInput.wasPressed(MappedInputManager::Button::Left) ||
+        mappedInput.wasPressed(MappedInputManager::Button::Right)) {
+      mode = mode == QuizMode::TwoChoice ? QuizMode::TrueFalse : QuizMode::TwoChoice;
+      loadQuestion();
+      requestUpdate();
+      return;
+    }
+
     buttonNavigator.onNextRelease([this] {
       selectedOption = ButtonNavigator::nextIndex(selectedOption, 2);
       requestUpdate();
@@ -122,8 +140,10 @@ void StudyQuizActivity::render(RenderLock&&) {
   } else {
     const StudyCard& question = cards[questionIndex];
     const StudyCard& distractor = cards[(questionIndex + 1) % static_cast<int>(cards.size())];
-    const std::string options[2] = {correctOption == 0 ? question.back : distractor.back,
-                                    correctOption == 1 ? question.back : distractor.back};
+    const StudyCard& candidate = truthPromptMatches ? question : distractor;
+    const std::string options[2] = {
+        mode == QuizMode::TwoChoice ? (correctOption == 0 ? question.back : distractor.back) : std::string("True"),
+        mode == QuizMode::TwoChoice ? (correctOption == 1 ? question.back : distractor.back) : std::string("False")};
 
     char meta[32];
     snprintf(meta, sizeof(meta), "Question %d/%d", questionIndex + 1, static_cast<int>(cards.size()));
@@ -131,14 +151,21 @@ void StudyQuizActivity::render(RenderLock&&) {
     const std::string deckName = renderer.truncatedText(SMALL_FONT_ID, question.deckName.c_str(), pageWidth / 2);
     renderer.drawText(SMALL_FONT_ID, pageWidth - pad - renderer.getTextWidth(SMALL_FONT_ID, deckName.c_str()), contentTop,
                       deckName.c_str());
+    renderer.drawCenteredText(SMALL_FONT_ID, contentTop, modeLabel(mode));
 
     const int cardY = contentTop + 24;
     const int cardH = 112;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-    renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14, "Pick the correct answer");
+    renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14,
+                      mode == QuizMode::TwoChoice ? "Pick the correct answer" : "Does this answer match?");
+
+    std::string prompt = question.front;
+    if (mode == QuizMode::TrueFalse) {
+      prompt += "\n\n" + candidate.back;
+    }
 
     const auto promptLines =
-        renderer.wrappedText(UI_12_FONT_ID, question.front.c_str(), pageWidth - pad * 2 - 32, 3, EpdFontFamily::BOLD);
+        renderer.wrappedText(UI_12_FONT_ID, prompt.c_str(), pageWidth - pad * 2 - 32, 4, EpdFontFamily::BOLD);
     const int promptY = cardY + 46;
     for (size_t i = 0; i < promptLines.size(); i++) {
       renderer.drawCenteredText(UI_12_FONT_ID, promptY + static_cast<int>(i) * 26, promptLines[i].c_str(), true,
@@ -157,7 +184,7 @@ void StudyQuizActivity::render(RenderLock&&) {
       renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, answerCorrect ? "Correct - Confirm for next"
                                                                                  : "Wrong - Confirm for next");
     } else {
-      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Use Up/Down then Confirm");
+      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Up/Down answer  Left/Right mode");
     }
   }
 
