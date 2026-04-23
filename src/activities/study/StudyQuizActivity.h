@@ -7,7 +7,7 @@
 
 class StudyQuizActivity final : public Activity {
  public:
-  enum class QuizMode : uint8_t { TwoChoice, TrueFalse };
+  enum class QuizMode : uint8_t { TwoChoice, TrueFalse, FirstLetter };
 
  private:
   ButtonNavigator buttonNavigator;

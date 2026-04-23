@@ -11,7 +11,15 @@
 
 namespace {
 const char* modeLabel(const StudyQuizActivity::QuizMode mode) {
-  return mode == StudyQuizActivity::QuizMode::TwoChoice ? "Two Choice" : "True / False";
+  switch (mode) {
+    case StudyQuizActivity::QuizMode::TrueFalse:
+      return "True / False";
+    case StudyQuizActivity::QuizMode::FirstLetter:
+      return "First Letter";
+    case StudyQuizActivity::QuizMode::TwoChoice:
+    default:
+      return "Two Choice";
+  }
 }
 
 void drawOptionButton(GfxRenderer& renderer, int x, int y, int w, int h, const std::string& text, bool selected,
@@ -51,9 +59,12 @@ void StudyQuizActivity::loadQuestion() {
   if (mode == QuizMode::TwoChoice) {
     correctOption = questionIndex % 2;
     truthPromptMatches = false;
-  } else {
+  } else if (mode == QuizMode::TrueFalse) {
     truthPromptMatches = (questionIndex % 2) == 0;
     correctOption = truthPromptMatches ? 0 : 1;
+  } else {
+    correctOption = questionIndex % 2;
+    truthPromptMatches = false;
   }
 }
 
@@ -84,7 +95,18 @@ void StudyQuizActivity::loop() {
   if (!showingResult) {
     if (mappedInput.wasPressed(MappedInputManager::Button::Left) ||
         mappedInput.wasPressed(MappedInputManager::Button::Right)) {
-      mode = mode == QuizMode::TwoChoice ? QuizMode::TrueFalse : QuizMode::TwoChoice;
+      switch (mode) {
+        case QuizMode::TwoChoice:
+          mode = QuizMode::TrueFalse;
+          break;
+        case QuizMode::TrueFalse:
+          mode = QuizMode::FirstLetter;
+          break;
+        case QuizMode::FirstLetter:
+        default:
+          mode = QuizMode::TwoChoice;
+          break;
+      }
       loadQuestion();
       requestUpdate();
       return;
@@ -141,9 +163,19 @@ void StudyQuizActivity::render(RenderLock&&) {
     const StudyCard& question = cards[questionIndex];
     const StudyCard& distractor = cards[(questionIndex + 1) % static_cast<int>(cards.size())];
     const StudyCard& candidate = truthPromptMatches ? question : distractor;
-    const std::string options[2] = {
-        mode == QuizMode::TwoChoice ? (correctOption == 0 ? question.back : distractor.back) : std::string("True"),
-        mode == QuizMode::TwoChoice ? (correctOption == 1 ? question.back : distractor.back) : std::string("False")};
+    std::string options[2];
+    if (mode == QuizMode::TwoChoice) {
+      options[0] = correctOption == 0 ? question.back : distractor.back;
+      options[1] = correctOption == 1 ? question.back : distractor.back;
+    } else if (mode == QuizMode::TrueFalse) {
+      options[0] = "True";
+      options[1] = "False";
+    } else {
+      const char correctLetter = question.front.empty() ? '?' : static_cast<char>(toupper(question.front.front()));
+      const char wrongLetter = distractor.front.empty() ? 'X' : static_cast<char>(toupper(distractor.front.front()));
+      options[0] = std::string(1, correctOption == 0 ? correctLetter : wrongLetter);
+      options[1] = std::string(1, correctOption == 1 ? correctLetter : wrongLetter);
+    }
 
     char meta[32];
     snprintf(meta, sizeof(meta), "Question %d/%d", questionIndex + 1, static_cast<int>(cards.size()));
@@ -156,12 +188,16 @@ void StudyQuizActivity::render(RenderLock&&) {
     const int cardY = contentTop + 24;
     const int cardH = 112;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-    renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14,
-                      mode == QuizMode::TwoChoice ? "Pick the correct answer" : "Does this answer match?");
+    renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14, mode == QuizMode::TwoChoice
+                                                           ? "Pick the correct answer"
+                                                           : (mode == QuizMode::TrueFalse ? "Does this answer match?"
+                                                                                          : "Pick the first letter"));
 
     std::string prompt = question.front;
     if (mode == QuizMode::TrueFalse) {
       prompt += "\n\n" + candidate.back;
+    } else if (mode == QuizMode::FirstLetter) {
+      prompt = question.back;
     }
 
     const auto promptLines =
