@@ -136,14 +136,17 @@ void StudyHubActivity::render(RenderLock&&) {
                                                       ? state.dueToday - state.completedToday
                                                       : 0);
           case 1:
-            return "Wrong cards: " + std::to_string(againQueueCount);
+            return againQueueCount > 0 ? ("Wrong cards: " + std::to_string(againQueueCount))
+                                       : std::string("No recovery backlog");
           case 2:
             return importedCardCount > 1 ? std::string("Three drill modes ready")
                                          : std::string("Need at least 2 cards");
           case 3:
-            return "Later: " + std::to_string(laterQueueCount) + "  Parked for later";
+            return laterQueueCount > 0 ? ("Later: " + std::to_string(laterQueueCount) + "  Parked for later")
+                                       : std::string("No postponed cards");
           case 4:
-            return "Saved: " + std::to_string(savedQueueCount) + "  Keep key cards";
+            return savedQueueCount > 0 ? ("Saved: " + std::to_string(savedQueueCount) + "  Keep key cards")
+                                       : std::string("Save cards you want to keep");
           case 5:
             return std::string("Weak area and mastery");
           case 6:
