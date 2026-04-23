@@ -26,13 +26,13 @@ const char* itemLabel(int index) {
     case 0:
       return "Study Cards";
     case 1:
-      return "Quiz Practice";
+      return "Recovery";
     case 2:
-      return "Saved Cards";
+      return "Quiz Practice";
     case 3:
       return "Later Cards";
     case 4:
-      return "Recovery";
+      return "Saved Cards";
     case 5:
       return "Learning Report";
     case 6:
@@ -86,16 +86,16 @@ void StudyHubActivity::loop() {
         activityManager.replaceActivity(std::make_unique<StudyCardsTodayActivity>(renderer, mappedInput));
         break;
       case 1:
-        activityManager.replaceActivity(std::make_unique<StudyQuizActivity>(renderer, mappedInput));
+        activityManager.replaceActivity(std::make_unique<StudyRecoveryActivity>(renderer, mappedInput));
         break;
       case 2:
-        activityManager.replaceActivity(std::make_unique<SavedCardsActivity>(renderer, mappedInput));
+        activityManager.replaceActivity(std::make_unique<StudyQuizActivity>(renderer, mappedInput));
         break;
       case 3:
         activityManager.replaceActivity(std::make_unique<StudyLaterActivity>(renderer, mappedInput));
         break;
       case 4:
-        activityManager.replaceActivity(std::make_unique<StudyRecoveryActivity>(renderer, mappedInput));
+        activityManager.replaceActivity(std::make_unique<SavedCardsActivity>(renderer, mappedInput));
         break;
       case 5:
         activityManager.replaceActivity(std::make_unique<LearningReportActivity>(renderer, mappedInput));
@@ -132,18 +132,20 @@ void StudyHubActivity::render(RenderLock&&) {
             if (importedCardCount <= 0) {
               return std::string("Import deck files to start");
             }
-            return "Cards: " + std::to_string(importedCardCount) + "  Again: " + std::to_string(againQueueCount);
+            return "Due today: " + std::to_string(state.dueToday > state.completedToday
+                                                      ? state.dueToday - state.completedToday
+                                                      : 0);
           case 1:
-            return importedCardCount > 1 ? std::string("Two-choice drills from real cards")
-                                         : std::string("Need at least 2 cards");
+            return "Wrong cards: " + std::to_string(againQueueCount);
           case 2:
-            return "Saved: " + std::to_string(savedQueueCount) + "  Keep key cards";
+            return importedCardCount > 1 ? std::string("Three drill modes ready")
+                                         : std::string("Need at least 2 cards");
           case 3:
             return "Later: " + std::to_string(laterQueueCount) + "  Parked for later";
           case 4:
-            return "Again: " + std::to_string(againQueueCount) + "  Recovery drill";
+            return "Saved: " + std::to_string(savedQueueCount) + "  Keep key cards";
           case 5:
-            return "Later: " + std::to_string(laterQueueCount) + "  Saved: " + std::to_string(savedQueueCount);
+            return std::string("Weak area and mastery");
           case 6:
             return "Again: " + std::to_string(againQueueCount) + "  Total: " +
                    std::to_string(againQueueCount + laterQueueCount + savedQueueCount);
