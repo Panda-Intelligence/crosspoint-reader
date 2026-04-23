@@ -32,8 +32,10 @@ void StudyRecoveryActivity::onEnter() {
   STUDY_REVIEW_QUEUE.loadFromFile();
   STUDY_STATE.loadFromFile();
   showingBack = false;
+  sessionComplete = false;
   selectedIndex = 0;
   actionIndex = 0;
+  completedCount = 0;
   requestUpdate();
 }
 
@@ -50,6 +52,9 @@ void StudyRecoveryActivity::loop() {
 
   const auto& cards = STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Again);
   if (cards.empty()) {
+    if (mappedInput.wasPressed(MappedInputManager::Button::Confirm) && sessionComplete) {
+      finish();
+    }
     return;
   }
 
@@ -87,6 +92,7 @@ void StudyRecoveryActivity::loop() {
     if (actionIndex == 0) {
       STUDY_STATE.recordReviewResult(true);
       STUDY_REVIEW_QUEUE.removeAt(StudyQueueKind::Again, selectedIndex);
+      completedCount++;
     } else {
       STUDY_STATE.recordReviewResult(false);
       STUDY_REVIEW_QUEUE.recordAgain({card.front, card.back, "", card.deckName});
@@ -96,6 +102,7 @@ void StudyRecoveryActivity::loop() {
     const int count = static_cast<int>(STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Again).size());
     if (count <= 0) {
       selectedIndex = 0;
+      sessionComplete = true;
     } else {
       selectedIndex = std::min(selectedIndex, count - 1);
     }
@@ -121,10 +128,18 @@ void StudyRecoveryActivity::render(RenderLock&&) {
     const int cardH = 132;
     const int cardY = (pageHeight - cardH) / 2 - 18;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 18, "No recovery cards", true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 18, sessionComplete ? "Recovery complete" : "No recovery cards",
+                              true, EpdFontFamily::BOLD);
     renderer.drawLine(pad + 18, cardY + 48, pageWidth - pad - 18, cardY + 48, true);
-    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, "Wrong cards will appear here");
-    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, "Miss a card in Study Cards");
+    if (sessionComplete) {
+      char done[40];
+      snprintf(done, sizeof(done), "Cleared %d recovery card%s", completedCount, completedCount == 1 ? "" : "s");
+      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, done);
+      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, "Press Confirm to return");
+    } else {
+      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, "Wrong cards will appear here");
+      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, "Miss a card in Study Cards");
+    }
   } else {
     const auto& card = cards[std::clamp(selectedIndex, 0, static_cast<int>(cards.size()) - 1)];
     char meta[48];
