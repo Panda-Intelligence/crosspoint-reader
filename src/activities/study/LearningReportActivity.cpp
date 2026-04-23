@@ -44,6 +44,22 @@ void LearningReportActivity::render(RenderLock&&) {
       state.dueToday > 0 ? (static_cast<int>(state.completedToday) * 100 / static_cast<int>(state.dueToday)) : 0;
   const int wrongRate = total > 0 ? (static_cast<int>(state.wrongToday) * 100 / total) : 0;
   const int masteryScore = std::clamp(accuracy + (completion / 2) - (wrongRate / 3), 0, 100);
+  const int againCount = STUDY_REVIEW_QUEUE.getAgainCount();
+  const int laterCount = STUDY_REVIEW_QUEUE.getLaterCount();
+  const int savedCount = STUDY_REVIEW_QUEUE.getSavedCount();
+
+  const char* weakArea = "Balanced progress";
+  const char* nextFocus = "Keep daily review steady";
+  if (againCount >= laterCount && againCount >= savedCount && againCount > 0) {
+    weakArea = "Recovery backlog high";
+    nextFocus = "Prioritise wrong cards first";
+  } else if (laterCount >= againCount && laterCount >= savedCount && laterCount > 0) {
+    weakArea = "Later queue growing";
+    nextFocus = "Turn postponed cards into wins";
+  } else if (savedCount > 0) {
+    weakArea = "Saved set expanding";
+    nextFocus = "Revisit saved cards this week";
+  }
 
   // ── Today label ──────────────────────────────────────────────────────
   renderer.drawText(UI_10_FONT_ID, pad, contentTop, "Today", true, EpdFontFamily::BOLD);
@@ -103,8 +119,7 @@ void LearningReportActivity::render(RenderLock&&) {
   rows[1].label = "Accuracy";
   snprintf(rows[1].value, sizeof(rows[1].value), "%d%%  (%u wrong)", accuracy, state.wrongToday);
   rows[2].label = "Review queue";
-  snprintf(rows[2].value, sizeof(rows[2].value), "A%d L%d S%d", STUDY_REVIEW_QUEUE.getAgainCount(),
-           STUDY_REVIEW_QUEUE.getLaterCount(), STUDY_REVIEW_QUEUE.getSavedCount());
+  snprintf(rows[2].value, sizeof(rows[2].value), "A%d L%d S%d", againCount, laterCount, savedCount);
 
   const int rowH = 28;
   for (int i = 0; i < 3; i++) {
@@ -123,6 +138,10 @@ void LearningReportActivity::render(RenderLock&&) {
   snprintf(masteryStr, sizeof(masteryStr), "Mastery %d/100", masteryScore);
   renderer.drawText(SMALL_FONT_ID, pageWidth - pad - renderer.getTextWidth(SMALL_FONT_ID, masteryStr), statusY,
                     masteryStr);
+
+  renderer.drawText(SMALL_FONT_ID, pad, statusY - 24, weakArea, true, EpdFontFamily::BOLD);
+  renderer.drawText(SMALL_FONT_ID, pageWidth - pad - renderer.getTextWidth(SMALL_FONT_ID, nextFocus), statusY - 24,
+                    nextFocus);
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Done", "", "");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
