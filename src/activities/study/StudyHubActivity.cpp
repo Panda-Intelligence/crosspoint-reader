@@ -7,13 +7,14 @@
 #include "LearningReportActivity.h"
 #include "ReviewQueueActivity.h"
 #include "StudyDeckStore.h"
+#include "StudyQuizActivity.h"
 #include "StudyReviewQueueStore.h"
 #include "StudyCardsTodayActivity.h"
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
 
 namespace {
-constexpr int kItemCount = 4;
+constexpr int kItemCount = 5;
 constexpr char kStudyDir[] = "/.mofei/study";
 constexpr char kStudyStateFile[] = "/.mofei/study/state.json";
 
@@ -22,10 +23,12 @@ const char* itemLabel(int index) {
     case 0:
       return "Study Cards";
     case 1:
-      return "Learning Report";
+      return "Quiz Practice";
     case 2:
-      return "Review Queue";
+      return "Learning Report";
     case 3:
+      return "Review Queue";
+    case 4:
     default:
       return "Deck Import Status";
   }
@@ -74,12 +77,15 @@ void StudyHubActivity::loop() {
         activityManager.replaceActivity(std::make_unique<StudyCardsTodayActivity>(renderer, mappedInput));
         break;
       case 1:
-        activityManager.replaceActivity(std::make_unique<LearningReportActivity>(renderer, mappedInput));
+        activityManager.replaceActivity(std::make_unique<StudyQuizActivity>(renderer, mappedInput));
         break;
       case 2:
-        activityManager.replaceActivity(std::make_unique<ReviewQueueActivity>(renderer, mappedInput));
+        activityManager.replaceActivity(std::make_unique<LearningReportActivity>(renderer, mappedInput));
         break;
       case 3:
+        activityManager.replaceActivity(std::make_unique<ReviewQueueActivity>(renderer, mappedInput));
+        break;
+      case 4:
       default:
         activityManager.replaceActivity(std::make_unique<DeckImportStatusActivity>(renderer, mappedInput));
         break;
@@ -110,11 +116,14 @@ void StudyHubActivity::render(RenderLock&&) {
             }
             return "Cards: " + std::to_string(importedCardCount) + "  Again: " + std::to_string(againQueueCount);
           case 1:
-            return "Later: " + std::to_string(laterQueueCount) + "  Saved: " + std::to_string(savedQueueCount);
+            return importedCardCount > 1 ? std::string("Two-choice drills from real cards")
+                                         : std::string("Need at least 2 cards");
           case 2:
+            return "Later: " + std::to_string(laterQueueCount) + "  Saved: " + std::to_string(savedQueueCount);
+          case 3:
             return "Again: " + std::to_string(againQueueCount) + "  Total: " +
                    std::to_string(againQueueCount + laterQueueCount + savedQueueCount);
-          case 3:
+          case 4:
           default:
             if (importedDeckCount > 0) {
               return "Decks: " + std::to_string(importedDeckCount) + "  Errors: " + std::to_string(deckErrorCount);
