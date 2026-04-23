@@ -158,9 +158,15 @@ void DashboardActivity::render(RenderLock&&) {
           case 1:
             return summary.todaySecondary;
           case 2:
-            return study.dueToday > study.completedToday
-                       ? ("Due cards: " + std::to_string(study.dueToday - study.completedToday))
-                       : std::string("All caught up");
+            if (summary.loadedCards <= 0) {
+              return std::string("Import study decks to begin");
+            }
+            if (summary.againCards > 0) {
+              return "Again queue: " + std::to_string(summary.againCards);
+            }
+            return summary.dueCards > 0 ? ("Due cards: " + std::to_string(summary.dueCards)) : std::string("All caught up");
+          case 5:
+            return "Cards " + std::to_string(summary.loadedCards) + "  Later " + std::to_string(summary.laterCards);
           default:
             return std::string(itemSubtitle(index));
         }

@@ -10,6 +10,10 @@ struct DesktopSummaryState {
   std::string todaySecondary = "Use Calendar to plan";
   int dueCards = 0;
   int studyDone = 0;
+  int loadedCards = 0;
+  int againCards = 0;
+  int laterCards = 0;
+  int savedCards = 0;
 };
 
 class DesktopSummaryStore {

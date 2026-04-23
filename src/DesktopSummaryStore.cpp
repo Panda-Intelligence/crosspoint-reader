@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
+#include "StudyDeckStore.h"
+#include "StudyReviewQueueStore.h"
 #include "WifiCredentialStore.h"
 #include "StudyStateStore.h"
 
@@ -27,7 +29,13 @@ void DesktopSummaryStore::refresh() {
 
   // Pull live study counters from StudyStateStore
   const auto& study = STUDY_STATE.getState();
+  STUDY_DECKS.refresh();
+  STUDY_REVIEW_QUEUE.loadFromFile();
   const int remaining = static_cast<int>(study.dueToday) - static_cast<int>(study.completedToday);
   state.dueCards = remaining > 0 ? remaining : 0;
   state.studyDone = static_cast<int>(study.completedToday);
+  state.loadedCards = static_cast<int>(STUDY_DECKS.getCards().size());
+  state.againCards = STUDY_REVIEW_QUEUE.getAgainCount();
+  state.laterCards = STUDY_REVIEW_QUEUE.getLaterCount();
+  state.savedCards = STUDY_REVIEW_QUEUE.getSavedCount();
 }
