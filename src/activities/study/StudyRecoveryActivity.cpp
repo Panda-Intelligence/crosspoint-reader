@@ -4,6 +4,9 @@
 
 #include <algorithm>
 
+#include "LearningReportActivity.h"
+#include "SavedCardsActivity.h"
+#include "StudyLaterActivity.h"
 #include "StudyReviewQueueStore.h"
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
@@ -26,6 +29,55 @@ void drawActionButton(GfxRenderer& renderer, int x, int y, int w, int h, const c
                     selected ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
 }
 }  // namespace
+
+StudyRecoveryActivity::NextStep StudyRecoveryActivity::recommendedNextStep() const {
+  if (STUDY_REVIEW_QUEUE.getLaterCount() > 0) {
+    return NextStep::Later;
+  }
+  if (STUDY_REVIEW_QUEUE.getSavedCount() > 0) {
+    return NextStep::Saved;
+  }
+  return NextStep::Report;
+}
+
+const char* StudyRecoveryActivity::nextStepLabel() const {
+  switch (recommendedNextStep()) {
+    case NextStep::Later:
+      return "Next: Later Cards";
+    case NextStep::Saved:
+      return "Next: Saved Cards";
+    case NextStep::Report:
+    default:
+      return "Next: Learning Report";
+  }
+}
+
+const char* StudyRecoveryActivity::nextStepHint() const {
+  switch (recommendedNextStep()) {
+    case NextStep::Later:
+      return "Convert postponed cards next";
+    case NextStep::Saved:
+      return "Review cards worth keeping";
+    case NextStep::Report:
+    default:
+      return "Check mastery and weak areas";
+  }
+}
+
+void StudyRecoveryActivity::openRecommendedNextStep() {
+  switch (recommendedNextStep()) {
+    case NextStep::Later:
+      activityManager.replaceActivity(std::make_unique<StudyLaterActivity>(renderer, mappedInput));
+      break;
+    case NextStep::Saved:
+      activityManager.replaceActivity(std::make_unique<SavedCardsActivity>(renderer, mappedInput));
+      break;
+    case NextStep::Report:
+    default:
+      activityManager.replaceActivity(std::make_unique<LearningReportActivity>(renderer, mappedInput));
+      break;
+  }
+}
 
 void StudyRecoveryActivity::onEnter() {
   Activity::onEnter();
@@ -53,7 +105,7 @@ void StudyRecoveryActivity::loop() {
   const auto& cards = STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Again);
   if (cards.empty()) {
     if (mappedInput.wasPressed(MappedInputManager::Button::Confirm) && sessionComplete) {
-      finish();
+      openRecommendedNextStep();
     }
     return;
   }
@@ -125,7 +177,7 @@ void StudyRecoveryActivity::render(RenderLock&&) {
 
   const auto& cards = STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Again);
   if (cards.empty()) {
-    const int cardH = 132;
+    const int cardH = sessionComplete ? 156 : 132;
     const int cardY = (pageHeight - cardH) / 2 - 18;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
     renderer.drawCenteredText(UI_10_FONT_ID, cardY + 18, sessionComplete ? "Recovery complete" : "No recovery cards",
@@ -135,7 +187,8 @@ void StudyRecoveryActivity::render(RenderLock&&) {
       char done[40];
       snprintf(done, sizeof(done), "Cleared %d recovery card%s", completedCount, completedCount == 1 ? "" : "s");
       renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, done);
-      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, "Press Confirm to return");
+      renderer.drawCenteredText(UI_10_FONT_ID, cardY + 94, nextStepLabel(), true, EpdFontFamily::BOLD);
+      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 122, nextStepHint());
     } else {
       renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, "Wrong cards will appear here");
       renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, "Miss a card in Study Cards");
@@ -177,8 +230,8 @@ void StudyRecoveryActivity::render(RenderLock&&) {
     }
   }
 
-  const auto labels =
-      mappedInput.mapLabels(tr(STR_BACK), showingBack ? "Apply" : "Flip", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), sessionComplete ? "Open" : (showingBack ? "Apply" : "Flip"),
+                                            tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

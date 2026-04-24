@@ -11,6 +11,13 @@ class StudyRecoveryActivity final : public Activity {
   int actionIndex = 0;
   int completedCount = 0;
 
+  enum class NextStep { Later, Saved, Report };
+
+  NextStep recommendedNextStep() const;
+  const char* nextStepLabel() const;
+  const char* nextStepHint() const;
+  void openRecommendedNextStep();
+
  public:
   explicit StudyRecoveryActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
       : Activity("StudyRecovery", renderer, mappedInput) {}
