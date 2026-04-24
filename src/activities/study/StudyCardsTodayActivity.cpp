@@ -4,7 +4,11 @@
 
 #include <algorithm>
 
+#include "LearningReportActivity.h"
+#include "SavedCardsActivity.h"
 #include "StudyDeckStore.h"
+#include "StudyLaterActivity.h"
+#include "StudyRecoveryActivity.h"
 #include "StudyReviewQueueStore.h"
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
@@ -45,10 +49,72 @@ std::string truncatedLine(GfxRenderer& renderer, int fontId, const std::string& 
 void StudyCardsTodayActivity::startSession() {
   inSession = true;
   showingBack = false;
+  sessionComplete = false;
   cardIndex = 0;
   actionIndex = 0;
   reviewedInSession = 0;
+  sessionAgainCount = 0;
+  sessionLaterCount = 0;
   savedCount = 0;
+}
+
+StudyCardsTodayActivity::NextStep StudyCardsTodayActivity::recommendedNextStep() const {
+  if (STUDY_REVIEW_QUEUE.getAgainCount() > 0) {
+    return NextStep::Recovery;
+  }
+  if (STUDY_REVIEW_QUEUE.getLaterCount() > 0) {
+    return NextStep::Later;
+  }
+  if (STUDY_REVIEW_QUEUE.getSavedCount() > 0) {
+    return NextStep::Saved;
+  }
+  return NextStep::Report;
+}
+
+const char* StudyCardsTodayActivity::nextStepLabel() const {
+  switch (recommendedNextStep()) {
+    case NextStep::Recovery:
+      return "Next: Recovery";
+    case NextStep::Later:
+      return "Next: Later Cards";
+    case NextStep::Saved:
+      return "Next: Saved Cards";
+    case NextStep::Report:
+    default:
+      return "Next: Learning Report";
+  }
+}
+
+const char* StudyCardsTodayActivity::nextStepHint() const {
+  switch (recommendedNextStep()) {
+    case NextStep::Recovery:
+      return "Fix missed cards first";
+    case NextStep::Later:
+      return "Clear postponed cards next";
+    case NextStep::Saved:
+      return "Review cards worth keeping";
+    case NextStep::Report:
+    default:
+      return "Check mastery and weak areas";
+  }
+}
+
+void StudyCardsTodayActivity::openRecommendedNextStep() {
+  switch (recommendedNextStep()) {
+    case NextStep::Recovery:
+      activityManager.replaceActivity(std::make_unique<StudyRecoveryActivity>(renderer, mappedInput));
+      break;
+    case NextStep::Later:
+      activityManager.replaceActivity(std::make_unique<StudyLaterActivity>(renderer, mappedInput));
+      break;
+    case NextStep::Saved:
+      activityManager.replaceActivity(std::make_unique<SavedCardsActivity>(renderer, mappedInput));
+      break;
+    case NextStep::Report:
+    default:
+      activityManager.replaceActivity(std::make_unique<LearningReportActivity>(renderer, mappedInput));
+      break;
+  }
 }
 
 void StudyCardsTodayActivity::advanceCard(const bool recordResult, const bool correct, const bool saved) {
@@ -57,8 +123,10 @@ void StudyCardsTodayActivity::advanceCard(const bool recordResult, const bool co
     const StudyCard& card = cards[std::clamp(cardIndex, 0, static_cast<int>(cards.size()) - 1)];
     if (recordResult && !correct) {
       STUDY_REVIEW_QUEUE.recordAgain(card);
+      sessionAgainCount++;
     } else if (!recordResult && !saved) {
       STUDY_REVIEW_QUEUE.recordLater(card);
+      sessionLaterCount++;
     } else if (saved) {
       STUDY_REVIEW_QUEUE.recordSaved(card);
     }
@@ -75,6 +143,7 @@ void StudyCardsTodayActivity::advanceCard(const bool recordResult, const bool co
   if (cards.empty() || reviewedInSession >= static_cast<int>(cards.size())) {
     inSession = false;
     showingBack = false;
+    sessionComplete = true;
     requestUpdate();
     return;
   }
@@ -92,9 +161,12 @@ void StudyCardsTodayActivity::onEnter() {
   STUDY_REVIEW_QUEUE.loadFromFile();
   inSession = false;
   showingBack = false;
+  sessionComplete = false;
   cardIndex = 0;
   actionIndex = 0;
   reviewedInSession = 0;
+  sessionAgainCount = 0;
+  sessionLaterCount = 0;
   savedCount = 0;
   requestUpdate();
 }
@@ -111,7 +183,9 @@ void StudyCardsTodayActivity::loop() {
   }
 
   if (!inSession) {
-    if (mappedInput.wasPressed(MappedInputManager::Button::Confirm) && STUDY_DECKS.hasCards()) {
+    if (mappedInput.wasPressed(MappedInputManager::Button::Confirm) && sessionComplete) {
+      openRecommendedNextStep();
+    } else if (mappedInput.wasPressed(MappedInputManager::Button::Confirm) && STUDY_DECKS.hasCards()) {
       startSession();
       requestUpdate();
     } else if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
@@ -189,6 +263,23 @@ void StudyCardsTodayActivity::render(RenderLock&&) {
     char status[48];
     snprintf(status, sizeof(status), "Decks %d  Errors %d", STUDY_DECKS.getDeckCount(), STUDY_DECKS.getErrorCount());
     renderer.drawCenteredText(SMALL_FONT_ID, contentBottom - 16, status);
+  } else if (!inSession && sessionComplete) {
+    const int cardH = 178;
+    const int cardY = contentTop + (contentBottom - contentTop - cardH) / 2 - 22;
+    renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
+    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 16, "Study complete", true, EpdFontFamily::BOLD);
+    renderer.drawLine(pad + 24, cardY + 46, pageWidth - pad - 24, cardY + 46, true);
+
+    char reviewed[48];
+    snprintf(reviewed, sizeof(reviewed), "Reviewed %d  Saved %d", reviewedInSession, savedCount);
+    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 62, reviewed);
+
+    char queues[48];
+    snprintf(queues, sizeof(queues), "Again %d  Later %d", sessionAgainCount, sessionLaterCount);
+    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 86, queues);
+
+    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 116, nextStepLabel(), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 144, nextStepHint());
   } else if (!inSession) {
     const int due = std::max(0, static_cast<int>(state.dueToday) - static_cast<int>(state.completedToday));
     const int cardH = 178;
@@ -264,7 +355,7 @@ void StudyCardsTodayActivity::render(RenderLock&&) {
   }
 
   const auto labels =
-      mappedInput.mapLabels(tr(STR_BACK), inSession ? (showingBack ? "Apply" : "Flip") : "Start",
+      mappedInput.mapLabels(tr(STR_BACK), inSession ? (showingBack ? "Apply" : "Flip") : (sessionComplete ? "Open" : "Start"),
                             tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
