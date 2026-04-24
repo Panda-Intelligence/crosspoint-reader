@@ -298,7 +298,7 @@ void setup() {
     // If we rebooted from a panic, go to crash report screen to show the panic info
     activityManager.goToCrashReport();
   }
-#if MOFEI_DEVICE
+#if MOFEI_APP
   else {
     // Mofei boots to the dashboard by default. Reader resume remains available
     // through package-level flows instead of being the system-wide boot target.

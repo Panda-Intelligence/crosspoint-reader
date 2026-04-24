@@ -229,7 +229,7 @@ void ActivityManager::goToFullScreenMessage(std::string message, EpdFontFamily::
 void ActivityManager::goToCrashReport() { replaceActivity(std::make_unique<CrashActivity>(renderer, mappedInput)); }
 
 void ActivityManager::goHome() {
-#if MOFEI_DEVICE
+#if MOFEI_APP
   replaceActivity(std::make_unique<DashboardActivity>(renderer, mappedInput));
 #else
   replaceActivity(std::make_unique<HomeActivity>(renderer, mappedInput));

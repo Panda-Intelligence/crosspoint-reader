@@ -194,7 +194,11 @@ void HalGPIO::begin() {
   inputMgr.begin();
   SPI.begin(EPD_SCLK, SPI_MISO, EPD_MOSI, EPD_CS);
 
-#if MOFEI_DEVICE
+#if MOFEI_FORCE_X3
+  _deviceType = DeviceType::X3;
+#elif MOFEI_FORCE_X4
+  _deviceType = DeviceType::X4;
+#elif MOFEI_DEVICE
   _deviceType = DeviceType::MOFEI;
 #else
   _deviceType = detectDeviceTypeWithFingerprint();
