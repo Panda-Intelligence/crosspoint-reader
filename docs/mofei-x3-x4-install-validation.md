@@ -32,6 +32,34 @@ Set the confirmed port:
 export XTEINK_PORT=/dev/cu.usbmodemXXXX
 ```
 
+## 1.1 Quick Script Flow
+
+Use the guarded helper script when a device is connected. It requires an explicit device type and refuses to upload
+without a confirmed serial port.
+
+Build only:
+
+```bash
+scripts/mofei_flash_validate.sh --device x4 --build-only
+scripts/mofei_flash_validate.sh --device x3 --build-only
+```
+
+Build and flash:
+
+```bash
+scripts/mofei_flash_validate.sh --device x4 --port "$XTEINK_PORT"
+scripts/mofei_flash_validate.sh --device x3 --port "$XTEINK_PORT"
+```
+
+Build, flash, then open serial monitor:
+
+```bash
+scripts/mofei_flash_validate.sh --device x4 --port "$XTEINK_PORT" --monitor
+scripts/mofei_flash_validate.sh --device x3 --port "$XTEINK_PORT" --monitor
+```
+
+The script exits before upload if no port is provided, and it rejects Bluetooth/debug-console ports.
+
 ## 2. Build Firmware
 
 For X4:
