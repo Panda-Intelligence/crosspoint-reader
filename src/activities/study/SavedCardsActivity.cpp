@@ -46,6 +46,33 @@ int SavedCardsActivity::deckCount() const {
   return static_cast<int>(decks.size());
 }
 
+int SavedCardsActivity::selectedQueueIndex() const {
+  const auto& cards = STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Saved);
+  std::vector<std::string> decks;
+  for (const auto& card : cards) {
+    if (std::find(decks.begin(), decks.end(), card.deckName) == decks.end()) {
+      decks.push_back(card.deckName);
+    }
+  }
+  if (decks.empty()) {
+    return -1;
+  }
+
+  const std::string activeDeck = decks[std::clamp(deckIndex, 0, static_cast<int>(decks.size()) - 1)];
+  const int targetIndex = std::clamp(selectedIndex, 0, std::max(0, itemCount() - 1));
+  int filteredIndex = 0;
+  for (int i = 0; i < static_cast<int>(cards.size()); i++) {
+    if (cards[i].deckName != activeDeck) {
+      continue;
+    }
+    if (filteredIndex == targetIndex) {
+      return i;
+    }
+    filteredIndex++;
+  }
+  return -1;
+}
+
 void SavedCardsActivity::onEnter() {
   Activity::onEnter();
   STUDY_REVIEW_QUEUE.loadFromFile();
@@ -100,7 +127,7 @@ void SavedCardsActivity::loop() {
       return;
     }
 
-    if (STUDY_REVIEW_QUEUE.removeAt(StudyQueueKind::Saved, selectedIndex)) {
+    if (STUDY_REVIEW_QUEUE.removeAt(StudyQueueKind::Saved, selectedQueueIndex())) {
       const int count = itemCount();
       if (count <= 0) {
         selectedIndex = 0;
@@ -151,8 +178,10 @@ void SavedCardsActivity::render(RenderLock&&) {
     }
 
     const auto& card = *filteredCards[std::clamp(selectedIndex, 0, static_cast<int>(filteredCards.size()) - 1)];
-    char meta[40];
-    snprintf(meta, sizeof(meta), "%d/%d  Saved", selectedIndex + 1, static_cast<int>(filteredCards.size()));
+    char meta[56];
+    snprintf(meta, sizeof(meta), "Deck %d/%d  Card %d/%d",
+             std::clamp(deckIndex, 0, static_cast<int>(decks.size()) - 1) + 1, static_cast<int>(decks.size()),
+             selectedIndex + 1, static_cast<int>(filteredCards.size()));
     renderer.drawText(SMALL_FONT_ID, pad, contentTop, meta);
     const std::string deckLabel = renderer.truncatedText(SMALL_FONT_ID, activeDeck.c_str(), pageWidth / 2);
     renderer.drawText(SMALL_FONT_ID, pageWidth - pad - renderer.getTextWidth(SMALL_FONT_ID, deckLabel.c_str()),
@@ -175,7 +204,10 @@ void SavedCardsActivity::render(RenderLock&&) {
     if (showingBack) {
       renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Confirm removes from saved");
     } else {
-      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Confirm to reveal");
+      char progress[56];
+      snprintf(progress, sizeof(progress), "%d in deck, %d saved total", static_cast<int>(filteredCards.size()),
+               static_cast<int>(cards.size()));
+      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, progress);
     }
   }
 

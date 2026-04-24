@@ -11,6 +11,7 @@ class SavedCardsActivity final : public Activity {
 
   int itemCount() const;
   int deckCount() const;
+  int selectedQueueIndex() const;
 
  public:
   explicit SavedCardsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)

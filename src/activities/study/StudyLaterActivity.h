@@ -11,6 +11,7 @@ class StudyLaterActivity final : public Activity {
 
   int itemCount() const;
   int deckCount() const;
+  int selectedQueueIndex() const;
 
  public:
   explicit StudyLaterActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
