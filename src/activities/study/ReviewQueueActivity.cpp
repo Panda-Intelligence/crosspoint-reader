@@ -185,6 +185,20 @@ void ReviewQueueActivity::render(RenderLock&&) {
     renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, queueHint(queueIndex));
     renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, "Use Left/Right to switch queues");
   } else {
+    if (confirmingClear) {
+      const int cardH = 132;
+      const int cardY = (pageHeight - cardH) / 2 - 18;
+      renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
+      renderer.drawCenteredText(UI_10_FONT_ID, cardY + 18, "Clear current queue?", true, EpdFontFamily::BOLD);
+      renderer.drawLine(pad + 18, cardY + 48, pageWidth - pad - 18, cardY + 48, true);
+      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, queueTitle(queueIndex));
+      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, "Right confirms, Left cancels");
+      const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "Cancel", "Clear");
+      GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+      renderer.displayBuffer();
+      return;
+    }
+
     const StudyQueuedCard& card = cards[std::clamp(cardIndex, 0, static_cast<int>(cards.size()) - 1)];
     char meta[48];
     snprintf(meta, sizeof(meta), "%d/%d  Count %u", cardIndex + 1, static_cast<int>(cards.size()), card.count);
@@ -211,8 +225,6 @@ void ReviewQueueActivity::render(RenderLock&&) {
       const char* action = queueKind(queueIndex) == StudyQueueKind::Saved ? "Saved card - Confirm closes"
                                                                           : "Confirm marks Done";
       renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, action);
-    } else if (confirmingClear) {
-      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Right clears queue, Left cancels");
     } else {
       renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Confirm reveal  Down clear queue");
     }
