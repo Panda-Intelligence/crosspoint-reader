@@ -129,6 +129,21 @@ constexpr uint16_t MOFEI_TOUCH_LOGICAL_WIDTH_PX = MOFEI_TOUCH_LOGICAL_WIDTH;
 constexpr uint16_t MOFEI_TOUCH_LOGICAL_HEIGHT_PX = MOFEI_TOUCH_LOGICAL_HEIGHT;
 constexpr uint16_t MOFEI_TOUCH_BOTTOM_ZONE_PX = 110;
 constexpr uint16_t MOFEI_TOUCH_EDGE_ZONE_PX = 80;
+constexpr uint16_t MOFEI_TOUCH_BUTTON_HINT_Y_PX = MOFEI_TOUCH_LOGICAL_HEIGHT_PX - 48;
+constexpr uint16_t MOFEI_TOUCH_BUTTON_HINT_HEIGHT_PX = 48;
+
+struct TouchButtonHintRect {
+  uint16_t x;
+  uint16_t width;
+  uint8_t button;
+};
+
+constexpr TouchButtonHintRect MOFEI_TOUCH_BUTTON_HINT_RECTS[] = {
+    {20, 113, HalGPIO::BTN_BACK},
+    {133, 108, HalGPIO::BTN_CONFIRM},
+    {241, 110, HalGPIO::BTN_LEFT},
+    {351, 109, HalGPIO::BTN_RIGHT},
+};
 #endif
 
 NvsDeviceValue readNvsDeviceValue(const char* key, NvsDeviceValue defaultValue) {
@@ -253,47 +268,82 @@ void HalGPIO::injectMofeiButtonEvent(uint8_t buttonIndex) {
   mofeiButtonPressFinish = mofeiButtonPressStart;
 }
 
+bool HalGPIO::mapMofeiButtonHintTapToButton(uint16_t x, uint16_t y, uint8_t* buttonIndex) const {
+  if (buttonIndex == nullptr) {
+    return false;
+  }
+  if (y < MOFEI_TOUCH_BUTTON_HINT_Y_PX || y >= MOFEI_TOUCH_BUTTON_HINT_Y_PX + MOFEI_TOUCH_BUTTON_HINT_HEIGHT_PX) {
+    return false;
+  }
+  for (const auto& rect : MOFEI_TOUCH_BUTTON_HINT_RECTS) {
+    if (x >= rect.x && x < rect.x + rect.width) {
+      *buttonIndex = rect.button;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool HalGPIO::mapMofeiTouchToButton(const MofeiTouchDriver::Event& event, uint8_t* buttonIndex) const {
+  if (buttonIndex == nullptr) {
+    return false;
+  }
+  switch (event.type) {
+    case MofeiTouchDriver::EventType::SwipeLeft:
+      *buttonIndex = BTN_RIGHT;
+      return true;
+    case MofeiTouchDriver::EventType::SwipeRight:
+      *buttonIndex = BTN_LEFT;
+      return true;
+    case MofeiTouchDriver::EventType::SwipeUp:
+      *buttonIndex = BTN_DOWN;
+      return true;
+    case MofeiTouchDriver::EventType::SwipeDown:
+      *buttonIndex = BTN_UP;
+      return true;
+    case MofeiTouchDriver::EventType::Tap:
+      break;
+    case MofeiTouchDriver::EventType::None:
+    default:
+      return false;
+  }
+
+  if (mapMofeiButtonHintTapToButton(event.x, event.y, buttonIndex)) {
+    return true;
+  }
+
+  if (event.y >= MOFEI_TOUCH_LOGICAL_HEIGHT_PX - MOFEI_TOUCH_BOTTOM_ZONE_PX) {
+    return false;
+  }
+
+  if (event.x <= MOFEI_TOUCH_EDGE_ZONE_PX) {
+    *buttonIndex = BTN_BACK;
+  } else if (event.x < MOFEI_TOUCH_LOGICAL_WIDTH_PX / 3) {
+    *buttonIndex = BTN_LEFT;
+  } else if (event.x >= (MOFEI_TOUCH_LOGICAL_WIDTH_PX * 2) / 3) {
+    *buttonIndex = BTN_RIGHT;
+  } else {
+    *buttonIndex = BTN_CONFIRM;
+  }
+  return true;
+}
+
 void HalGPIO::updateMofeiTouch() {
   MofeiTouchDriver::Event event;
   if (!mofeiTouch.update(&event)) {
     return;
   }
 
-  uint8_t button = BTN_CONFIRM;
-  switch (event.type) {
-    case MofeiTouchDriver::EventType::SwipeLeft:
-      button = BTN_RIGHT;
-      break;
-    case MofeiTouchDriver::EventType::SwipeRight:
-      button = BTN_LEFT;
-      break;
-    case MofeiTouchDriver::EventType::SwipeUp:
-      button = BTN_DOWN;
-      break;
-    case MofeiTouchDriver::EventType::SwipeDown:
-      button = BTN_UP;
-      break;
-    case MofeiTouchDriver::EventType::Tap:
-      if (event.y >= MOFEI_TOUCH_LOGICAL_HEIGHT_PX - MOFEI_TOUCH_BOTTOM_ZONE_PX) {
-        const uint16_t segment = (static_cast<uint32_t>(event.x) * 4) / MOFEI_TOUCH_LOGICAL_WIDTH_PX;
-        button = segment == 0 ? BTN_BACK : (segment == 1 ? BTN_CONFIRM : (segment == 2 ? BTN_LEFT : BTN_RIGHT));
-      } else if (event.x <= MOFEI_TOUCH_EDGE_ZONE_PX) {
-        button = BTN_BACK;
-      } else if (event.x < MOFEI_TOUCH_LOGICAL_WIDTH_PX / 3) {
-        button = BTN_LEFT;
-      } else if (event.x >= (MOFEI_TOUCH_LOGICAL_WIDTH_PX * 2) / 3) {
-        button = BTN_RIGHT;
-      } else {
-        button = BTN_CONFIRM;
-      }
-      break;
-    case MofeiTouchDriver::EventType::None:
-    default:
-      return;
-  }
+  mofeiTouchEvent = event;
+  mofeiTouchEventPending = true;
 
-  injectMofeiButtonEvent(button);
-  LOG_DBG("TOUCH", "event=%u x=%u y=%u button=%u", static_cast<unsigned>(event.type), event.x, event.y, button);
+  uint8_t button = BTN_CONFIRM;
+  if (mapMofeiTouchToButton(event, &button)) {
+    injectMofeiButtonEvent(button);
+    LOG_DBG("TOUCH", "event=%u x=%u y=%u button=%u", static_cast<unsigned>(event.type), event.x, event.y, button);
+  } else {
+    LOG_DBG("TOUCH", "event=%u x=%u y=%u button=none", static_cast<unsigned>(event.type), event.x, event.y);
+  }
 }
 #endif
 
@@ -385,6 +435,24 @@ unsigned long HalGPIO::getHeldTime() const {
   return inputMgr.getHeldTime();
 #endif
 }
+
+#if MOFEI_DEVICE
+bool HalGPIO::consumeMofeiTouchEvent(MofeiTouchDriver::Event* outEvent) {
+  if (!mofeiTouchEventPending) {
+    return false;
+  }
+  if (outEvent != nullptr) {
+    *outEvent = mofeiTouchEvent;
+  }
+  mofeiTouchEventPending = false;
+  return true;
+}
+
+bool HalGPIO::isMofeiTouchButtonHintTap(uint16_t x, uint16_t y) const {
+  uint8_t button = 0;
+  return mapMofeiButtonHintTapToButton(x, y, &button);
+}
+#endif
 
 void HalGPIO::startDeepSleep() {
 #if MOFEI_DEVICE

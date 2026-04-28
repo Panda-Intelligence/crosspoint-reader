@@ -11,6 +11,12 @@
 
 const char* const KeyboardEntryActivity::shiftString[2] = {"shift", "SHIFT"};
 
+namespace {
+bool pointInRect(uint16_t x, uint16_t y, const Rect& rect) {
+  return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
+}
+}  // namespace
+
 void KeyboardEntryActivity::onEnter() {
   Activity::onEnter();
   cursorPos = text.length();
@@ -29,6 +35,9 @@ void KeyboardEntryActivity::onEnter() {
   rightLongHandled = false;
   savedCursorPos = 0;
   rightStartCursorPos = 0;
+#if MOFEI_DEVICE
+  gpio.consumeMofeiTouchEvent(nullptr);
+#endif
   requestUpdate();
 }
 
@@ -176,6 +185,177 @@ bool KeyboardEntryActivity::handleKeyPress() {
   return insertChar(getSelectedChar());
 }
 
+KeyboardEntryActivity::KeyboardLayoutInfo KeyboardEntryActivity::buildKeyboardLayoutInfo() const {
+  KeyboardLayoutInfo layout;
+  const auto pageWidth = renderer.getScreenWidth();
+  const auto pageHeight = renderer.getScreenHeight();
+  const auto& metrics = UITheme::getInstance().getMetrics();
+
+  layout.lineHeight = renderer.getLineHeight(UI_12_FONT_ID);
+  layout.inputStartY = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing +
+                       metrics.verticalSpacing * 4 + metrics.keyboardVerticalOffset;
+
+  const bool isPassword = (inputType == InputType::Password);
+  int availableWidth = pageWidth;
+  if (gpio.deviceIsX3()) {
+    availableWidth -= 2 * metrics.sideButtonHintsWidth;
+  }
+  layout.effectiveMargin = (pageWidth - availableWidth * metrics.keyboardTextFieldWidthPercent / 100) / 2;
+  const int toggleGap = isPassword ? 4 : 0;
+  const int toggleReserve = isPassword ? std::max(renderer.getTextWidth(UI_12_FONT_ID, "[abc]"),
+                                                  renderer.getTextWidth(UI_12_FONT_ID, "[***]")) +
+                                             toggleGap
+                                       : 0;
+  layout.textAreaWidth = pageWidth - 2 * layout.effectiveMargin - toggleReserve;
+
+  std::string displayText;
+  if (isPassword && !passwordVisible) {
+    size_t revealPos;
+    if (cursorMode) {
+      revealPos = text.length();
+    } else {
+      revealPos = (text.length() > 0 && cursorPos > 0) ? cursorPos - 1 : std::string::npos;
+    }
+    displayText = text;
+    for (size_t i = 0; i < displayText.length(); i++) {
+      if (i != revealPos) {
+        displayText[i] = '*';
+      }
+    }
+  } else {
+    displayText = text;
+  }
+
+  int lineStartIdx = 0;
+  int lineEndIdx = displayText.length();
+  while (true) {
+    if (lineEndIdx <= lineStartIdx && lineStartIdx < static_cast<int>(displayText.length())) {
+      lineEndIdx = lineStartIdx + 1;
+    }
+    const std::string lineText = displayText.substr(lineStartIdx, lineEndIdx - lineStartIdx);
+    const int textWidth = renderer.getTextWidth(UI_12_FONT_ID, lineText.c_str());
+    if (textWidth <= layout.textAreaWidth || lineEndIdx <= lineStartIdx + 1) {
+      if (lineEndIdx == static_cast<int>(displayText.length())) {
+        break;
+      }
+      layout.inputHeight += layout.lineHeight;
+      lineStartIdx = lineEndIdx;
+      lineEndIdx = displayText.length();
+    } else {
+      lineEndIdx -= 1;
+    }
+  }
+
+  if (isPassword) {
+    const char* toggleLabel = passwordVisible ? "[***]" : "[abc]";
+    layout.toggleWidth = renderer.getTextWidth(UI_12_FONT_ID, toggleLabel);
+    layout.toggleX = pageWidth - layout.effectiveMargin - layout.toggleWidth;
+    layout.toggleY = layout.inputStartY + layout.inputHeight;
+  }
+
+  layout.keyHeight = metrics.keyboardKeyHeight;
+  layout.bottomKeyHeight = metrics.keyboardBottomKeyHeight;
+  layout.keySpacing = metrics.keyboardKeySpacing;
+  layout.contentCols = getContentColCount();
+  layout.keyboardWidth = pageWidth * metrics.keyboardWidthPercent / 100;
+  layout.keyWidth = (layout.keyboardWidth - (layout.contentCols - 1) * layout.keySpacing) / layout.contentCols;
+  layout.leftMargin =
+      (pageWidth - (layout.contentCols * layout.keyWidth + (layout.contentCols - 1) * layout.keySpacing)) / 2;
+
+  layout.bottomRowGap = metrics.keyboardBottomKeySpacing > 0 ? 4 : 0;
+  layout.keyboardStartY = metrics.keyboardBottomAligned
+                              ? pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing -
+                                    (layout.keyHeight + layout.keySpacing) * getContentRowCount() -
+                                    layout.bottomKeyHeight - layout.bottomRowGap + metrics.keyboardVerticalOffset
+                              : layout.inputStartY + layout.inputHeight + layout.lineHeight + metrics.verticalSpacing;
+
+  layout.bkSpacing = metrics.keyboardBottomKeySpacing;
+  layout.abcKeyWidth = (layout.keyboardWidth - (COLS - 1) * layout.keySpacing) / COLS;
+  layout.contentTotalWidth = COLS * layout.abcKeyWidth + (COLS - 1) * layout.keySpacing;
+  layout.bottomKeyWidth = (layout.contentTotalWidth - (BOTTOM_KEY_COUNT - 1) * layout.bkSpacing) / BOTTOM_KEY_COUNT;
+  layout.bottomLeftMargin =
+      (pageWidth - (BOTTOM_KEY_COUNT * layout.bottomKeyWidth + (BOTTOM_KEY_COUNT - 1) * layout.bkSpacing)) / 2;
+
+  layout.urlLeftMargin = layout.leftMargin;
+  if (urlMode) {
+    const int urlTotalWidth = 3 * layout.keyWidth + 2 * layout.keySpacing;
+    const int urlCenterX = layout.bottomLeftMargin +
+                           static_cast<int>(SpecialKeyType::Space) * (layout.bottomKeyWidth + layout.bkSpacing) +
+                           layout.bottomKeyWidth / 2;
+    layout.urlLeftMargin = urlCenterX - urlTotalWidth / 2;
+  }
+
+  layout.contentRows = getContentRowCount();
+  layout.bottomRowY =
+      layout.keyboardStartY + layout.contentRows * (layout.keyHeight + layout.keySpacing) + layout.bottomRowGap;
+  return layout;
+}
+
+bool KeyboardEntryActivity::handleTouchTap(uint16_t x, uint16_t y) {
+  const KeyboardLayoutInfo layout = buildKeyboardLayoutInfo();
+
+  for (int row = 0; row < layout.contentRows; row++) {
+    const int rowY = layout.keyboardStartY + row * (layout.keyHeight + layout.keySpacing);
+    const int rowLeftMargin = urlMode ? layout.urlLeftMargin : layout.leftMargin;
+
+    for (int col = 0; col < layout.contentCols; col++) {
+      if (urlMode && col + row * 3 >= URL_SNIPPET_COUNT) {
+        continue;
+      }
+      const int keyX = rowLeftMargin + col * (layout.keyWidth + layout.keySpacing);
+      if (pointInRect(x, y, Rect{keyX, rowY, layout.keyWidth, layout.keyHeight})) {
+        cursorMode = false;
+        togglePos = false;
+        selectedRow = row;
+        selectedCol = col;
+        if (handleKeyPress()) {
+          requestUpdate();
+        }
+        return true;
+      }
+    }
+  }
+
+  for (int col = 0; col < BOTTOM_KEY_COUNT; col++) {
+    const int keyX = layout.bottomLeftMargin + col * (layout.bottomKeyWidth + layout.bkSpacing);
+    if (pointInRect(x, y, Rect{keyX, layout.bottomRowY, layout.bottomKeyWidth, layout.bottomKeyHeight})) {
+      cursorMode = false;
+      togglePos = false;
+      selectedRow = getContentRowCount();
+      selectedCol = col;
+      if (handleKeyPress()) {
+        requestUpdate();
+      }
+      return true;
+    }
+  }
+
+  if (inputType == InputType::Password && layout.toggleWidth > 0) {
+    const Rect toggleRect{layout.toggleX - 8, layout.toggleY - 8, layout.toggleWidth + 16, layout.lineHeight + 16};
+    if (pointInRect(x, y, toggleRect)) {
+      passwordVisible = !passwordVisible;
+      cursorMode = true;
+      togglePos = true;
+      hintVisible = true;
+      hintShowTime = millis();
+      requestUpdate();
+      return true;
+    }
+  }
+
+  const Rect textRect{layout.effectiveMargin, layout.inputStartY, layout.textAreaWidth, layout.lineHeight * 2};
+  if (pointInRect(x, y, textRect)) {
+    cursorMode = true;
+    togglePos = false;
+    hintVisible = true;
+    hintShowTime = millis();
+    requestUpdate();
+    return true;
+  }
+
+  return false;
+}
+
 void KeyboardEntryActivity::mapColContentBottom(int& col, bool goingUp) const {
   if (urlMode) {
     col = goingUp ? col - 1 : col + 1;
@@ -188,6 +368,18 @@ void KeyboardEntryActivity::mapColContentBottom(int& col, bool goingUp) const {
 
 void KeyboardEntryActivity::loop() {
   const int totalRows = getTotalRowCount();
+
+#if MOFEI_DEVICE
+  MofeiTouchDriver::Event touchEvent;
+  if (gpio.consumeMofeiTouchEvent(&touchEvent) && touchEvent.type == MofeiTouchDriver::EventType::Tap) {
+    if (handleTouchTap(touchEvent.x, touchEvent.y)) {
+      return;
+    }
+    if (!gpio.isMofeiTouchButtonHintTap(touchEvent.x, touchEvent.y)) {
+      return;
+    }
+  }
+#endif
 
   if (!cursorMode && mappedInput.wasPressed(MappedInputManager::Button::Up)) {
     upHeld = true;

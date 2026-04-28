@@ -78,6 +78,8 @@ class HalGPIO {
   unsigned long mofeiButtonPressFinish = 0;
 #if MOFEI_DEVICE
   MofeiTouchDriver mofeiTouch;
+  MofeiTouchDriver::Event mofeiTouchEvent;
+  bool mofeiTouchEventPending = false;
 #endif
 
   uint8_t readMofeiButtonState() const;
@@ -85,6 +87,8 @@ class HalGPIO {
 #if MOFEI_DEVICE
   void updateMofeiTouch();
   void injectMofeiButtonEvent(uint8_t buttonIndex);
+  bool mapMofeiButtonHintTapToButton(uint16_t x, uint16_t y, uint8_t* buttonIndex) const;
+  bool mapMofeiTouchToButton(const MofeiTouchDriver::Event& event, uint8_t* buttonIndex) const;
 #endif
 
  public:
@@ -106,6 +110,10 @@ class HalGPIO {
   bool wasReleased(uint8_t buttonIndex) const;
   bool wasAnyReleased() const;
   unsigned long getHeldTime() const;
+#if MOFEI_DEVICE
+  bool consumeMofeiTouchEvent(MofeiTouchDriver::Event* outEvent);
+  bool isMofeiTouchButtonHintTap(uint16_t x, uint16_t y) const;
+#endif
 
   // Setup wake up GPIO and enter deep sleep
   void startDeepSleep();

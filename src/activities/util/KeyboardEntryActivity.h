@@ -213,6 +213,34 @@ class KeyboardEntryActivity : public Activity {
 
   static const char* const shiftString[2];
 
+  struct KeyboardLayoutInfo {
+    int lineHeight = 0;
+    int inputStartY = 0;
+    int inputHeight = 0;
+    int effectiveMargin = 0;
+    int textAreaWidth = 0;
+    int toggleX = 0;
+    int toggleY = 0;
+    int toggleWidth = 0;
+    int keyHeight = 0;
+    int bottomKeyHeight = 0;
+    int keySpacing = 0;
+    int contentCols = 0;
+    int keyboardWidth = 0;
+    int keyWidth = 0;
+    int leftMargin = 0;
+    int bottomRowGap = 0;
+    int keyboardStartY = 0;
+    int bkSpacing = 0;
+    int abcKeyWidth = 0;
+    int contentTotalWidth = 0;
+    int bottomKeyWidth = 0;
+    int bottomLeftMargin = 0;
+    int urlLeftMargin = 0;
+    int contentRows = 0;
+    int bottomRowY = 0;
+  };
+
   int getContentRowCount() const;
   int getContentColCount() const;
   int getTotalRowCount() const;
@@ -223,4 +251,6 @@ class KeyboardEntryActivity : public Activity {
   bool insertChar(char c);
   void insertString(const std::string& str);
   void mapColContentBottom(int& col, bool goingUp) const;
+  KeyboardLayoutInfo buildKeyboardLayoutInfo() const;
+  bool handleTouchTap(uint16_t x, uint16_t y);
 };
