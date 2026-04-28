@@ -39,12 +39,19 @@ bool readFt6336(uint8_t reg, uint8_t* buffer, uint8_t len) {
     while (Wire.available()) {
       Wire.read();
     }
+    Wire.beginTransmission(FT6336_ADDR);
+    Wire.endTransmission(true);
     return false;
   }
 
   for (uint8_t i = 0; i < len; ++i) {
     buffer[i] = Wire.read();
   }
+  
+  // Force a STOP condition just in case the core failed to send it
+  Wire.beginTransmission(FT6336_ADDR);
+  Wire.endTransmission(true);
+  
   return true;
 }
 
@@ -135,16 +142,16 @@ bool MofeiTouchDriver::update(Event* outEvent) {
     return false;
   }
 
-  uint16_t x = 0;
-  uint16_t y = 0;
-  bool released = false;
-
   // Only read from I2C if the hardware INT pin is active (LOW) indicating touch,
   // or if we are already tracking an active touch and waiting for release.
   const bool intActive = MOFEI_TOUCH_INT >= 0 && digitalRead(MOFEI_TOUCH_INT) == LOW;
   if (!intActive && !touchDown) {
     return false;
   }
+
+  uint16_t x = 0;
+  uint16_t y = 0;
+  bool released = false;
 
   if (!readPoint(&x, &y, &released)) {
     if (now - lastReadErrorLogMs >= TOUCH_READ_ERROR_LOG_INTERVAL_MS) {
@@ -199,6 +206,7 @@ bool MofeiTouchDriver::readPoint(uint16_t* x, uint16_t* y, bool* released) {
     return true;
   }
   if (points > FT6336_MAX_POINTS) {
+    LOG_DBG("TOUCH", "Invalid points=%u data: %02X %02X %02X %02X %02X", points, data[0], data[1], data[2], data[3], data[4]);
     return false;
   }
 
