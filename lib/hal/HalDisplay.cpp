@@ -23,6 +23,9 @@ void HalDisplay::begin() {
   if (wakeupReason == HalGPIO::WakeupReason::PowerButton || wakeupReason == HalGPIO::WakeupReason::AfterFlash ||
       wakeupReason == HalGPIO::WakeupReason::Other) {
     einkDisplay.requestResync();
+    if (gpio.deviceIsMofei()) {
+      forceHalfRefreshNext = true;
+    }
   }
 }
 
@@ -53,6 +56,16 @@ EInkDisplay::RefreshMode convertRefreshMode(HalDisplay::RefreshMode mode) {
 void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen) {
   if (gpio.deviceIsX3() && mode == RefreshMode::HALF_REFRESH) {
     einkDisplay.requestResync(1);
+  }
+
+  if (gpio.deviceIsMofei() && forceHalfRefreshNext && mode == RefreshMode::FAST_REFRESH) {
+    if (Serial) {
+      Serial.printf("[%lu] HalDisplay: forcing Mofei SSD1677 half refresh for RAM resync\n", millis());
+    }
+    mode = RefreshMode::HALF_REFRESH;
+  }
+  if (gpio.deviceIsMofei()) {
+    forceHalfRefreshNext = false;
   }
 
   einkDisplay.displayBuffer(convertRefreshMode(mode), turnOffScreen);

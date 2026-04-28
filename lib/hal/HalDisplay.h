@@ -57,6 +57,7 @@ class HalDisplay {
 
  private:
   EInkDisplay einkDisplay;
+  bool forceHalfRefreshNext = false;
 };
 
 extern HalDisplay display;
