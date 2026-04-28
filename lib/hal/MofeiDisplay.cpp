@@ -59,6 +59,12 @@ static_assert(sizeof(MOFEI_LUT_FAST) == MOFEI_LUT_TOTAL_BYTES, "Mofei fast LUT m
 uint8_t progmemRead(const uint8_t* data, uint32_t index, bool fromProgmem) {
   return fromProgmem ? pgm_read_byte(data + index) : data[index];
 }
+
+uint8_t reverseBits(uint8_t value) {
+  value = static_cast<uint8_t>(((value & 0xF0) >> 4) | ((value & 0x0F) << 4));
+  value = static_cast<uint8_t>(((value & 0xCC) >> 2) | ((value & 0x33) << 2));
+  return static_cast<uint8_t>(((value & 0xAA) >> 1) | ((value & 0x55) << 1));
+}
 }  // namespace
 
 MofeiDisplay::MofeiDisplay(int8_t sclk, int8_t mosi, int8_t cs, int8_t dc, int8_t rst, int8_t busy)
@@ -201,7 +207,16 @@ void MofeiDisplay::setRamArea() {
 void MofeiDisplay::writeRam(uint8_t command, const uint8_t* data) {
   setRamArea();
   sendCommand(command);
-  sendData(data, BUFFER_SIZE);
+
+  // Mofei 面板的 RAM 扫描方向与 framebuffer 的逻辑 X 方向相反，逐行翻转后再写入控制器。
+  uint8_t row[DISPLAY_WIDTH_BYTES];
+  for (uint16_t y = 0; y < DISPLAY_HEIGHT; ++y) {
+    const uint8_t* src = data + static_cast<uint32_t>(y) * DISPLAY_WIDTH_BYTES;
+    for (uint16_t x = 0; x < DISPLAY_WIDTH_BYTES; ++x) {
+      row[x] = reverseBits(src[DISPLAY_WIDTH_BYTES - 1 - x]);
+    }
+    sendData(row, DISPLAY_WIDTH_BYTES);
+  }
 }
 
 void MofeiDisplay::writeRepeatedRam(uint8_t command, uint8_t value) {
