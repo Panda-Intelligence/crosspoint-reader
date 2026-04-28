@@ -3,6 +3,7 @@
 #include <HalPowerManager.h>
 
 #include "OpdsServerStore.h"
+#include "arcade/ArcadeHubActivity.h"
 #include "boot_sleep/BootActivity.h"
 #include "boot_sleep/SleepActivity.h"
 #include "browser/OpdsBookBrowserActivity.h"
@@ -13,7 +14,6 @@
 #include "home/HomeActivity.h"
 #include "home/RecentBooksActivity.h"
 #include "network/CrossPointWebServerActivity.h"
-#include "arcade/ArcadeHubActivity.h"
 #include "reader/ReaderActivity.h"
 #include "reader/ReadingHubActivity.h"
 #include "settings/OpdsServerListActivity.h"
@@ -203,21 +203,13 @@ void ActivityManager::goToReader(std::string path) {
   replaceActivity(std::make_unique<ReaderActivity>(renderer, mappedInput, std::move(path)));
 }
 
-void ActivityManager::goToDesktopHub() {
-  replaceActivity(std::make_unique<DesktopHubActivity>(renderer, mappedInput));
-}
+void ActivityManager::goToDesktopHub() { replaceActivity(std::make_unique<DesktopHubActivity>(renderer, mappedInput)); }
 
-void ActivityManager::goToStudyHub() {
-  replaceActivity(std::make_unique<StudyHubActivity>(renderer, mappedInput));
-}
+void ActivityManager::goToStudyHub() { replaceActivity(std::make_unique<StudyHubActivity>(renderer, mappedInput)); }
 
-void ActivityManager::goToReadingHub() {
-  replaceActivity(std::make_unique<ReadingHubActivity>(renderer, mappedInput));
-}
+void ActivityManager::goToReadingHub() { replaceActivity(std::make_unique<ReadingHubActivity>(renderer, mappedInput)); }
 
-void ActivityManager::goToArcadeHub() {
-  replaceActivity(std::make_unique<ArcadeHubActivity>(renderer, mappedInput));
-}
+void ActivityManager::goToArcadeHub() { replaceActivity(std::make_unique<ArcadeHubActivity>(renderer, mappedInput)); }
 
 void ActivityManager::goToSleep() {
   replaceActivity(std::make_unique<SleepActivity>(renderer, mappedInput));

@@ -5,8 +5,8 @@
 
 #include "StudyDeckStore.h"
 #include "StudyReviewQueueStore.h"
-#include "WifiCredentialStore.h"
 #include "StudyStateStore.h"
+#include "WifiCredentialStore.h"
 
 DesktopSummaryStore DesktopSummaryStore::instance;
 

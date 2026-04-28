@@ -240,8 +240,7 @@ void Game2048Activity::render(RenderLock&&) {
         char buffer[8];
         snprintf(buffer, sizeof(buffer), "%u", value);
         const int textH = renderer.getTextHeight(UI_10_FONT_ID);
-        renderer.drawCenteredText(UI_10_FONT_ID, tileY + (tileH - textH) / 2, buffer, !whiteText,
-                                  EpdFontFamily::BOLD);
+        renderer.drawCenteredText(UI_10_FONT_ID, tileY + (tileH - textH) / 2, buffer, !whiteText, EpdFontFamily::BOLD);
       }
     }
   }

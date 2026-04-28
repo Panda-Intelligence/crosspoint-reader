@@ -7,12 +7,12 @@
 #include "LearningReportActivity.h"
 #include "ReviewQueueActivity.h"
 #include "SavedCardsActivity.h"
-#include "StudyLaterActivity.h"
-#include "StudyRecoveryActivity.h"
-#include "StudyDeckStore.h"
-#include "StudyQuizActivity.h"
-#include "StudyReviewQueueStore.h"
 #include "StudyCardsTodayActivity.h"
+#include "StudyDeckStore.h"
+#include "StudyLaterActivity.h"
+#include "StudyQuizActivity.h"
+#include "StudyRecoveryActivity.h"
+#include "StudyReviewQueueStore.h"
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
 
@@ -132,9 +132,8 @@ void StudyHubActivity::render(RenderLock&&) {
             if (importedCardCount <= 0) {
               return std::string("Import deck files to start");
             }
-            return "Due today: " + std::to_string(state.dueToday > state.completedToday
-                                                      ? state.dueToday - state.completedToday
-                                                      : 0);
+            return "Due today: " +
+                   std::to_string(state.dueToday > state.completedToday ? state.dueToday - state.completedToday : 0);
           case 1:
             return againQueueCount > 0 ? ("Wrong cards: " + std::to_string(againQueueCount))
                                        : std::string("No recovery backlog");
@@ -150,8 +149,8 @@ void StudyHubActivity::render(RenderLock&&) {
           case 5:
             return std::string("Weak area and mastery");
           case 6:
-            return "Again: " + std::to_string(againQueueCount) + "  Total: " +
-                   std::to_string(againQueueCount + laterQueueCount + savedQueueCount);
+            return "Again: " + std::to_string(againQueueCount) +
+                   "  Total: " + std::to_string(againQueueCount + laterQueueCount + savedQueueCount);
           case 7:
           default:
             if (importedDeckCount > 0) {

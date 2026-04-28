@@ -8,9 +8,9 @@
 #include <cstring>
 #include <string>
 
-#include "fontIds.h"
 #include "ExternalFontIds.h"
 #include "StorageFontRegistry.h"
+#include "fontIds.h"
 
 // Initialize the static instance
 CrossPointSettings CrossPointSettings::instance;
@@ -356,7 +356,7 @@ int CrossPointSettings::getReaderFontId() const {
                                                                             : NOTOSANS_16_FONT_ID;
         case EXTRA_LARGE:
           return StorageFontRegistry::isTraditionalChineseFontLoaded(EXTRA_LARGE) ? NOTOSANS_TC_18_FONT_ID
-                                                                                   : NOTOSANS_18_FONT_ID;
+                                                                                  : NOTOSANS_18_FONT_ID;
       }
   }
 }

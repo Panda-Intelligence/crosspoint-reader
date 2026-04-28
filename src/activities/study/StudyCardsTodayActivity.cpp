@@ -323,7 +323,8 @@ void StudyCardsTodayActivity::render(RenderLock&&) {
     const std::string primary = showingBack ? card.back : card.front;
     const std::string secondary = showingBack ? card.example : "";
     const int textMaxWidth = pageWidth - pad * 2 - 32;
-    const auto primaryLines = renderer.wrappedText(UI_12_FONT_ID, primary.c_str(), textMaxWidth, 3, EpdFontFamily::BOLD);
+    const auto primaryLines =
+        renderer.wrappedText(UI_12_FONT_ID, primary.c_str(), textMaxWidth, 3, EpdFontFamily::BOLD);
     const int firstLineY = cardY + 56;
     for (size_t i = 0; i < primaryLines.size(); i++) {
       renderer.drawCenteredText(UI_12_FONT_ID, firstLineY + static_cast<int>(i) * 28, primaryLines[i].c_str(), true,
@@ -354,9 +355,9 @@ void StudyCardsTodayActivity::render(RenderLock&&) {
     }
   }
 
-  const auto labels =
-      mappedInput.mapLabels(tr(STR_BACK), inSession ? (showingBack ? "Apply" : "Flip") : (sessionComplete ? "Open" : "Start"),
-                            tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(
+      tr(STR_BACK), inSession ? (showingBack ? "Apply" : "Flip") : (sessionComplete ? "Open" : "Start"), tr(STR_DIR_UP),
+      tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

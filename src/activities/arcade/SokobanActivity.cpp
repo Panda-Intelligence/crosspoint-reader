@@ -11,14 +11,7 @@
 
 namespace {
 constexpr const char* kLevelTemplate[SokobanActivity::kRows] = {
-    "  ####  ",
-    "###  ###",
-    "#     $#",
-    "# #  #$#",
-    "# . .@ #",
-    "########",
-    "        ",
-    "        ",
+    "  ####  ", "###  ###", "#     $#", "# #  #$#", "# . .@ #", "########", "        ", "        ",
 };
 }  // namespace
 

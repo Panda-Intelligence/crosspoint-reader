@@ -33,7 +33,8 @@ void drawOptionButton(GfxRenderer& renderer, int x, int y, int w, int h, const s
   }
 
   const std::string line = renderer.truncatedText(SMALL_FONT_ID, text.c_str(), w - 20);
-  const int tw = renderer.getTextWidth(SMALL_FONT_ID, line.c_str(), reveal && correct ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+  const int tw = renderer.getTextWidth(SMALL_FONT_ID, line.c_str(),
+                                       reveal && correct ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
   const int th = renderer.getTextHeight(SMALL_FONT_ID);
   const bool blackText = !(reveal && correct);
   renderer.drawText(SMALL_FONT_ID, x + (w - tw) / 2, y + (h - th) / 2, line.c_str(), blackText,
@@ -181,17 +182,17 @@ void StudyQuizActivity::render(RenderLock&&) {
     snprintf(meta, sizeof(meta), "Question %d/%d", questionIndex + 1, static_cast<int>(cards.size()));
     renderer.drawText(SMALL_FONT_ID, pad, contentTop, meta);
     const std::string deckName = renderer.truncatedText(SMALL_FONT_ID, question.deckName.c_str(), pageWidth / 2);
-    renderer.drawText(SMALL_FONT_ID, pageWidth - pad - renderer.getTextWidth(SMALL_FONT_ID, deckName.c_str()), contentTop,
-                      deckName.c_str());
+    renderer.drawText(SMALL_FONT_ID, pageWidth - pad - renderer.getTextWidth(SMALL_FONT_ID, deckName.c_str()),
+                      contentTop, deckName.c_str());
     renderer.drawCenteredText(SMALL_FONT_ID, contentTop, modeLabel(mode));
 
     const int cardY = contentTop + 24;
     const int cardH = 112;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-    renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14, mode == QuizMode::TwoChoice
-                                                           ? "Pick the correct answer"
-                                                           : (mode == QuizMode::TrueFalse ? "Does this answer match?"
-                                                                                          : "Pick the first letter"));
+    renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14,
+                      mode == QuizMode::TwoChoice
+                          ? "Pick the correct answer"
+                          : (mode == QuizMode::TrueFalse ? "Does this answer match?" : "Pick the first letter"));
 
     std::string prompt = question.front;
     if (mode == QuizMode::TrueFalse) {
@@ -217,8 +218,8 @@ void StudyQuizActivity::render(RenderLock&&) {
                      showingResult, correctOption == 1);
 
     if (showingResult) {
-      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, answerCorrect ? "Correct - Confirm for next"
-                                                                                 : "Wrong - Confirm for next");
+      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30,
+                                answerCorrect ? "Correct - Confirm for next" : "Wrong - Confirm for next");
     } else {
       renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Up/Down answer  Left/Right mode");
     }

@@ -57,8 +57,8 @@ StudyQueuedCard StudyReviewQueueStore::toQueuedCard(const StudyCard& card) {
 }
 
 void StudyReviewQueueStore::upsert(std::vector<StudyQueuedCard>& queue, const StudyCard& card) {
-  const auto existing = std::find_if(queue.begin(), queue.end(),
-                                    [&card](const StudyQueuedCard& item) { return sameCard(item, card); });
+  const auto existing =
+      std::find_if(queue.begin(), queue.end(), [&card](const StudyQueuedCard& item) { return sameCard(item, card); });
   if (existing != queue.end()) {
     if (existing->count < UINT16_MAX) {
       existing->count++;

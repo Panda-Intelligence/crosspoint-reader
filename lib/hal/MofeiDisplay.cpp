@@ -207,16 +207,7 @@ void MofeiDisplay::setRamArea() {
 void MofeiDisplay::writeRam(uint8_t command, const uint8_t* data) {
   setRamArea();
   sendCommand(command);
-
-  // Mofei 面板的 RAM 扫描方向与 framebuffer 的逻辑 X 方向相反，逐行翻转后再写入控制器。
-  uint8_t row[DISPLAY_WIDTH_BYTES];
-  for (uint16_t y = 0; y < DISPLAY_HEIGHT; ++y) {
-    const uint8_t* src = data + static_cast<uint32_t>(y) * DISPLAY_WIDTH_BYTES;
-    for (uint16_t x = 0; x < DISPLAY_WIDTH_BYTES; ++x) {
-      row[x] = reverseBits(src[DISPLAY_WIDTH_BYTES - 1 - x]);
-    }
-    sendData(row, DISPLAY_WIDTH_BYTES);
-  }
+  sendData(data, BUFFER_SIZE);
 }
 
 void MofeiDisplay::writeRepeatedRam(uint8_t command, uint8_t value) {

@@ -82,8 +82,8 @@ void ReadingHubActivity::render(RenderLock&&) {
   GUI.drawList(
       renderer,
       Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, pageWidth,
-           pageHeight - (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
-                         metrics.verticalSpacing * 2)},
+           pageHeight -
+               (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)},
       kItemCount, selectedIndex, [](int index) { return std::string(itemLabel(index)); },
       [](int index) {
         switch (index) {

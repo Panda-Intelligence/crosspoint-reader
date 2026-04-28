@@ -71,8 +71,8 @@ void DictionaryActivity::render(RenderLock&&) {
     GUI.drawList(
         renderer,
         Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, pageWidth,
-             pageHeight - (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
-                           metrics.verticalSpacing * 2)},
+             pageHeight -
+                 (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)},
         static_cast<int>(kEntries.size()), selectedIndex, [](int index) { return std::string(kEntries[index].word); },
         [](int index) { return std::string(kEntries[index].meaning); });
   } else {
@@ -82,8 +82,8 @@ void DictionaryActivity::render(RenderLock&&) {
     renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 50, "Confirm toggles detail");
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), showingDetail ? "Toggle" : "Open", tr(STR_DIR_UP),
-                                            tr(STR_DIR_DOWN));
+  const auto labels =
+      mappedInput.mapLabels(tr(STR_BACK), showingDetail ? "Toggle" : "Open", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

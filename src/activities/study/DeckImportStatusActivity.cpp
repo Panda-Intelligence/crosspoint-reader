@@ -97,15 +97,13 @@ void DeckImportStatusActivity::render(RenderLock&&) {
     renderer.fillRoundedRect(bx, cardY + 58, bulletR * 2, bulletR * 2, bulletR, Color::Black);
     renderer.drawText(SMALL_FONT_ID, tx, cardY + 54, "Copy .json decks to /.mofei/study");
     renderer.fillRoundedRect(bx, cardY + 82, bulletR * 2, bulletR * 2, bulletR, Color::Black);
-    renderer.drawText(SMALL_FONT_ID, tx, cardY + 78,
-                      hasStudyStateFile ? "Study state: ready" : "state.json not found");
+    renderer.drawText(SMALL_FONT_ID, tx, cardY + 78, hasStudyStateFile ? "Study state: ready" : "state.json not found");
     renderer.fillRoundedRect(bx, cardY + 106, bulletR * 2, bulletR * 2, bulletR, Color::Black);
     renderer.drawText(SMALL_FONT_ID, tx, cardY + 102, "Press Refresh after copying");
   } else {
     const int listH = pageHeight - (contentTop + metrics.buttonHintsHeight + metrics.verticalSpacing + 24);
     GUI.drawList(
-        renderer, Rect{0, contentTop, pageWidth, listH},
-        static_cast<int>(deckEntries.size()), selectedIndex,
+        renderer, Rect{0, contentTop, pageWidth, listH}, static_cast<int>(deckEntries.size()), selectedIndex,
         [](int index) {
           const auto& entry = STUDY_DECKS.getDeckSummaries()[index];
           return entry.valid ? entry.title : (entry.filename + "  ! error");
@@ -121,10 +119,8 @@ void DeckImportStatusActivity::render(RenderLock&&) {
     // Summary below list
     const int badgeY = pageHeight - metrics.buttonHintsHeight - 22;
     char countStr[48];
-    snprintf(countStr, sizeof(countStr), "%d deck%s  %s",
-             STUDY_DECKS.getDeckCount(),
-             deckEntries.size() == 1 ? "" : "s",
-             hasStudyStateFile ? "| state ready" : "| no state file");
+    snprintf(countStr, sizeof(countStr), "%d deck%s  %s", STUDY_DECKS.getDeckCount(),
+             deckEntries.size() == 1 ? "" : "s", hasStudyStateFile ? "| state ready" : "| no state file");
     renderer.drawCenteredText(SMALL_FONT_ID, badgeY, countStr);
   }
 

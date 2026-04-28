@@ -1,13 +1,13 @@
 #pragma once
 
+#include <EpdFont.h>
+#include <EpdFontData.h>
+#include <EpdFontFamily.h>
+
 #include <array>
 #include <cstdint>
 #include <memory>
 #include <vector>
-
-#include <EpdFont.h>
-#include <EpdFontData.h>
-#include <EpdFontFamily.h>
 
 #include "CrossPointSettings.h"
 

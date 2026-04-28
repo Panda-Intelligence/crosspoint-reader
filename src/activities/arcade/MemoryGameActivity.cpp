@@ -216,8 +216,8 @@ void MemoryGameActivity::render(RenderLock&&) {
     renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 4, buf);
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), matchedPairs == kPairs ? "Restart" : "Flip",
-                                            tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), matchedPairs == kPairs ? "Restart" : "Flip", tr(STR_DIR_UP),
+                                            tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

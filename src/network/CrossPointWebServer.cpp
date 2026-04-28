@@ -15,8 +15,8 @@
 #include "SettingsList.h"
 #include "StorageFontRegistry.h"
 #include "WebDAVHandler.h"
-#include "html/FontsPageHtml.generated.h"
 #include "html/FilesPageHtml.generated.h"
+#include "html/FontsPageHtml.generated.h"
 #include "html/HomePageHtml.generated.h"
 #include "html/SettingsPageHtml.generated.h"
 #include "html/js/jszip_minJs.generated.h"
@@ -101,8 +101,8 @@ bool validateFontPackFile(const String& filePath) {
     return false;
   }
   char magic[4] = {};
-  const bool ok = file.read(magic, sizeof(magic)) == static_cast<int>(sizeof(magic)) &&
-                  memcmp(magic, "EPF2", sizeof(magic)) == 0;
+  const bool ok =
+      file.read(magic, sizeof(magic)) == static_cast<int>(sizeof(magic)) && memcmp(magic, "EPF2", sizeof(magic)) == 0;
   file.close();
   return ok;
 }

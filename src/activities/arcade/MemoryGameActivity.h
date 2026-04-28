@@ -20,13 +20,13 @@ class MemoryGameActivity final : public Activity {
   enum class CardState : uint8_t { Hidden, Flipped, Matched };
   std::array<CardState, kCols * kRows> states{};
 
-  int cursorIndex = 0;      // selected card index (0..kCols*kRows-1)
-  int firstFlipped = -1;    // index of first card flipped this turn, -1 if none
+  int cursorIndex = 0;    // selected card index (0..kCols*kRows-1)
+  int firstFlipped = -1;  // index of first card flipped this turn, -1 if none
   int matchedPairs = 0;
   int moveCount = 0;
 
   // Delay rendering of a failed flip to give the player time to see both cards
-  uint32_t flipFailMs = 0;      // millis() timestamp when flip-fail started
+  uint32_t flipFailMs = 0;  // millis() timestamp when flip-fail started
   bool awaitingFlipReset = false;
 
   ButtonNavigator buttonNavigator;

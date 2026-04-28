@@ -4,10 +4,10 @@
 
 #include "DesktopSummaryStore.h"
 #include "StudyStateStore.h"
-#include "activities/desktop/CalendarActivity.h"
-#include "activities/desktop/WeatherClockActivity.h"
 #include "activities/arcade/ArcadeHubActivity.h"
+#include "activities/desktop/CalendarActivity.h"
 #include "activities/desktop/DesktopHubActivity.h"
+#include "activities/desktop/WeatherClockActivity.h"
 #include "activities/reader/ReadingHubActivity.h"
 #include "activities/study/StudyHubActivity.h"
 #include "components/UITheme.h"
@@ -148,8 +148,8 @@ void DashboardActivity::render(RenderLock&&) {
   GUI.drawList(
       renderer,
       Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, pageWidth,
-           pageHeight - (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
-                         metrics.verticalSpacing * 2)},
+           pageHeight -
+               (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)},
       kItemCount, selectedIndex, [](int index) { return std::string(itemLabel(index)); },
       [&summary, &study](int index) {
         switch (index) {
@@ -164,7 +164,8 @@ void DashboardActivity::render(RenderLock&&) {
             if (summary.againCards > 0) {
               return "Again queue: " + std::to_string(summary.againCards);
             }
-            return summary.dueCards > 0 ? ("Due cards: " + std::to_string(summary.dueCards)) : std::string("All caught up");
+            return summary.dueCards > 0 ? ("Due cards: " + std::to_string(summary.dueCards))
+                                        : std::string("All caught up");
           case 5:
             return "Cards " + std::to_string(summary.loadedCards) + "  Later " + std::to_string(summary.laterCards);
           default:

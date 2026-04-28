@@ -12,8 +12,8 @@
 #include "OpdsServerListActivity.h"
 #include "OtaUpdateActivity.h"
 #include "SettingsList.h"
-#include "StorageFontRegistry.h"
 #include "StatusBarSettingsActivity.h"
+#include "StorageFontRegistry.h"
 #include "TraditionalChineseFontsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
@@ -36,8 +36,7 @@ std::string traditionalChineseFontStatus() {
 std::string readerFontValueText(const SettingInfo& setting) {
   const uint8_t value = SETTINGS.*(setting.valuePtr);
   std::string valueText = I18N.get(setting.enumValues[value]);
-  if (setting.valuePtr == &CrossPointSettings::fontFamily &&
-      value == CrossPointSettings::FONT_FAMILY::NOTOSANS_TC) {
+  if (setting.valuePtr == &CrossPointSettings::fontFamily && value == CrossPointSettings::FONT_FAMILY::NOTOSANS_TC) {
     valueText += " [";
     valueText += traditionalChineseFontStatus();
     valueText += "]";
@@ -211,8 +210,7 @@ void SettingsActivity::toggleCurrentSetting() {
         startActivityForResult(std::make_unique<ButtonRemapActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::TraditionalChineseFonts:
-        startActivityForResult(std::make_unique<TraditionalChineseFontsActivity>(renderer, mappedInput),
-                               resultHandler);
+        startActivityForResult(std::make_unique<TraditionalChineseFontsActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::CustomiseStatusBar:
         startActivityForResult(std::make_unique<StatusBarSettingsActivity>(renderer, mappedInput), resultHandler);
@@ -284,8 +282,7 @@ void SettingsActivity::render(RenderLock&&) {
           valueText = readerFontValueText(setting);
         } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
           valueText = std::to_string(SETTINGS.*(setting.valuePtr));
-        } else if (setting.type == SettingType::ACTION &&
-                   setting.action == SettingAction::TraditionalChineseFonts) {
+        } else if (setting.type == SettingType::ACTION && setting.action == SettingAction::TraditionalChineseFonts) {
           valueText = tcFontPackSummary();
         }
         return valueText;

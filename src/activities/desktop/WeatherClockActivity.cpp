@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <I18n.h>
+
 #include <algorithm>
 #include <ctime>
 
@@ -118,7 +119,8 @@ void WeatherClockActivity::render(RenderLock&&) {
     // Bullet commute hints
     const int bulletTop = metricTop + metricH + 12;
     const int bulletR = 3;
-    drawBulletLine(renderer, pad, bulletTop, bulletR, summary.isOnline ? "Umbrella recommended" : "Offline - no forecast");
+    drawBulletLine(renderer, pad, bulletTop, bulletR,
+                   summary.isOnline ? "Umbrella recommended" : "Offline - no forecast");
     drawBulletLine(renderer, pad, bulletTop + 22, bulletR,
                    summary.isOnline ? "Light traffic window" : "Cached data only");
 
@@ -179,8 +181,7 @@ void WeatherClockActivity::render(RenderLock&&) {
     snprintf(scenes[1].detail, sizeof(scenes[1].detail), "%s",
              temp <= 20 ? "Light jacket suggested" : "Shirt + thin layer");
     scenes[2].title = "Umbrella";
-    snprintf(scenes[2].detail, sizeof(scenes[2].detail), "%s",
-             carryUmbrella ? "Recommended today" : "Optional");
+    snprintf(scenes[2].detail, sizeof(scenes[2].detail), "%s", carryUmbrella ? "Recommended today" : "Optional");
 
     const int rowH = 52;
     for (int i = 0; i < 3; i++) {

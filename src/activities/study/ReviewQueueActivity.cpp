@@ -213,8 +213,8 @@ void ReviewQueueActivity::render(RenderLock&&) {
     renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14, showingBack ? "Back" : "Front");
 
     const std::string text = showingBack ? card.back : card.front;
-    const auto lines = renderer.wrappedText(UI_12_FONT_ID, text.c_str(), pageWidth - pad * 2 - 32, 4,
-                                            EpdFontFamily::BOLD);
+    const auto lines =
+        renderer.wrappedText(UI_12_FONT_ID, text.c_str(), pageWidth - pad * 2 - 32, 4, EpdFontFamily::BOLD);
     const int firstLineY = cardY + 58;
     for (size_t i = 0; i < lines.size(); i++) {
       renderer.drawCenteredText(UI_12_FONT_ID, firstLineY + static_cast<int>(i) * 30, lines[i].c_str(), true,
@@ -222,16 +222,15 @@ void ReviewQueueActivity::render(RenderLock&&) {
     }
 
     if (showingBack) {
-      const char* action = queueKind(queueIndex) == StudyQueueKind::Saved ? "Saved card - Confirm closes"
-                                                                          : "Confirm marks Done";
+      const char* action =
+          queueKind(queueIndex) == StudyQueueKind::Saved ? "Saved card - Confirm closes" : "Confirm marks Done";
       renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, action);
     } else {
       renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Confirm reveal  Down clear queue");
     }
   }
 
-  const auto labels =
-      mappedInput.mapLabels(tr(STR_BACK), showingBack ? "Done" : "Flip", "Queue -", "Queue +");
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), showingBack ? "Done" : "Flip", "Queue -", "Queue +");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

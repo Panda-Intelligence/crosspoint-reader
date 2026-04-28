@@ -211,8 +211,7 @@ void SavedCardsActivity::render(RenderLock&&) {
     }
   }
 
-  const auto labels =
-      mappedInput.mapLabels(tr(STR_BACK), showingBack ? "Remove" : "Flip", "Deck -", "Deck +");
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), showingBack ? "Remove" : "Flip", "Deck -", "Deck +");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

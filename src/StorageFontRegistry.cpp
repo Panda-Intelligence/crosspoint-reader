@@ -189,8 +189,7 @@ bool StorageFontPack::load(const char* path) {
   }
 
   bitmap_.resize(header.bitmapSize);
-  if (header.bitmapSize > 0 &&
-      file.read(bitmap_.data(), header.bitmapSize) != static_cast<int>(header.bitmapSize)) {
+  if (header.bitmapSize > 0 && file.read(bitmap_.data(), header.bitmapSize) != static_cast<int>(header.bitmapSize)) {
     return false;
   }
 
@@ -208,8 +207,8 @@ bool StorageFontPack::load(const char* path) {
 
   glyphs_.resize(rawGlyphs.size());
   for (size_t i = 0; i < rawGlyphs.size(); i++) {
-    glyphs_[i] = {rawGlyphs[i].width,  rawGlyphs[i].height, rawGlyphs[i].advanceX, rawGlyphs[i].left,
-                  rawGlyphs[i].top,    rawGlyphs[i].dataLength, rawGlyphs[i].dataOffset};
+    glyphs_[i] = {rawGlyphs[i].width, rawGlyphs[i].height,     rawGlyphs[i].advanceX,  rawGlyphs[i].left,
+                  rawGlyphs[i].top,   rawGlyphs[i].dataLength, rawGlyphs[i].dataOffset};
   }
 
   intervals_.resize(rawIntervals.size());
@@ -296,8 +295,7 @@ bool loadTraditionalChineseFonts(GfxRenderer& renderer) {
       if (boldItalic != nullptr) runtime.family->boldItalic->load(boldItalic->path);
 
       runtime.family->family = std::make_unique<EpdFontFamily>(
-          &runtime.family->regular->font(),
-          runtime.family->bold->loaded() ? &runtime.family->bold->font() : nullptr,
+          &runtime.family->regular->font(), runtime.family->bold->loaded() ? &runtime.family->bold->font() : nullptr,
           runtime.family->italic->loaded() ? &runtime.family->italic->font() : nullptr,
           runtime.family->boldItalic->loaded() ? &runtime.family->boldItalic->font() : nullptr);
       runtime.family->loaded = true;
