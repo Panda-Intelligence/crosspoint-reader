@@ -1,8 +1,10 @@
 #pragma once
 
 #include <Arduino.h>
+#if !MOFEI_DEVICE
 #include <BatteryMonitor.h>
 #include <InputManager.h>
+#endif
 #include <Logging.h>
 #include <Wire.h>
 #include <freertos/semphr.h>

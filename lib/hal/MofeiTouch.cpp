@@ -7,13 +7,21 @@
 
 namespace {
 constexpr uint8_t FT6336_ADDR = 0x38;
+constexpr uint8_t FT6336_REG_DEVICE_MODE = 0x00;
 constexpr uint8_t FT6336_REG_TD_STATUS = 0x02;
+constexpr uint8_t FT6336_REG_THGROUP = 0x80;
+constexpr uint8_t FT6336_REG_PERIODACTIVE = 0x88;
+constexpr uint8_t FT6336_REG_FIRMWARE_ID = 0xA6;
 constexpr uint8_t FT6336_MAX_POINTS = 2;
+constexpr uint8_t FT6336_DEVICE_MODE_WORKING = 0;
+constexpr uint8_t FT6336_THGROUP_DEFAULT = 22;
+constexpr uint8_t FT6336_PERIODACTIVE_DEFAULT = 14;
 constexpr uint16_t SWIPE_THRESHOLD_PX = 80;
 constexpr uint16_t TAP_MAX_MOVE_PX = 60;
 constexpr unsigned long TOUCH_TIMEOUT_MS = 1200;
 constexpr unsigned long TOUCH_STATUS_LOG_INTERVAL_MS = 10000;
 constexpr unsigned long TOUCH_READ_ERROR_LOG_INTERVAL_MS = 5000;
+constexpr unsigned long TOUCH_POWER_SETTLE_MS = 320;
 #if MOFEI_TOUCH_AUTOSCAN
 constexpr int TOUCH_AUTO_PIN_CANDIDATES[] = {12, 13, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 47, 48};
 #endif
@@ -38,6 +46,13 @@ bool readFt6336(uint8_t reg, uint8_t* buffer, uint8_t len) {
   return true;
 }
 
+bool writeFt6336(uint8_t reg, uint8_t value) {
+  Wire.beginTransmission(FT6336_ADDR);
+  Wire.write(reg);
+  Wire.write(value);
+  return Wire.endTransmission(true) == 0;
+}
+
 uint16_t scaleAxis(uint16_t value, uint16_t rawExtent, uint16_t logicalExtent) {
   if (rawExtent <= 1 || logicalExtent <= 1) {
     return 0;
@@ -55,8 +70,15 @@ void MofeiTouchDriver::begin() {
   activeSda = MOFEI_TOUCH_SDA;
   activeScl = MOFEI_TOUCH_SCL;
 
+  if (MOFEI_TOUCH_PWR >= 0) {
+    pinMode(MOFEI_TOUCH_PWR, OUTPUT);
+    digitalWrite(MOFEI_TOUCH_PWR, MOFEI_TOUCH_PWR_ENABLE_LEVEL);
+    LOG_INF("TOUCH", "Mofei touch power GPIO%d=%d", MOFEI_TOUCH_PWR, MOFEI_TOUCH_PWR_ENABLE_LEVEL);
+    delay(TOUCH_POWER_SETTLE_MS);
+  }
   if (MOFEI_TOUCH_INT >= 0) {
     pinMode(MOFEI_TOUCH_INT, INPUT_PULLUP);
+    LOG_INF("TOUCH", "Mofei touch INT GPIO%d", MOFEI_TOUCH_INT);
   }
   if (MOFEI_TOUCH_RST >= 0) {
     pinMode(MOFEI_TOUCH_RST, OUTPUT);
@@ -67,14 +89,20 @@ void MofeiTouchDriver::begin() {
   }
 
   ready = detectOnPins(MOFEI_TOUCH_SDA, MOFEI_TOUCH_SCL);
+  if (ready && !configureController()) {
+    LOG_ERR("TOUCH", "Mofei FT6336U config failed on SDA=%d SCL=%d addr=0x%02X", activeSda, activeScl, FT6336_ADDR);
+  }
 #if MOFEI_TOUCH_AUTOSCAN
   if (!ready) {
     ready = autoDetectPins();
+    if (ready && !configureController()) {
+      LOG_ERR("TOUCH", "Mofei FT6336U config failed on SDA=%d SCL=%d addr=0x%02X", activeSda, activeScl, FT6336_ADDR);
+    }
   }
 #endif
 
-  LOG_INF("TOUCH", "Mofei FT6336U %s on SDA=%d SCL=%d addr=0x%02X", ready ? "detected" : "not detected",
-          activeSda, activeScl, FT6336_ADDR);
+  LOG_INF("TOUCH", "Mofei FT6336U %s on SDA=%d SCL=%d addr=0x%02X", ready ? "detected" : "not detected", activeSda,
+          activeScl, FT6336_ADDR);
   lastStatusLogMs = millis();
 #else
   ready = false;
@@ -205,6 +233,25 @@ bool MofeiTouchDriver::autoDetectPins() {
 #else
   return false;
 #endif
+}
+
+bool MofeiTouchDriver::configureController() {
+  const bool okMode = writeFt6336(FT6336_REG_DEVICE_MODE, FT6336_DEVICE_MODE_WORKING);
+  const bool okThreshold = writeFt6336(FT6336_REG_THGROUP, FT6336_THGROUP_DEFAULT);
+  const bool okPeriod = writeFt6336(FT6336_REG_PERIODACTIVE, FT6336_PERIODACTIVE_DEFAULT);
+
+  uint8_t firmwareId = 0;
+  const bool okFirmware = readFt6336(FT6336_REG_FIRMWARE_ID, &firmwareId, 1);
+  uint8_t threshold = 0;
+  const bool okThresholdRead = readFt6336(FT6336_REG_THGROUP, &threshold, 1);
+  uint8_t period = 0;
+  const bool okPeriodRead = readFt6336(FT6336_REG_PERIODACTIVE, &period, 1);
+
+  LOG_INF("TOUCH", "FT6336U init mode=%d th=%u/%u period=%u/%u fw=%s0x%02X", okMode ? 0 : -1,
+          okThresholdRead ? threshold : 0, FT6336_THGROUP_DEFAULT, okPeriodRead ? period : 0,
+          FT6336_PERIODACTIVE_DEFAULT, okFirmware ? "" : "?", firmwareId);
+
+  return okMode && okThreshold && okPeriod;
 }
 
 MofeiTouchDriver::Event MofeiTouchDriver::finishTouch() {

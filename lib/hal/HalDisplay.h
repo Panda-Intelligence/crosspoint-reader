@@ -1,6 +1,10 @@
 #pragma once
 #include <Arduino.h>
+#if MOFEI_DEVICE
+#include "MofeiDisplay.h"
+#else
 #include <EInkDisplay.h>
+#endif
 
 class HalDisplay {
  public:
@@ -21,10 +25,17 @@ class HalDisplay {
   void begin();
 
   // Display dimensions
+#if MOFEI_DEVICE
+  static constexpr uint16_t DISPLAY_WIDTH = MofeiDisplay::DISPLAY_WIDTH;
+  static constexpr uint16_t DISPLAY_HEIGHT = MofeiDisplay::DISPLAY_HEIGHT;
+  static constexpr uint16_t DISPLAY_WIDTH_BYTES = MofeiDisplay::DISPLAY_WIDTH_BYTES;
+  static constexpr uint32_t BUFFER_SIZE = MofeiDisplay::BUFFER_SIZE;
+#else
   static constexpr uint16_t DISPLAY_WIDTH = EInkDisplay::DISPLAY_WIDTH;
   static constexpr uint16_t DISPLAY_HEIGHT = EInkDisplay::DISPLAY_HEIGHT;
   static constexpr uint16_t DISPLAY_WIDTH_BYTES = DISPLAY_WIDTH / 8;
   static constexpr uint32_t BUFFER_SIZE = DISPLAY_WIDTH_BYTES * DISPLAY_HEIGHT;
+#endif
 
   // Frame buffer operations
   void clearScreen(uint8_t color = 0xFF) const;
@@ -56,8 +67,12 @@ class HalDisplay {
   uint32_t getBufferSize() const;
 
  private:
+#if MOFEI_DEVICE
+  MofeiDisplay einkDisplay;
+#else
   EInkDisplay einkDisplay;
   bool forceHalfRefreshNext = false;
+#endif
 };
 
 extern HalDisplay display;

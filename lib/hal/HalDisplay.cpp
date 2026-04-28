@@ -11,13 +11,22 @@ HalDisplay::HalDisplay() : einkDisplay(EPD_SCLK, EPD_MOSI, EPD_CS, EPD_DC, EPD_R
 HalDisplay::~HalDisplay() {}
 
 void HalDisplay::begin() {
+#if !MOFEI_DEVICE
   // Set X3-specific panel mode before initializing.
   if (gpio.deviceIsX3()) {
     einkDisplay.setDisplayX3();
   }
+#endif
 
   einkDisplay.begin();
 
+#if MOFEI_DEVICE
+  const auto wakeupReason = gpio.getWakeupReason();
+  if (wakeupReason == HalGPIO::WakeupReason::PowerButton || wakeupReason == HalGPIO::WakeupReason::AfterFlash ||
+      wakeupReason == HalGPIO::WakeupReason::Other) {
+    einkDisplay.requestFullRefresh();
+  }
+#else
   // Request resync after specific wakeup events to ensure clean display state
   const auto wakeupReason = gpio.getWakeupReason();
   if (wakeupReason == HalGPIO::WakeupReason::PowerButton || wakeupReason == HalGPIO::WakeupReason::AfterFlash ||
@@ -27,6 +36,7 @@ void HalDisplay::begin() {
       forceHalfRefreshNext = true;
     }
   }
+#endif
 }
 
 void HalDisplay::clearScreen(uint8_t color) const { einkDisplay.clearScreen(color); }
@@ -41,6 +51,7 @@ void HalDisplay::drawImageTransparent(const uint8_t* imageData, uint16_t x, uint
   einkDisplay.drawImageTransparent(imageData, x, y, w, h, fromProgmem);
 }
 
+#if !MOFEI_DEVICE
 EInkDisplay::RefreshMode convertRefreshMode(HalDisplay::RefreshMode mode) {
   switch (mode) {
     case HalDisplay::FULL_REFRESH:
@@ -52,8 +63,25 @@ EInkDisplay::RefreshMode convertRefreshMode(HalDisplay::RefreshMode mode) {
       return EInkDisplay::FAST_REFRESH;
   }
 }
+#endif
 
 void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen) {
+#if MOFEI_DEVICE
+  MofeiDisplay::RefreshMode displayMode = MofeiDisplay::FAST_REFRESH;
+  switch (mode) {
+    case RefreshMode::FULL_REFRESH:
+      displayMode = MofeiDisplay::FULL_REFRESH;
+      break;
+    case RefreshMode::HALF_REFRESH:
+      displayMode = MofeiDisplay::HALF_REFRESH;
+      break;
+    case RefreshMode::FAST_REFRESH:
+    default:
+      displayMode = MofeiDisplay::FAST_REFRESH;
+      break;
+  }
+  einkDisplay.displayBuffer(displayMode, turnOffScreen);
+#else
   if (gpio.deviceIsX3() && mode == RefreshMode::HALF_REFRESH) {
     einkDisplay.requestResync(1);
   }
@@ -69,14 +97,32 @@ void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen)
   }
 
   einkDisplay.displayBuffer(convertRefreshMode(mode), turnOffScreen);
+#endif
 }
 
 void HalDisplay::refreshDisplay(HalDisplay::RefreshMode mode, bool turnOffScreen) {
+#if MOFEI_DEVICE
+  MofeiDisplay::RefreshMode displayMode = MofeiDisplay::FAST_REFRESH;
+  switch (mode) {
+    case RefreshMode::FULL_REFRESH:
+      displayMode = MofeiDisplay::FULL_REFRESH;
+      break;
+    case RefreshMode::HALF_REFRESH:
+      displayMode = MofeiDisplay::HALF_REFRESH;
+      break;
+    case RefreshMode::FAST_REFRESH:
+    default:
+      displayMode = MofeiDisplay::FAST_REFRESH;
+      break;
+  }
+  einkDisplay.refreshDisplay(displayMode, turnOffScreen);
+#else
   if (gpio.deviceIsX3() && mode == RefreshMode::HALF_REFRESH) {
     einkDisplay.requestResync(1);
   }
 
   einkDisplay.refreshDisplay(convertRefreshMode(mode), turnOffScreen);
+#endif
 }
 
 void HalDisplay::deepSleep() { einkDisplay.deepSleep(); }

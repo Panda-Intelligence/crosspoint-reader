@@ -4,13 +4,17 @@
 #include <FS.h>  // need to be included before SdFat.h for compatibility with FS.h's File class
 #include <HalGPIO.h>
 #include <Logging.h>
+#if !MOFEI_DEVICE
 #include <SDCardManager.h>
+#endif
 #include <SD_MMC.h>
 
 #include <cassert>
 #include <cstring>
 
+#if !MOFEI_DEVICE
 #define SDCard SDCardManager::getInstance()
+#endif
 
 HalStorage HalStorage::instance;
 
@@ -132,8 +136,7 @@ bool HalStorage::begin() {
     return false;
   }
 
-  mofeiSdReady =
-      SD_MMC.begin("/sdcard", false, false, MOFEI_SDMMC_FREQ_KHZ, MOFEI_SDMMC_MAX_OPEN_FILES);
+  mofeiSdReady = SD_MMC.begin("/sdcard", false, false, MOFEI_SDMMC_FREQ_KHZ, MOFEI_SDMMC_MAX_OPEN_FILES);
   if (!mofeiSdReady) {
     LOG_ERR("SD", "Mofei SD_MMC mount failed");
     return false;
@@ -326,16 +329,22 @@ bool HalStorage::ensureDirectoryExists(const char* path) {
 
 class HalFile::Impl {
  public:
+#if MOFEI_DEVICE
+  explicit Impl(File&& arduinoFile) : arduinoFile(std::move(arduinoFile)) {}
+#else
   explicit Impl(FsFile&& fsFile) : fsFile(std::move(fsFile)), backend(Backend::SdFat) {}
   explicit Impl(File&& arduinoFile) : arduinoFile(std::move(arduinoFile)), backend(Backend::ArduinoFs) {}
 
   enum class Backend { SdFat, ArduinoFs };
 
   FsFile fsFile;
+#endif
   File arduinoFile;
+#if !MOFEI_DEVICE
   Backend backend;
 
   bool isArduinoFs() const { return backend == Backend::ArduinoFs; }
+#endif
 };
 
 HalFile::HalFile() = default;
@@ -477,16 +486,29 @@ bool HalStorage::removeDir(const char* path) {
 void HalFile::flush() {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  impl->arduinoFile.flush();
+#else
   if (impl->isArduinoFs()) {
     impl->arduinoFile.flush();
   } else {
     impl->fsFile.flush();
   }
+#endif
 }
 
 size_t HalFile::getName(char* name, size_t len) {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  const char* fileName = impl->arduinoFile.name();
+  if (!fileName || len == 0) {
+    return 0;
+  }
+  std::strncpy(name, fileName, len - 1);
+  name[len - 1] = '\0';
+  return std::strlen(name);
+#else
   if (impl->isArduinoFs()) {
     const char* fileName = impl->arduinoFile.name();
     if (!fileName || len == 0) {
@@ -497,82 +519,135 @@ size_t HalFile::getName(char* name, size_t len) {
     return std::strlen(name);
   }
   return impl->fsFile.getName(name, len);
+#endif
 }
 
 size_t HalFile::size() {
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  return impl->arduinoFile.size();
+#else
   return impl->isArduinoFs() ? impl->arduinoFile.size() : impl->fsFile.size();
+#endif
 }
 
 size_t HalFile::fileSize() {
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  return impl->arduinoFile.size();
+#else
   return impl->isArduinoFs() ? impl->arduinoFile.size() : impl->fsFile.fileSize();
+#endif
 }
 
 bool HalFile::seek(size_t pos) {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  return impl->arduinoFile.seek(pos);
+#else
   return impl->isArduinoFs() ? impl->arduinoFile.seek(pos) : impl->fsFile.seekSet(pos);
+#endif
 }
 
 bool HalFile::seekCur(int64_t offset) {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  return impl->arduinoFile.seek(static_cast<uint32_t>(offset), SeekCur);
+#else
   if (impl->isArduinoFs()) {
     return impl->arduinoFile.seek(static_cast<uint32_t>(offset), SeekCur);
   }
   return impl->fsFile.seekCur(offset);
+#endif
 }
 
 bool HalFile::seekSet(size_t offset) {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  return impl->arduinoFile.seek(offset);
+#else
   return impl->isArduinoFs() ? impl->arduinoFile.seek(offset) : impl->fsFile.seekSet(offset);
+#endif
 }
 
 int HalFile::available() const {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  return impl->arduinoFile.available();
+#else
   return impl->isArduinoFs() ? impl->arduinoFile.available() : impl->fsFile.available();
+#endif
 }
 
 size_t HalFile::position() const {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  return impl->arduinoFile.position();
+#else
   return impl->isArduinoFs() ? impl->arduinoFile.position() : impl->fsFile.position();
+#endif
 }
 
 int HalFile::read(void* buf, size_t count) {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  return static_cast<int>(impl->arduinoFile.read(static_cast<uint8_t*>(buf), count));
+#else
   if (impl->isArduinoFs()) {
     return static_cast<int>(impl->arduinoFile.read(static_cast<uint8_t*>(buf), count));
   }
   return impl->fsFile.read(buf, count);
+#endif
 }
 
 int HalFile::read() {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  return impl->arduinoFile.read();
+#else
   return impl->isArduinoFs() ? impl->arduinoFile.read() : impl->fsFile.read();
+#endif
 }
 
 size_t HalFile::write(const void* buf, size_t count) {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  return impl->arduinoFile.write(static_cast<const uint8_t*>(buf), count);
+#else
   return impl->isArduinoFs() ? impl->arduinoFile.write(static_cast<const uint8_t*>(buf), count)
                              : impl->fsFile.write(buf, count);
+#endif
 }
 
 size_t HalFile::write(uint8_t b) {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  return impl->arduinoFile.write(b);
+#else
   return impl->isArduinoFs() ? impl->arduinoFile.write(b) : impl->fsFile.write(b);
+#endif
 }
 
 bool HalFile::rename(const char* newPath) {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  const char* oldPath = impl->arduinoFile.path();
+  if (!oldPath) {
+    return false;
+  }
+  impl->arduinoFile.close();
+  return SD_MMC.rename(oldPath, newPath);
+#else
   if (impl->isArduinoFs()) {
     const char* oldPath = impl->arduinoFile.path();
     if (!oldPath) {
@@ -582,45 +657,67 @@ bool HalFile::rename(const char* newPath) {
     return SD_MMC.rename(oldPath, newPath);
   }
   return impl->fsFile.rename(newPath);
+#endif
 }
 
 bool HalFile::isDirectory() const {
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  return impl->arduinoFile.isDirectory();
+#else
   return impl->isArduinoFs() ? impl->arduinoFile.isDirectory() : impl->fsFile.isDirectory();
+#endif
 }
 
 void HalFile::rewindDirectory() {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  impl->arduinoFile.rewindDirectory();
+#else
   if (impl->isArduinoFs()) {
     impl->arduinoFile.rewindDirectory();
   } else {
     impl->fsFile.rewindDirectory();
   }
+#endif
 }
 
 bool HalFile::close() {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  impl->arduinoFile.close();
+  return true;
+#else
   if (impl->isArduinoFs()) {
     impl->arduinoFile.close();
     return true;
   }
   return impl->fsFile.close();
+#endif
 }
 
 HalFile HalFile::openNextFile() {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
+#if MOFEI_DEVICE
+  return HalFile(std::make_unique<Impl>(impl->arduinoFile.openNextFile(FILE_READ)));
+#else
   if (impl->isArduinoFs()) {
     return HalFile(std::make_unique<Impl>(impl->arduinoFile.openNextFile(FILE_READ)));
   }
   return HalFile(std::make_unique<Impl>(impl->fsFile.openNextFile()));
+#endif
 }
 bool HalFile::isOpen() const {
   if (impl == nullptr) {
     return false;
   }
+#if MOFEI_DEVICE
+  return static_cast<bool>(impl->arduinoFile);
+#else
   return impl->isArduinoFs() ? static_cast<bool>(impl->arduinoFile) : impl->fsFile.isOpen();
+#endif
 }
 HalFile::operator bool() const { return isOpen(); }

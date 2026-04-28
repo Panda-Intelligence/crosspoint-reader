@@ -1,7 +1,20 @@
 #pragma once
 
+#include <Arduino.h>
 #include <Print.h>
+#if MOFEI_DEVICE
+using oflag_t = int;
+#ifndef O_READ
+#define O_READ O_RDONLY
+#endif
+#ifndef O_WRITE
+#define O_WRITE O_WRONLY
+#endif
+
+inline bool isWriteMode(oflag_t oflag) { return oflag & (O_WRONLY | O_RDWR); }
+#else
 #include <common/FsApiConstants.h>  // for oflag_t
+#endif
 #include <freertos/semphr.h>
 
 #include <memory>

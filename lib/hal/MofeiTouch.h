@@ -16,8 +16,16 @@
 #define MOFEI_TOUCH_SCL 12
 #endif
 
+#ifndef MOFEI_TOUCH_PWR
+#define MOFEI_TOUCH_PWR 45
+#endif
+
+#ifndef MOFEI_TOUCH_PWR_ENABLE_LEVEL
+#define MOFEI_TOUCH_PWR_ENABLE_LEVEL HIGH
+#endif
+
 #ifndef MOFEI_TOUCH_INT
-#define MOFEI_TOUCH_INT -1
+#define MOFEI_TOUCH_INT 44
 #endif
 
 #ifndef MOFEI_TOUCH_RST
@@ -90,6 +98,7 @@ class MofeiTouchDriver {
   bool readPoint(uint16_t* x, uint16_t* y, bool* released);
   bool detectOnPins(int sda, int scl);
   bool autoDetectPins();
+  bool configureController();
   Event finishTouch();
   void normalizePoint(uint16_t* x, uint16_t* y) const;
   void logStatus(unsigned long now);

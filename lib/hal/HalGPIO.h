@@ -1,7 +1,9 @@
 #pragma once
 
 #include <Arduino.h>
+#if !MOFEI_DEVICE
 #include <InputManager.h>
+#endif
 
 #if MOFEI_DEVICE
 #include "MofeiTouch.h"
@@ -57,7 +59,7 @@
 #define QMI8658_WHO_AM_I_VALUE 0x05  // WHO_AM_I expected value
 
 class HalGPIO {
-#if CROSSPOINT_EMULATED == 0
+#if CROSSPOINT_EMULATED == 0 && !MOFEI_DEVICE
   InputManager inputMgr;
 #endif
 

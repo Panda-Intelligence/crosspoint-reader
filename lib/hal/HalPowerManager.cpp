@@ -11,6 +11,9 @@
 HalPowerManager powerManager;  // Singleton instance
 
 void HalPowerManager::begin() {
+#if MOFEI_DEVICE
+  pinMode(BAT_GPIO0, INPUT);
+#else
   if (gpio.deviceIsX3()) {
     // X3 uses an I2C fuel gauge for battery monitoring.
     // I2C init must come AFTER gpio.begin() so early hardware detection/probes are finished.
@@ -20,6 +23,7 @@ void HalPowerManager::begin() {
   } else {
     pinMode(BAT_GPIO0, INPUT);
   }
+#endif
   normalFreq = getCpuFrequencyMhz();
   modeMutex = xSemaphoreCreateMutex();
   assert(modeMutex != nullptr);
@@ -71,6 +75,11 @@ void HalPowerManager::setPowerSaving(bool enabled) {
 }
 
 void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
+#if MOFEI_DEVICE
+  (void)gpio;
+  LOG_INF("PWR", "Mofei deep sleep disabled until PMIC/latch GPIO is mapped");
+  return;
+#else
   if (gpio.deviceIsMofei()) {
     LOG_INF("PWR", "Mofei deep sleep disabled until PMIC/latch GPIO is mapped");
     return;
@@ -99,9 +108,14 @@ void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
   esp_sleep_enable_gpio_wakeup();
   // Enter Deep Sleep
   esp_deep_sleep_start();
+#endif
 }
 
 uint16_t HalPowerManager::getBatteryPercentage() const {
+#if MOFEI_DEVICE
+  // Mofei BAT_ADC 分压比例尚未在现有文档中确认，避免复用 X4 BatteryMonitor 的错误模型。
+  return _batteryCachedPercent;
+#else
   if (_batteryUseI2C) {
     const unsigned long now = millis();
     if (_batteryLastPollMs != 0 && (now - _batteryLastPollMs) < BATTERY_POLL_MS) {
@@ -137,6 +151,7 @@ uint16_t HalPowerManager::getBatteryPercentage() const {
     _batteryCachedPercent = (_batteryCachedPercent * 9 + battery.readPercentage() * 10) / 10;
   }
   return _batteryCachedPercent / 10;
+#endif
 }
 
 HalPowerManager::Lock::Lock() {
