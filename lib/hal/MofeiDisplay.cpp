@@ -180,31 +180,37 @@ void MofeiDisplay::sendData(const uint8_t* data, uint32_t length) const {
 }
 
 void MofeiDisplay::setRamArea() {
-  // Data entry mode 0x03: X-increment, Y-increment (top-left origin, matches Arduino reference)
+  // Data entry mode 0x00: X-decrement, Y-decrement, X-direction update.
+  // GfxRenderer::Portrait maps logical(0,0) → physical(0, panelHeight-1) = last row, first byte.
+  // DEM 0x00 starts the write pointer at bottom-right and scans toward top-left to match.
   sendCommand(CMD_DATA_ENTRY_MODE);
-  sendData(0x03);
+  sendData(0x00);
 
-  // RAM-X address: 0 .. DISPLAY_WIDTH_BYTES-1 (pixel columns packed as bytes)
+  // RAM-X range: full pixel width (0 .. DISPLAY_WIDTH-1).
   sendCommand(CMD_SET_RAM_X_RANGE);
   sendData(0x00);
   sendData(0x00);
   sendData((DISPLAY_WIDTH - 1) % 256);
   sendData((DISPLAY_WIDTH - 1) / 256);
 
-  // RAM-Y address: 0 .. DISPLAY_HEIGHT-1
+  // RAM-Y range: full pixel height (0 .. DISPLAY_HEIGHT-1).
   sendCommand(CMD_SET_RAM_Y_RANGE);
   sendData(0x00);
   sendData(0x00);
   sendData((DISPLAY_HEIGHT - 1) % 256);
   sendData((DISPLAY_HEIGHT - 1) / 256);
 
-  // Reset write counters to (0, 0) — top-left corner of the framebuffer
+  // X counter: last byte column = DISPLAY_WIDTH_BYTES-1 = 99.
+  // X is byte-addressed (8 pixels/byte). The original bug sent pixel value 799
+  // which placed the write pointer 700 bytes past the valid 100-byte row, causing ~50% X offset.
   sendCommand(CMD_SET_RAM_X_COUNTER);
-  sendData(0x00);
-  sendData(0x00);
+  sendData((DISPLAY_WIDTH_BYTES - 1) % 256);
+  sendData((DISPLAY_WIDTH_BYTES - 1) / 256);
+
+  // Y counter: last row = DISPLAY_HEIGHT-1 = 479.
   sendCommand(CMD_SET_RAM_Y_COUNTER);
-  sendData(0x00);
-  sendData(0x00);
+  sendData((DISPLAY_HEIGHT - 1) % 256);
+  sendData((DISPLAY_HEIGHT - 1) / 256);
   waitWhileBusy("ram area");
 }
 
