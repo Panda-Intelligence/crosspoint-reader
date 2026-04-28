@@ -3,6 +3,10 @@
 #include <Arduino.h>
 #include <InputManager.h>
 
+#if MOFEI_DEVICE
+#include "MofeiTouch.h"
+#endif
+
 // Display SPI pins.
 #if MOFEI_DEVICE
 #define EPD_SCLK 4   // EPD CLK
@@ -72,9 +76,16 @@ class HalGPIO {
   unsigned long mofeiLastDebounceTime = 0;
   unsigned long mofeiButtonPressStart = 0;
   unsigned long mofeiButtonPressFinish = 0;
+#if MOFEI_DEVICE
+  MofeiTouchDriver mofeiTouch;
+#endif
 
   uint8_t readMofeiButtonState() const;
   void updateMofeiButtons();
+#if MOFEI_DEVICE
+  void updateMofeiTouch();
+  void injectMofeiButtonEvent(uint8_t buttonIndex);
+#endif
 
  public:
   HalGPIO() = default;
