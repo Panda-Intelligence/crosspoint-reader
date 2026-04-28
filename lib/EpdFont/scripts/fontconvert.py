@@ -807,11 +807,24 @@ if compress:
         (0x20A0, 0x20CF),   # Currency Symbols
         (0x2190, 0x21FF),   # Arrows
         (0x2200, 0x22FF),   # Math Operators
+        (0x2E80, 0x2EFF),   # CJK Radicals Supplement
+        (0x2F00, 0x2FDF),   # Kangxi Radicals
+        (0x3000, 0x303F),   # CJK Symbols and Punctuation
+        (0x3040, 0x309F),   # Hiragana
+        (0x30A0, 0x30FF),   # Katakana
+        (0x31F0, 0x31FF),   # Katakana Phonetic Extensions
+        (0xF900, 0xFAFF),   # CJK Compatibility Ideographs
+        (0xFE30, 0xFE4F),   # CJK Compatibility Forms
         (0xFB00, 0xFB06),   # Alphabetic Presentation Forms (ligatures)
+        (0xFF00, 0xFFEF),   # Halfwidth and Fullwidth Forms
         (0xFFFD, 0xFFFD),   # Replacement Character
     ]
 
+    CJK_UNIFIED_GROUP_BASE = len(SCRIPT_GROUP_RANGES)
+
     def get_script_group(code_point):
+        if 0x4E00 <= code_point <= 0x9FFF:
+            return CJK_UNIFIED_GROUP_BASE + ((code_point - 0x4E00) >> 8)
         for i, (start, end) in enumerate(SCRIPT_GROUP_RANGES):
             if start <= code_point <= end:
                 return i

@@ -165,25 +165,26 @@ Interactive controls:
 - `r`: refresh
 - Mouse click: tap at cursor position
 
-### Traditional Chinese Font Packs
+### Multilingual Font Packs
 
-The `mofei` branch supports anti-aliased Traditional Chinese reading fonts through external storage-backed font packs.
-These packs are not embedded into firmware, so they do not inflate the app image size.
+The `mofei` branch supports anti-aliased multilingual reading fonts through external storage-backed font packs.
+These packs are not embedded into firmware, so they do not inflate the app image size. The default builder covers
+Chinese, Japanese kana and punctuation, French, and Spanish.
 
-Build packs from a Traditional Chinese font file such as `NotoSansTC-Regular.otf`:
+Build packs from a CJK-capable font file such as `NotoSansCJK-Regular.otf`:
 
 ```sh
-python3 scripts/build_tc_font_pack.py --font /path/to/NotoSansTC-Regular.otf
+python3 scripts/build_multilingual_font_pack.py --font /path/to/NotoSansCJK-Regular.otf
 ```
 
 Optional styled packs can be generated when matching source fonts are available:
 
 ```sh
-python3 scripts/build_tc_font_pack.py \
-  --font /path/to/NotoSansTC-Regular.otf \
-  --font-bold /path/to/NotoSansTC-Bold.otf \
-  --font-italic /path/to/NotoSansTC-Italic.otf \
-  --font-bolditalic /path/to/NotoSansTC-BoldItalic.otf
+python3 scripts/build_multilingual_font_pack.py \
+  --font /path/to/NotoSansCJK-Regular.otf \
+  --font-bold /path/to/NotoSansCJK-Bold.otf \
+  --font-italic /path/to/NotoSansCJK-Italic.otf \
+  --font-bolditalic /path/to/NotoSansCJK-BoldItalic.otf
 ```
 
 This generates:
@@ -214,9 +215,11 @@ Expected filenames:
 /.mofei/fonts/notosans_tc_18.epf
 ```
 
-Once installed, select `Noto Sans TC` in the reader font family setting. If the packs are missing, the firmware falls
+Once installed, select `Noto Sans CJK` in the reader font family setting. If the packs are missing, the firmware falls
 back to built-in `Noto Sans`. When optional styled packs are present, EPUB/TXT bold and italic spans use the matching
-Traditional Chinese font faces instead of falling back to the regular face.
+multilingual font faces instead of falling back to the regular face.
+
+`scripts/build_tc_font_pack.py` is still available as a compatibility alias for the same builder.
 
 ## Internals
 

@@ -101,37 +101,37 @@ StorageFontFamilySlot tc16Family{&tc16Pack, &tc16BoldPack, &tc16ItalicPack, &tc1
 StorageFontFamilySlot tc18Family{&tc18Pack, &tc18BoldPack, &tc18ItalicPack, &tc18BoldItalicPack};
 
 constexpr std::array<TraditionalChineseFontPackInfo, 4> kTraditionalChineseFontPacks = {{
-    {"Noto Sans TC 12", "/.mofei/fonts/notosans_tc_12.epf", CrossPointSettings::SMALL, NOTOSANS_TC_12_FONT_ID},
-    {"Noto Sans TC 14", "/.mofei/fonts/notosans_tc_14.epf", CrossPointSettings::MEDIUM, NOTOSANS_TC_14_FONT_ID},
-    {"Noto Sans TC 16", "/.mofei/fonts/notosans_tc_16.epf", CrossPointSettings::LARGE, NOTOSANS_TC_16_FONT_ID},
-    {"Noto Sans TC 18", "/.mofei/fonts/notosans_tc_18.epf", CrossPointSettings::EXTRA_LARGE, NOTOSANS_TC_18_FONT_ID},
+    {"Noto Sans CJK 12", "/.mofei/fonts/notosans_tc_12.epf", CrossPointSettings::SMALL, NOTOSANS_TC_12_FONT_ID},
+    {"Noto Sans CJK 14", "/.mofei/fonts/notosans_tc_14.epf", CrossPointSettings::MEDIUM, NOTOSANS_TC_14_FONT_ID},
+    {"Noto Sans CJK 16", "/.mofei/fonts/notosans_tc_16.epf", CrossPointSettings::LARGE, NOTOSANS_TC_16_FONT_ID},
+    {"Noto Sans CJK 18", "/.mofei/fonts/notosans_tc_18.epf", CrossPointSettings::EXTRA_LARGE, NOTOSANS_TC_18_FONT_ID},
 }};
 
 constexpr std::array<TraditionalChineseFontFaceInfo, 16> kTraditionalChineseFontFaces = {{
-    {"Noto Sans TC 12", "/.mofei/fonts/notosans_tc_12.epf", CrossPointSettings::SMALL, EpdFontFamily::REGULAR},
-    {"Noto Sans TC 12 Bold", "/.mofei/fonts/notosans_tc_12_bold.epf", CrossPointSettings::SMALL, EpdFontFamily::BOLD},
-    {"Noto Sans TC 12 Italic", "/.mofei/fonts/notosans_tc_12_italic.epf", CrossPointSettings::SMALL,
+    {"Noto Sans CJK 12", "/.mofei/fonts/notosans_tc_12.epf", CrossPointSettings::SMALL, EpdFontFamily::REGULAR},
+    {"Noto Sans CJK 12 Bold", "/.mofei/fonts/notosans_tc_12_bold.epf", CrossPointSettings::SMALL, EpdFontFamily::BOLD},
+    {"Noto Sans CJK 12 Italic", "/.mofei/fonts/notosans_tc_12_italic.epf", CrossPointSettings::SMALL,
      EpdFontFamily::ITALIC},
-    {"Noto Sans TC 12 Bold Italic", "/.mofei/fonts/notosans_tc_12_bolditalic.epf", CrossPointSettings::SMALL,
+    {"Noto Sans CJK 12 Bold Italic", "/.mofei/fonts/notosans_tc_12_bolditalic.epf", CrossPointSettings::SMALL,
      EpdFontFamily::BOLD_ITALIC},
-    {"Noto Sans TC 14", "/.mofei/fonts/notosans_tc_14.epf", CrossPointSettings::MEDIUM, EpdFontFamily::REGULAR},
-    {"Noto Sans TC 14 Bold", "/.mofei/fonts/notosans_tc_14_bold.epf", CrossPointSettings::MEDIUM, EpdFontFamily::BOLD},
-    {"Noto Sans TC 14 Italic", "/.mofei/fonts/notosans_tc_14_italic.epf", CrossPointSettings::MEDIUM,
+    {"Noto Sans CJK 14", "/.mofei/fonts/notosans_tc_14.epf", CrossPointSettings::MEDIUM, EpdFontFamily::REGULAR},
+    {"Noto Sans CJK 14 Bold", "/.mofei/fonts/notosans_tc_14_bold.epf", CrossPointSettings::MEDIUM, EpdFontFamily::BOLD},
+    {"Noto Sans CJK 14 Italic", "/.mofei/fonts/notosans_tc_14_italic.epf", CrossPointSettings::MEDIUM,
      EpdFontFamily::ITALIC},
-    {"Noto Sans TC 14 Bold Italic", "/.mofei/fonts/notosans_tc_14_bolditalic.epf", CrossPointSettings::MEDIUM,
+    {"Noto Sans CJK 14 Bold Italic", "/.mofei/fonts/notosans_tc_14_bolditalic.epf", CrossPointSettings::MEDIUM,
      EpdFontFamily::BOLD_ITALIC},
-    {"Noto Sans TC 16", "/.mofei/fonts/notosans_tc_16.epf", CrossPointSettings::LARGE, EpdFontFamily::REGULAR},
-    {"Noto Sans TC 16 Bold", "/.mofei/fonts/notosans_tc_16_bold.epf", CrossPointSettings::LARGE, EpdFontFamily::BOLD},
-    {"Noto Sans TC 16 Italic", "/.mofei/fonts/notosans_tc_16_italic.epf", CrossPointSettings::LARGE,
+    {"Noto Sans CJK 16", "/.mofei/fonts/notosans_tc_16.epf", CrossPointSettings::LARGE, EpdFontFamily::REGULAR},
+    {"Noto Sans CJK 16 Bold", "/.mofei/fonts/notosans_tc_16_bold.epf", CrossPointSettings::LARGE, EpdFontFamily::BOLD},
+    {"Noto Sans CJK 16 Italic", "/.mofei/fonts/notosans_tc_16_italic.epf", CrossPointSettings::LARGE,
      EpdFontFamily::ITALIC},
-    {"Noto Sans TC 16 Bold Italic", "/.mofei/fonts/notosans_tc_16_bolditalic.epf", CrossPointSettings::LARGE,
+    {"Noto Sans CJK 16 Bold Italic", "/.mofei/fonts/notosans_tc_16_bolditalic.epf", CrossPointSettings::LARGE,
      EpdFontFamily::BOLD_ITALIC},
-    {"Noto Sans TC 18", "/.mofei/fonts/notosans_tc_18.epf", CrossPointSettings::EXTRA_LARGE, EpdFontFamily::REGULAR},
-    {"Noto Sans TC 18 Bold", "/.mofei/fonts/notosans_tc_18_bold.epf", CrossPointSettings::EXTRA_LARGE,
+    {"Noto Sans CJK 18", "/.mofei/fonts/notosans_tc_18.epf", CrossPointSettings::EXTRA_LARGE, EpdFontFamily::REGULAR},
+    {"Noto Sans CJK 18 Bold", "/.mofei/fonts/notosans_tc_18_bold.epf", CrossPointSettings::EXTRA_LARGE,
      EpdFontFamily::BOLD},
-    {"Noto Sans TC 18 Italic", "/.mofei/fonts/notosans_tc_18_italic.epf", CrossPointSettings::EXTRA_LARGE,
+    {"Noto Sans CJK 18 Italic", "/.mofei/fonts/notosans_tc_18_italic.epf", CrossPointSettings::EXTRA_LARGE,
      EpdFontFamily::ITALIC},
-    {"Noto Sans TC 18 Bold Italic", "/.mofei/fonts/notosans_tc_18_bolditalic.epf", CrossPointSettings::EXTRA_LARGE,
+    {"Noto Sans CJK 18 Bold Italic", "/.mofei/fonts/notosans_tc_18_bolditalic.epf", CrossPointSettings::EXTRA_LARGE,
      EpdFontFamily::BOLD_ITALIC},
 }};
 
@@ -302,11 +302,11 @@ bool loadTraditionalChineseFonts(GfxRenderer& renderer) {
           runtime.family->boldItalic->loaded() ? &runtime.family->boldItalic->font() : nullptr);
       runtime.family->loaded = true;
       renderer.insertFont(runtime.info->fontId, *runtime.family->family);
-      LOG_INF("TCFONT", "Loaded Traditional Chinese font family: %s", runtime.info->path);
+      LOG_INF("TCFONT", "Loaded multilingual font family: %s", runtime.info->path);
       anyLoaded = true;
     } else {
       renderer.removeFont(runtime.info->fontId);
-      LOG_DBG("TCFONT", "Traditional Chinese font family not found: %s", runtime.info->path);
+      LOG_DBG("TCFONT", "Multilingual font family not found: %s", runtime.info->path);
     }
   }
   if (auto* cacheManager = renderer.getFontCacheManager()) {
