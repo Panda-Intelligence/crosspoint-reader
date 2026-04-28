@@ -117,6 +117,20 @@ bool MofeiTouchDriver::update(Event* outEvent) {
   }
   const unsigned long now = millis();
   logStatus(now);
+
+  // Late-init retry: FT6336U may not be I2C-ready at boot time.
+  // Retry detectOnPins every 5s after the first 8s until detected.
+  if (!ready && now > 8000 && (now - lastRetryMs) > 5000) {
+    lastRetryMs = now;
+    ready = detectOnPins(MOFEI_TOUCH_SDA, MOFEI_TOUCH_SCL);
+    if (ready) {
+      if (!configureController()) {
+        LOG_ERR("TOUCH", "FT6336U late-init config failed");
+      }
+      LOG_INF("TOUCH", "FT6336U late-init detected SDA=%d SCL=%d", activeSda, activeScl);
+    }
+  }
+
   if (!ready) {
     return false;
   }
@@ -124,6 +138,14 @@ bool MofeiTouchDriver::update(Event* outEvent) {
   uint16_t x = 0;
   uint16_t y = 0;
   bool released = false;
+
+  // Only read from I2C if the hardware INT pin is active (LOW) indicating touch,
+  // or if we are already tracking an active touch and waiting for release.
+  const bool intActive = MOFEI_TOUCH_INT >= 0 && digitalRead(MOFEI_TOUCH_INT) == LOW;
+  if (!intActive && !touchDown) {
+    return false;
+  }
+
   if (!readPoint(&x, &y, &released)) {
     if (now - lastReadErrorLogMs >= TOUCH_READ_ERROR_LOG_INTERVAL_MS) {
       LOG_DBG("TOUCH", "FT6336U read failed on SDA=%d SCL=%d addr=0x%02X", activeSda, activeScl, FT6336_ADDR);
@@ -204,12 +226,11 @@ bool MofeiTouchDriver::detectOnPins(int sda, int scl) {
   }
   Wire.setTimeOut(4);
 
+  // A successful I2C read is sufficient to confirm the device is present.
+  // Don't check the status value here — FT6336U may return unexpected values
+  // during startup before its firmware is fully loaded.
   uint8_t status = 0;
   if (!readFt6336(FT6336_REG_TD_STATUS, &status, 1)) {
-    Wire.end();
-    return false;
-  }
-  if ((status & 0x0F) > FT6336_MAX_POINTS) {
     Wire.end();
     return false;
   }

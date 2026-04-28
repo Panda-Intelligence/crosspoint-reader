@@ -87,6 +87,7 @@ class MofeiTouchDriver {
   bool touchDown = false;
   unsigned long lastStatusLogMs = 0;
   unsigned long lastReadErrorLogMs = 0;
+  unsigned long lastRetryMs = 0;  // for late-init retry
   int activeSda = MOFEI_TOUCH_SDA;
   int activeScl = MOFEI_TOUCH_SCL;
   uint16_t startX = 0;
