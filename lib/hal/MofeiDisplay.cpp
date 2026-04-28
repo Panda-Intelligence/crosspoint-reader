@@ -174,27 +174,37 @@ void MofeiDisplay::sendData(const uint8_t* data, uint32_t length) const {
 }
 
 void MofeiDisplay::setRamArea() {
+  // Data Entry Mode 0x01 = X-increment, Y-decrement.
+  // This matches the proven-correct EInkDisplay (SSD1677) configuration used
+  // before MofeiDisplay was introduced — gates on this panel are reversed,
+  // requiring Y to scan from high to low while X scans normally low to high.
   sendCommand(CMD_DATA_ENTRY_MODE);
-  sendData(0x03);
+  sendData(0x01);
 
+  // X range: 0 .. DISPLAY_WIDTH-1 (pixels, low-to-high, X increments)
   sendCommand(CMD_SET_RAM_X_RANGE);
   sendData(0x00);
   sendData(0x00);
   sendData((DISPLAY_WIDTH - 1) % 256);
   sendData((DISPLAY_WIDTH - 1) / 256);
 
+  // Y range: start = DISPLAY_HEIGHT-1, end = 0 (Y decrements, so start > end)
   sendCommand(CMD_SET_RAM_Y_RANGE);
-  sendData(0x00);
-  sendData(0x00);
   sendData((DISPLAY_HEIGHT - 1) % 256);
   sendData((DISPLAY_HEIGHT - 1) / 256);
+  sendData(0x00);
+  sendData(0x00);
 
+  // X counter: start at 0 (X increments from left)
   sendCommand(CMD_SET_RAM_X_COUNTER);
   sendData(0x00);
   sendData(0x00);
+
+  // Y counter: start at DISPLAY_HEIGHT-1 (Y decrements from bottom)
   sendCommand(CMD_SET_RAM_Y_COUNTER);
-  sendData(0x00);
-  sendData(0x00);
+  sendData((DISPLAY_HEIGHT - 1) % 256);
+  sendData((DISPLAY_HEIGHT - 1) / 256);
+
   waitWhileBusy("ram area");
 }
 
