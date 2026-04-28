@@ -21,9 +21,11 @@ constexpr uint16_t TAP_MAX_MOVE_PX = 60;
 constexpr unsigned long TOUCH_TIMEOUT_MS = 1200;
 constexpr unsigned long TOUCH_STATUS_LOG_INTERVAL_MS = 10000;
 constexpr unsigned long TOUCH_READ_ERROR_LOG_INTERVAL_MS = 5000;
-constexpr unsigned long TOUCH_POWER_SETTLE_MS = 320;
+constexpr unsigned long TOUCH_POWER_SETTLE_MS = 1000;  // FT6336U needs ~1s after power-on before I2C is ready
 #if MOFEI_TOUCH_AUTOSCAN
-constexpr int TOUCH_AUTO_PIN_CANDIDATES[] = {12, 13, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 47, 48};
+// GPIO 0-2: keys; 3-8: EPD SPI; 9: BAT; 10-11,14-18,21: SD-MMC; 19-20: USB.
+// Only GPIO12 and GPIO13 are free for I2C touch.
+constexpr int TOUCH_AUTO_PIN_CANDIDATES[] = {12, 13};
 #endif
 
 bool readFt6336(uint8_t reg, uint8_t* buffer, uint8_t len) {
