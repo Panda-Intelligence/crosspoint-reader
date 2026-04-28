@@ -116,7 +116,7 @@ void MofeiDisplay::initController(bool fastMode) {
   sendCommand(CMD_DRIVER_OUTPUT_CONTROL);
   sendData((DISPLAY_HEIGHT - 1) % 256);
   sendData((DISPLAY_HEIGHT - 1) / 256);
-  sendData(0x02);
+  sendData(0x03);
 
   sendCommand(CMD_BORDER_WAVEFORM);
   sendData(0x01);
@@ -180,21 +180,25 @@ void MofeiDisplay::sendData(const uint8_t* data, uint32_t length) const {
 }
 
 void MofeiDisplay::setRamArea() {
+  // Data entry mode 0x03: X-increment, Y-increment (top-left origin, matches Arduino reference)
   sendCommand(CMD_DATA_ENTRY_MODE);
   sendData(0x03);
 
+  // RAM-X address: 0 .. DISPLAY_WIDTH_BYTES-1 (pixel columns packed as bytes)
   sendCommand(CMD_SET_RAM_X_RANGE);
   sendData(0x00);
   sendData(0x00);
   sendData((DISPLAY_WIDTH - 1) % 256);
   sendData((DISPLAY_WIDTH - 1) / 256);
 
+  // RAM-Y address: 0 .. DISPLAY_HEIGHT-1
   sendCommand(CMD_SET_RAM_Y_RANGE);
   sendData(0x00);
   sendData(0x00);
   sendData((DISPLAY_HEIGHT - 1) % 256);
   sendData((DISPLAY_HEIGHT - 1) / 256);
 
+  // Reset write counters to (0, 0) — top-left corner of the framebuffer
   sendCommand(CMD_SET_RAM_X_COUNTER);
   sendData(0x00);
   sendData(0x00);
