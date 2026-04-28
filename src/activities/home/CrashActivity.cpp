@@ -16,7 +16,7 @@ void CrashActivity::onEnter() {
   }
   HalSystem::clearPanic();
 
-  requestUpdateAndWait();
+  requestUpdate();
 }
 
 void CrashActivity::loop() {

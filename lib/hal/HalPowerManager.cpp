@@ -30,6 +30,16 @@ void HalPowerManager::setPowerSaving(bool enabled) {
     return;  // invalid state
   }
 
+  if (gpio.deviceIsMofei()) {
+    if (isLowPower) {
+      LOG_DBG("PWR", "Restoring normal CPU frequency");
+      if (setCpuFrequencyMhz(normalFreq)) {
+        isLowPower = false;
+      }
+    }
+    return;
+  }
+
   auto wifiMode = WiFi.getMode();
   if (wifiMode != WIFI_MODE_NULL) {
     // Wifi is active, force disabling power saving
@@ -61,6 +71,11 @@ void HalPowerManager::setPowerSaving(bool enabled) {
 }
 
 void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
+  if (gpio.deviceIsMofei()) {
+    LOG_INF("PWR", "Mofei deep sleep disabled until PMIC/latch GPIO is mapped");
+    return;
+  }
+
   // Ensure that the power button has been released to avoid immediately turning back on if you're holding it
   while (gpio.isPressed(HalGPIO::BTN_POWER)) {
     delay(50);

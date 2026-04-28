@@ -3,19 +3,33 @@
 #include <Arduino.h>
 #include <InputManager.h>
 
-// Display SPI pins (custom pins for XteinkX4, not hardware SPI defaults)
+// Display SPI pins.
+#if MOFEI_DEVICE
+#define EPD_SCLK 4   // EPD CLK
+#define EPD_MOSI 3   // EPD DIN
+#define EPD_CS 5     // EPD CS
+#define EPD_DC 6     // EPD DC
+#define EPD_RST 7    // EPD RST
+#define EPD_BUSY 8   // EPD BUSY
+#define SPI_MISO -1  // Mofei EPD bus has no MISO line
+#define BAT_GPIO0 9  // Mofei BAT_ADC
+#else
 #define EPD_SCLK 8   // SPI Clock
 #define EPD_MOSI 10  // SPI MOSI (Master Out Slave In)
 #define EPD_CS 21    // Chip Select
 #define EPD_DC 4     // Data/Command
 #define EPD_RST 5    // Reset
 #define EPD_BUSY 6   // Busy
-
-#define SPI_MISO 7  // SPI MISO, shared between SD card and display (Master In Slave Out)
-
+#define SPI_MISO 7   // SPI MISO, shared between SD card and display (Master In Slave Out)
 #define BAT_GPIO0 0  // Battery voltage
+#endif
 
 #define UART0_RXD 20  // Used for USB connection detection
+
+// Mofei ESP32-S3 discrete keys from the main MCU schematic.
+#define MOFEI_KEY_LOCK 0
+#define MOFEI_KEY1 1
+#define MOFEI_KEY2 2
 
 // Xteink X3 Hardware
 #define X3_I2C_SDA 20
@@ -51,6 +65,16 @@ class HalGPIO {
 
  private:
   DeviceType _deviceType = DeviceType::X4;
+  uint8_t mofeiCurrentState = 0;
+  uint8_t mofeiLastState = 0;
+  uint8_t mofeiPressedEvents = 0;
+  uint8_t mofeiReleasedEvents = 0;
+  unsigned long mofeiLastDebounceTime = 0;
+  unsigned long mofeiButtonPressStart = 0;
+  unsigned long mofeiButtonPressFinish = 0;
+
+  uint8_t readMofeiButtonState() const;
+  void updateMofeiButtons();
 
  public:
   HalGPIO() = default;

@@ -172,6 +172,10 @@ void verifyPowerButtonDuration() {
   }
 }
 void waitForPowerRelease() {
+  if (gpio.deviceIsMofei()) {
+    return;
+  }
+
   gpio.update();
   while (gpio.isPressed(HalGPIO::BTN_POWER)) {
     delay(50);
@@ -228,23 +232,21 @@ void setupDisplayAndFonts() {
 }
 
 void setup() {
+  logSerial.begin(115200);
+  // Wait briefly for USB serial on native-USB boards.
+  const unsigned long start = millis();
+  while (!logSerial && (millis() - start) < 1000) {
+    delay(10);
+  }
+  logSerial.println("\n\n=== CROSSPOINT START ===");
+
   t1 = millis();
 
   HalSystem::begin();
   gpio.begin();
   powerManager.begin();
 
-#ifdef ENABLE_SERIAL_LOG
-  if (gpio.isUsbConnected()) {
-    Serial.begin(115200);
-    const unsigned long start = millis();
-    while (!Serial && (millis() - start) < 500) {
-      delay(10);
-    }
-  }
-#endif
-
-  const char* hardwareLabel = gpio.deviceIsMofei() ? "MOFEI" : (gpio.deviceIsX3() ? "X3" : "X4");
+  const char* hardwareLabel = gpio.deviceIsMofei() ? "MOFEI (ESP32-S3)" : (gpio.deviceIsX3() ? "X3" : "X4");
   LOG_INF("MAIN", "Hardware detect: %s", hardwareLabel);
 
   // SD Card Initialization
@@ -337,7 +339,7 @@ void loop() {
 
   renderer.setFadingFix(SETTINGS.fadingFix);
 
-  if (Serial && millis() - lastMemPrint >= 10000) {
+  if (logSerial && millis() - lastMemPrint >= 10000) {
     LOG_INF("MEM", "Free: %d bytes, Total: %d bytes, Min Free: %d bytes, MaxAlloc: %d bytes", ESP.getFreeHeap(),
             ESP.getHeapSize(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
     lastMemPrint = millis();
@@ -382,13 +384,16 @@ void loop() {
   }
 
   const unsigned long sleepTimeoutMs = SETTINGS.getSleepTimeoutMs();
+#if !MOFEI_DEVICE
   if (millis() - lastActivityTime >= sleepTimeoutMs) {
     LOG_DBG("SLP", "Auto-sleep triggered after %lu ms of inactivity", sleepTimeoutMs);
     enterDeepSleep();
     // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start
     return;
   }
+#endif
 
+#if !MOFEI_DEVICE
   if (gpio.isPressed(HalGPIO::BTN_POWER) && gpio.getHeldTime() > SETTINGS.getPowerButtonDuration()) {
     // If the screenshot combination is potentially being pressed, don't sleep
     if (gpio.isPressed(HalGPIO::BTN_DOWN)) {
@@ -398,6 +403,7 @@ void loop() {
     // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start
     return;
   }
+#endif
 
   // Refresh screen when power button is short-pressed with FORCE_REFRESH setting.
   if (SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::FORCE_REFRESH &&

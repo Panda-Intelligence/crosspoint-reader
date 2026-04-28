@@ -107,7 +107,9 @@ X3ProbeResult runX3ProbePass() {
   result.qmi8658 = probeQMI8658Signature();
 
   Wire.end();
+#if !MOFEI_DEVICE
   pinMode(20, INPUT);
+#endif
   pinMode(0, INPUT);
   return result;
 }
@@ -120,6 +122,8 @@ constexpr char NVS_KEY_DEV_OVERRIDE[] = "dev_ovr";  // 0=auto, 1=x4, 2=x3
 constexpr char NVS_KEY_DEV_CACHED[] = "dev_det";    // 0=unknown, 1=x4, 2=x3
 
 enum class NvsDeviceValue : uint8_t { Unknown = 0, X4 = 1, X3 = 2 };
+
+constexpr unsigned long BUTTON_DEBOUNCE_DELAY_MS = 5;
 
 NvsDeviceValue readNvsDeviceValue(const char* key, NvsDeviceValue defaultValue) {
   Preferences prefs;
@@ -190,28 +194,76 @@ HalGPIO::DeviceType detectDeviceTypeWithFingerprint() {
 
 }  // namespace
 
+uint8_t HalGPIO::readMofeiButtonState() const {
+  uint8_t state = 0;
+  if (digitalRead(MOFEI_KEY_LOCK) == LOW) {
+    state |= (1 << BTN_BACK);
+  }
+  if (digitalRead(MOFEI_KEY1) == LOW) {
+    state |= (1 << BTN_CONFIRM);
+  }
+  if (digitalRead(MOFEI_KEY2) == LOW) {
+    state |= (1 << BTN_DOWN);
+  }
+  return state;
+}
+
+void HalGPIO::updateMofeiButtons() {
+  const unsigned long currentTime = millis();
+  const uint8_t state = readMofeiButtonState();
+
+  mofeiPressedEvents = 0;
+  mofeiReleasedEvents = 0;
+
+  if (state != mofeiLastState) {
+    mofeiLastDebounceTime = currentTime;
+    mofeiLastState = state;
+  }
+
+  if ((currentTime - mofeiLastDebounceTime) > BUTTON_DEBOUNCE_DELAY_MS && state != mofeiCurrentState) {
+    mofeiPressedEvents = state & ~mofeiCurrentState;
+    mofeiReleasedEvents = mofeiCurrentState & ~state;
+
+    if (mofeiPressedEvents > 0 && mofeiCurrentState == 0) {
+      mofeiButtonPressStart = currentTime;
+    }
+    if (mofeiReleasedEvents > 0 && state == 0) {
+      mofeiButtonPressFinish = currentTime;
+    }
+
+    mofeiCurrentState = state;
+  }
+}
+
 void HalGPIO::begin() {
+#if MOFEI_DEVICE
+  _deviceType = DeviceType::MOFEI;
+  pinMode(MOFEI_KEY_LOCK, INPUT_PULLUP);
+  pinMode(MOFEI_KEY1, INPUT_PULLUP);
+  pinMode(MOFEI_KEY2, INPUT_PULLUP);
+  pinMode(BAT_GPIO0, INPUT);
+  SPI.begin(EPD_SCLK, SPI_MISO, EPD_MOSI, EPD_CS);
+#else
   inputMgr.begin();
   SPI.begin(EPD_SCLK, SPI_MISO, EPD_MOSI, EPD_CS);
 
-#if MOFEI_FORCE_X3
-  _deviceType = DeviceType::X3;
-#elif MOFEI_FORCE_X4
-  _deviceType = DeviceType::X4;
-#elif MOFEI_DEVICE
-  _deviceType = DeviceType::MOFEI;
-#else
   _deviceType = detectDeviceTypeWithFingerprint();
-#endif
 
   if (deviceIsX4()) {
     pinMode(BAT_GPIO0, INPUT);
     pinMode(UART0_RXD, INPUT);
   }
+#endif
+
+  lastUsbConnected = isUsbConnected();
 }
 
 void HalGPIO::update() {
+#if MOFEI_DEVICE
+  updateMofeiButtons();
+#else
   inputMgr.update();
+#endif
   const bool connected = isUsbConnected();
   usbStateChanged = (connected != lastUsbConnected);
   lastUsbConnected = connected;
@@ -219,19 +271,62 @@ void HalGPIO::update() {
 
 bool HalGPIO::wasUsbStateChanged() const { return usbStateChanged; }
 
-bool HalGPIO::isPressed(uint8_t buttonIndex) const { return inputMgr.isPressed(buttonIndex); }
+bool HalGPIO::isPressed(uint8_t buttonIndex) const {
+#if MOFEI_DEVICE
+  return mofeiCurrentState & (1 << buttonIndex);
+#else
+  return inputMgr.isPressed(buttonIndex);
+#endif
+}
 
-bool HalGPIO::wasPressed(uint8_t buttonIndex) const { return inputMgr.wasPressed(buttonIndex); }
+bool HalGPIO::wasPressed(uint8_t buttonIndex) const {
+#if MOFEI_DEVICE
+  return mofeiPressedEvents & (1 << buttonIndex);
+#else
+  return inputMgr.wasPressed(buttonIndex);
+#endif
+}
 
-bool HalGPIO::wasAnyPressed() const { return inputMgr.wasAnyPressed(); }
+bool HalGPIO::wasAnyPressed() const {
+#if MOFEI_DEVICE
+  return mofeiPressedEvents > 0;
+#else
+  return inputMgr.wasAnyPressed();
+#endif
+}
 
-bool HalGPIO::wasReleased(uint8_t buttonIndex) const { return inputMgr.wasReleased(buttonIndex); }
+bool HalGPIO::wasReleased(uint8_t buttonIndex) const {
+#if MOFEI_DEVICE
+  return mofeiReleasedEvents & (1 << buttonIndex);
+#else
+  return inputMgr.wasReleased(buttonIndex);
+#endif
+}
 
-bool HalGPIO::wasAnyReleased() const { return inputMgr.wasAnyReleased(); }
+bool HalGPIO::wasAnyReleased() const {
+#if MOFEI_DEVICE
+  return mofeiReleasedEvents > 0;
+#else
+  return inputMgr.wasAnyReleased();
+#endif
+}
 
-unsigned long HalGPIO::getHeldTime() const { return inputMgr.getHeldTime(); }
+unsigned long HalGPIO::getHeldTime() const {
+#if MOFEI_DEVICE
+  if (mofeiCurrentState > 0) {
+    return millis() - mofeiButtonPressStart;
+  }
+  return mofeiButtonPressFinish - mofeiButtonPressStart;
+#else
+  return inputMgr.getHeldTime();
+#endif
+}
 
 void HalGPIO::startDeepSleep() {
+#if MOFEI_DEVICE
+  LOG_INF("PWR", "Mofei deep sleep disabled until PMIC/latch GPIO is mapped");
+  return;
+#else
   // Ensure that the power button has been released to avoid immediately turning back on if you're holding it
   while (inputMgr.isPressed(BTN_POWER)) {
     delay(50);
@@ -242,9 +337,15 @@ void HalGPIO::startDeepSleep() {
   esp_sleep_enable_gpio_wakeup();
   // Enter Deep Sleep
   esp_deep_sleep_start();
+#endif
 }
 
 void HalGPIO::verifyPowerButtonWakeup(uint16_t requiredDurationMs, bool shortPressAllowed) {
+#if MOFEI_DEVICE
+  (void)requiredDurationMs;
+  (void)shortPressAllowed;
+  return;
+#else
   if (shortPressAllowed) {
     // Fast path - no duration check needed
     return;
@@ -274,6 +375,7 @@ void HalGPIO::verifyPowerButtonWakeup(uint16_t requiredDurationMs, bool shortPre
   } else {
     startDeepSleep();
   }
+#endif
 }
 
 bool HalGPIO::isUsbConnected() const {
