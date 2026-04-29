@@ -130,13 +130,25 @@ bool HalStorage::begin() {
   const bool cardDetectLow = digitalRead(MOFEI_SD_CD) == LOW;
   LOG_INF("SD", "Mofei SD card detect GPIO%d=%d", MOFEI_SD_CD, cardDetectLow ? 0 : 1);
 
-  if (!SD_MMC.setPins(MOFEI_SD_CLK, MOFEI_SD_CMD, MOFEI_SD_D0, MOFEI_SD_D1, MOFEI_SD_D2, MOFEI_SD_D3)) {
-    LOG_ERR("SD", "Mofei SD_MMC setPins failed");
-    mofeiSdReady = false;
-    return false;
+#ifndef MOFEI_SD_1BIT
+#define MOFEI_SD_1BIT 0
+#endif
+
+  if (MOFEI_SD_1BIT) {
+    if (!SD_MMC.setPins(MOFEI_SD_CLK, MOFEI_SD_CMD, MOFEI_SD_D0)) {
+      LOG_ERR("SD", "Mofei SD_MMC (1-bit) setPins failed");
+      mofeiSdReady = false;
+      return false;
+    }
+  } else {
+    if (!SD_MMC.setPins(MOFEI_SD_CLK, MOFEI_SD_CMD, MOFEI_SD_D0, MOFEI_SD_D1, MOFEI_SD_D2, MOFEI_SD_D3)) {
+      LOG_ERR("SD", "Mofei SD_MMC (4-bit) setPins failed");
+      mofeiSdReady = false;
+      return false;
+    }
   }
 
-  mofeiSdReady = SD_MMC.begin("/sdcard", false, false, MOFEI_SDMMC_FREQ_KHZ, MOFEI_SDMMC_MAX_OPEN_FILES);
+  mofeiSdReady = SD_MMC.begin("/sdcard", MOFEI_SD_1BIT != 0, false, MOFEI_SDMMC_FREQ_KHZ, MOFEI_SDMMC_MAX_OPEN_FILES);
   if (!mofeiSdReady) {
     LOG_ERR("SD", "Mofei SD_MMC mount failed");
     return false;

@@ -448,28 +448,69 @@ void quickProbePair(int sda, int scl) {
 }
 
 void scanAllPins() {
-  LOG_INF("SCAN", "=== I2C scanner with RST release ===");
+  delay(3000);
+  LOG_INF("SCAN", "=== Ultimate Mofei Touch Scanner ===");
 
-  // Drive all candidate RST pins HIGH (active-low reset release for FT6336U)
-  static constexpr int8_t rstCandidates[] = {14, 15, 16, 17, 18, 21, 38, 39, 40, 41, 42, 47, 48};
-  for (int rst : rstCandidates) {
-    digitalWrite(rst, HIGH);
-    pinMode(rst, OUTPUT);
-  }
-  delay(TOUCH_RESET_SETTLE_MS);
+  auto scanBus = [](int sda, int scl, int delayUs) -> bool {
+    bool found = false;
+    for (int addr = 1; addr < 127; ++addr) {
+      // Inline probeAddr with custom delay
+      scanStart(sda, scl);
+      uint8_t val = static_cast<uint8_t>(addr) << 1;
+      scanSclLow(scl);
+      for (uint8_t i = 0; i < 8; ++i) {
+        if ((val & 0x80) != 0) scanSdaHigh(sda);
+        else scanSdaLow(sda);
+        val <<= 1;
+        delayMicroseconds(delayUs);
+        scanSclHigh(scl);
+        delayMicroseconds(delayUs);
+        scanSclLow(scl);
+        delayMicroseconds(delayUs);
+      }
+      scanSdaHigh(sda);
+      delayMicroseconds(delayUs);
+      scanSclHigh(scl);
+      delayMicroseconds(delayUs);
+      bool ack = !scanReadSda(sda);
+      scanSclLow(scl);
+      
+      if (ack) {
+        LOG_INF("SCAN", "  FOUND 0x%02X on SDA=%d SCL=%d", addr, sda, scl);
+        found = true;
+      }
+    }
+    return found;
+  };
 
-  // Full address scan on GPIO12/13
-  scanGpioPair(MOFEI_TOUCH_SDA, MOFEI_TOUCH_SCL);
+  int sda1 = 12, scl1 = 11;
+  int sda2 = 11, scl2 = 12;
 
-  // Also quick-probe other GPIO pairs (in case FT6336U is elsewhere)
-  for (int sdaPin : rstCandidates) {
-    for (int sclPin : rstCandidates) {
-      if (sdaPin <= sclPin) continue;
-      if (sdaPin == MOFEI_TOUCH_SDA && sclPin == MOFEI_TOUCH_SCL) continue;
-      quickProbePair(sdaPin, sclPin);
+  // Try all combinations of 45 and 46 as power/enable
+  for (int pwr45 = 0; pwr45 <= 1; ++pwr45) {
+    for (int pwr46 = 0; pwr46 <= 1; ++pwr46) {
+      LOG_INF("SCAN", "Config: 45=%d, 46=%d", pwr45, pwr46);
+      pinMode(45, OUTPUT); digitalWrite(45, pwr45);
+      pinMode(46, OUTPUT); digitalWrite(46, pwr46);
+      delay(50);
+
+      // Try resetting via 7
+      pinMode(7, OUTPUT);
+      digitalWrite(7, LOW); delay(20); digitalWrite(7, HIGH); delay(100);
+      
+      if (scanBus(sda1, scl1, 30)) LOG_INF("SCAN", "  -> Success with 12/11");
+      if (scanBus(sda2, scl2, 30)) LOG_INF("SCAN", "  -> Success with 11/12");
+      
+      // Try resetting via 45 (if it's not power)
+      if (pwr45 == 1) {
+        digitalWrite(45, LOW); delay(20); digitalWrite(45, HIGH); delay(100);
+        if (scanBus(sda1, scl1, 30)) LOG_INF("SCAN", "  -> Success with 12/11 (RST=45)");
+        if (scanBus(sda2, scl2, 30)) LOG_INF("SCAN", "  -> Success with 11/12 (RST=45)");
+      }
     }
   }
-  LOG_INF("SCAN", "=== Scan complete ===");
+
+  LOG_INF("SCAN", "=== Ultimate Scan complete ===");
 }
 #endif  // MOFEI_TOUCH_SCAN
 

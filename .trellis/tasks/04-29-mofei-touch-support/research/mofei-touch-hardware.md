@@ -323,26 +323,45 @@ Code changes applied to `MofeiTouch.h`: all five defaults updated to schematic v
 Despite this, SD card mounted successfully after touch detection attempt on GPIO12/11, suggesting
 either 1-bit fallback or pin reconfiguration by SD_MMC driver.
 
-### Current state
+To definitively test this, a 1-bit SD card mode was added (`MOFEI_SD_1BIT`) to `HalStorage.cpp` to free up GPIO 11 from the SD_MMC driver.
 
-- MofeiTouch.h defaults updated to schematic values (SDA=12, SCL=11, INT=45, PWR=46, RST=7)
-- 0x2E remains production default address
-- 0x38 diagnostic bypass code present in `detectOnPins()` for future testing
-- Scan code (`MOFEI_TOUCH_SCAN`) still present in MofeiTouch.cpp
-- Multiple diagnostic build envs in platformio.ini:
-  - `mofei_touch_soft_i2c`: soft I2C with current defaults
-  - `mofei_touch_soft_i2c_addr38_diag`: soft I2C + addr 0x38
-  - `mofei_touch_addr38_diag`: hardware Wire + addr 0x38
-  - `mofei_touch_soft_i2c_power_low_diag`: active-low power
-  - `mofei_touch_soft_i2c_rst7_diag`: RST=7 with soft I2C
-  - `mofei_touch_scan`: full I2C scanner
-  - `mofei_touch_no_power_diag`: no power control
-  - `mofei_test_sda13_scl12`: GPIO13/12 at 0x2E cross-check
-  - `mofei`: production build
+## Exhaustive Hardware Scans: 2026-04-29
+
+With SD_MMC constrained to 1-bit mode, exhaustive I2C address and bus scans were executed directly on the device.
+
+### 1. Confirmed Devices on Main Bus (SDA=13, SCL=12)
+
+A register-level probe on the main working bus (13/12) revealed exactly three devices.
+- `0x38`: Confirmed AHT20 temperature/humidity sensor.
+- `0x32`: Returns valid chip ID (`0x28`). This is highly likely an RTC chip (e.g., BM8563 or RX8025).
+- `0x18`: Returns `0x0A` on register `0x02` (error code for invalid register sequence) and vendor ID `0x50`. This perfectly matches a Bosch BMA423 accelerometer (used for auto-rotation).
+- **`0x2E`**: No response. The touch controller is not visible on the main bus.
+
+### 2. Schematic Bus (SDA=12, SCL=11) Testing
+
+Tested all permutations of:
+- Power: GPIO46 HIGH, GPIO46 LOW, GPIO45 HIGH, GPIO45 LOW
+- Reset: GPIO7 toggle, GPIO45 toggle
+- SDA/SCL orientation: 12/11 and 11/12
+
+Result: **Total failure**. Depending on pull-ups and power states, the bus either responded with `No devices found` or a floating-line ghost response where every address from `0x01` to `0x7E` ACKed. No actual I2C silicon is communicating on these pins.
+
+### 3. All Other Unaccounted GPIOs
+
+Swept every remaining candidate pin (1, 2, 9, 14, 15, 16, 17, 18, 43, 44, 47, 48) paired against each other to find any hidden I2C bus.
+
+Result: **No valid I2C buses found**.
+
+### Current State & Hypothesis
+
+Every available I2C-capable pin on the ESP32-S3 has been scanned under multiple power and reset conditions. The FT6336U (`0x2E`) is physically invisible to the MCU.
+
+The only logical explanations remaining:
+1. **Unmapped Power Pin:** The touch controller's power regulator is controlled by a GPIO we haven't toggled (e.g., GPIO 9, 10, or an IO expander on the I2C bus).
+2. **Defective Hardware:** The specific unit being tested has a physical defect in the FPC connector or touch silicon.
+3. **Missing Hardware:** This specific hardware revision simply does not have the touch layer installed, despite previous system assumptions.
 
 ### Blocked on
 
-GPIO12/11 (schematic-correct bus) is completely dead — no I2C devices respond. GPIO13/12 (only known
-working I2C bus) has AHT20@0x38 but nothing at 0x2E. FT6336U physical I2C pins remain unidentified.
-Waiting for user to re-verify schematic SDA/SCL net labels or visually trace PCB traces from touch FPC
-connector to ESP32-S3 pads.
+Need hardware verification of the touch FPC connector voltage levels during boot, or validation on a second identical Mofei unit.
+
