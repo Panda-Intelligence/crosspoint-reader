@@ -448,69 +448,60 @@ void quickProbePair(int sda, int scl) {
 }
 
 void scanAllPins() {
-  delay(3000);
-  LOG_INF("SCAN", "=== Ultimate Mofei Touch Scanner ===");
+  delay(6000);
+  LOG_INF("SCAN", "=== Focused ic.png Diagnostic (SDA=13 SCL=12) ===");
 
-  auto scanBus = [](int sda, int scl, int delayUs) -> bool {
-    bool found = false;
-    for (int addr = 1; addr < 127; ++addr) {
-      // Inline probeAddr with custom delay
-      scanStart(sda, scl);
-      uint8_t val = static_cast<uint8_t>(addr) << 1;
-      scanSclLow(scl);
-      for (uint8_t i = 0; i < 8; ++i) {
-        if ((val & 0x80) != 0) scanSdaHigh(sda);
-        else scanSdaLow(sda);
-        val <<= 1;
-        delayMicroseconds(delayUs);
-        scanSclHigh(scl);
-        delayMicroseconds(delayUs);
-        scanSclLow(scl);
-        delayMicroseconds(delayUs);
-      }
-      scanSdaHigh(sda);
-      delayMicroseconds(delayUs);
-      scanSclHigh(scl);
-      delayMicroseconds(delayUs);
-      bool ack = !scanReadSda(sda);
-      scanSclLow(scl);
-      
-      if (ack) {
-        LOG_INF("SCAN", "  FOUND 0x%02X on SDA=%d SCL=%d", addr, sda, scl);
-        found = true;
-      }
+  int sda = 13;
+  int scl = 12;
+  int pwr = 45;
+  int intr = 44;
+
+  auto probeTouch = [sda, scl](uint8_t addr) -> bool {
+    scanStart(sda, scl);
+    // writeByte logic (simplified for ACK check)
+    uint8_t val = addr << 1;
+    scanSclLow(scl);
+    for (int i = 0; i < 8; i++) {
+      if (val & 0x80) scanSdaHigh(sda); else scanSdaLow(sda);
+      val <<= 1; delayMicroseconds(20); scanSclHigh(scl); delayMicroseconds(20); scanSclLow(scl); delayMicroseconds(20);
     }
-    return found;
+    scanSdaHigh(sda); delayMicroseconds(20); scanSclHigh(scl); delayMicroseconds(20);
+    bool ack = !scanReadSda(sda);
+    scanSclLow(scl); scanStop(sda, scl);
+    return ack;
   };
 
-  int sda1 = 12, scl1 = 11;
-  int sda2 = 11, scl2 = 12;
+  static constexpr int8_t rstPins[] = {-1, 7, 46};
+  bool pwrStates[] = {true, false};
 
-  // Try all combinations of 45 and 46 as power/enable
-  for (int pwr45 = 0; pwr45 <= 1; ++pwr45) {
-    for (int pwr46 = 0; pwr46 <= 1; ++pwr46) {
-      LOG_INF("SCAN", "Config: 45=%d, 46=%d", pwr45, pwr46);
-      pinMode(45, OUTPUT); digitalWrite(45, pwr45);
-      pinMode(46, OUTPUT); digitalWrite(46, pwr46);
-      delay(50);
+  for (bool pwrHigh : pwrStates) {
+    LOG_INF("SCAN", "Testing with TOUCH_PWR(GPIO45) = %s", pwrHigh ? "HIGH" : "LOW");
+    pinMode(pwr, OUTPUT);
+    digitalWrite(pwr, pwrHigh ? HIGH : LOW);
+    
+    for (int8_t rst : rstPins) {
+      if (rst != -1) {
+        LOG_INF("SCAN", "  Applying Reset on GPIO%d...", rst);
+        pinMode(rst, OUTPUT);
+        digitalWrite(rst, LOW); delay(20); digitalWrite(rst, HIGH); delay(100);
+      } else {
+        LOG_INF("SCAN", "  No explicit reset...");
+      }
 
-      // Try resetting via 7
-      pinMode(7, OUTPUT);
-      digitalWrite(7, LOW); delay(20); digitalWrite(7, HIGH); delay(100);
+      if (probeTouch(0x2E)) {
+        LOG_INF("SCAN", "  >>> SUCCESS! FOUND 0x2E (FT6336U) on 13/12! <<<");
+      } else {
+        LOG_INF("SCAN", "  0x2E not found.");
+      }
       
-      if (scanBus(sda1, scl1, 30)) LOG_INF("SCAN", "  -> Success with 12/11");
-      if (scanBus(sda2, scl2, 30)) LOG_INF("SCAN", "  -> Success with 11/12");
-      
-      // Try resetting via 45 (if it's not power)
-      if (pwr45 == 1) {
-        digitalWrite(45, LOW); delay(20); digitalWrite(45, HIGH); delay(100);
-        if (scanBus(sda1, scl1, 30)) LOG_INF("SCAN", "  -> Success with 12/11 (RST=45)");
-        if (scanBus(sda2, scl2, 30)) LOG_INF("SCAN", "  -> Success with 11/12 (RST=45)");
+      // Also check 0x38 as control (it should always be there if pwr doesn't kill the bus)
+      if (probeTouch(0x38)) {
+        LOG_INF("SCAN", "  (Control 0x38 is present)");
       }
     }
   }
 
-  LOG_INF("SCAN", "=== Ultimate Scan complete ===");
+  LOG_INF("SCAN", "=== Diagnostic complete ===");
 }
 #endif  // MOFEI_TOUCH_SCAN
 
@@ -644,6 +635,7 @@ bool MofeiTouchDriver::update(Event* outEvent) {
     startY = y;
     startMs = millis();
   }
+  
   lastX = x;
   lastY = y;
   return false;
