@@ -36,8 +36,20 @@
 #define MOFEI_TOUCH_I2C_FREQ 400000
 #endif
 
+#ifndef MOFEI_TOUCH_ADDR
+#define MOFEI_TOUCH_ADDR 0x2E
+#endif
+
 #ifndef MOFEI_TOUCH_AUTOSCAN
 #define MOFEI_TOUCH_AUTOSCAN 0
+#endif
+
+#ifndef MOFEI_TOUCH_SOFT_I2C
+#define MOFEI_TOUCH_SOFT_I2C 0
+#endif
+
+#ifndef MOFEI_TOUCH_DIAGNOSTIC_LOG
+#define MOFEI_TOUCH_DIAGNOSTIC_LOG MOFEI_TOUCH_SOFT_I2C
 #endif
 
 #ifndef MOFEI_TOUCH_WIDTH
@@ -85,6 +97,8 @@ class MofeiTouchDriver {
  private:
   bool ready = false;
   bool touchDown = false;
+  bool lastReadInvalidFrame = false;
+  bool useSoftwareI2c = false;
   unsigned long lastStatusLogMs = 0;
   unsigned long lastReadErrorLogMs = 0;
   unsigned long lastRetryMs = 0;  // for late-init retry
@@ -98,8 +112,13 @@ class MofeiTouchDriver {
 
   bool readPoint(uint16_t* x, uint16_t* y, bool* released);
   bool detectOnPins(int sda, int scl);
+#if MOFEI_TOUCH_AUTOSCAN
   bool autoDetectPins();
+#endif
+  bool readRegister(uint8_t reg, uint8_t* buffer, uint8_t len);
+  bool writeRegister(uint8_t reg, uint8_t value);
   bool configureController();
+  void markUnavailable();
   Event finishTouch();
   void normalizePoint(uint16_t* x, uint16_t* y) const;
   void logStatus(unsigned long now);

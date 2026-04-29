@@ -6,16 +6,23 @@
 #include <Wire.h>
 
 namespace {
-constexpr uint8_t FT6336_ADDR = 0x38;
+constexpr uint8_t FT6336_ADDR = MOFEI_TOUCH_ADDR;
 constexpr uint8_t FT6336_REG_DEVICE_MODE = 0x00;
 constexpr uint8_t FT6336_REG_TD_STATUS = 0x02;
+constexpr uint8_t FT6336_REG_GESTURE_ID = 0x01;
 constexpr uint8_t FT6336_REG_THGROUP = 0x80;
 constexpr uint8_t FT6336_REG_PERIODACTIVE = 0x88;
 constexpr uint8_t FT6336_REG_FIRMWARE_ID = 0xA6;
+constexpr uint8_t FT6336_REG_VENDOR_ID = 0xA8;
 constexpr uint8_t FT6336_MAX_POINTS = 2;
+constexpr uint8_t FT6336_FRAME_LEN = 11;
+constexpr uint8_t FT6336_TOUCH1_OFFSET = 1;
+constexpr uint8_t FT6336_TOUCH2_OFFSET = 7;
 constexpr uint8_t FT6336_DEVICE_MODE_WORKING = 0;
 constexpr uint8_t FT6336_THGROUP_DEFAULT = 22;
 constexpr uint8_t FT6336_PERIODACTIVE_DEFAULT = 14;
+constexpr uint8_t FT6336_EVENT_PUT_UP = 1;
+constexpr uint8_t FT6336_EVENT_RESERVED = 3;
 constexpr uint16_t SWIPE_THRESHOLD_PX = 80;
 constexpr uint16_t TAP_MAX_MOVE_PX = 60;
 constexpr unsigned long TOUCH_TIMEOUT_MS = 1200;
@@ -27,39 +34,248 @@ constexpr unsigned long TOUCH_POWER_SETTLE_MS = 1000;  // FT6336U needs ~1s afte
 // Only GPIO12 and GPIO13 are free for I2C touch.
 constexpr int TOUCH_AUTO_PIN_CANDIDATES[] = {12, 13};
 #endif
+constexpr unsigned long TOUCH_RESET_LOW_MS = 50;
+constexpr unsigned long TOUCH_RESET_SETTLE_MS = 100;
+constexpr unsigned long TOUCH_BUS_IDLE_MS = 10;
 
-bool readFt6336(uint8_t reg, uint8_t* buffer, uint8_t len) {
-  Wire.beginTransmission(FT6336_ADDR);
-  Wire.write(reg);
-  if (Wire.endTransmission(false) != 0) {
-    return false;
+enum class Ft6336FrameStatus : uint8_t { TransportError, Valid, Invalid };
+
+class Ft6336Transport {
+ public:
+  virtual bool begin(int sda, int scl) = 0;
+  virtual void end() = 0;
+  virtual bool read(uint8_t reg, uint8_t* buffer, uint8_t len) = 0;
+  virtual bool write(uint8_t reg, uint8_t value) = 0;
+};
+
+class WireFt6336Transport final : public Ft6336Transport {
+ public:
+  bool begin(int sda, int scl) override {
+    Wire.end();
+    if (!Wire.begin(sda, scl, MOFEI_TOUCH_I2C_FREQ)) {
+      return false;
+    }
+    Wire.setTimeOut(4);
+    return true;
   }
 
-  if (Wire.requestFrom(FT6336_ADDR, len, static_cast<uint8_t>(true)) != len) {
-    while (Wire.available()) {
-      Wire.read();
+  void end() override { Wire.end(); }
+
+  bool read(uint8_t reg, uint8_t* buffer, uint8_t len) override {
+    Wire.beginTransmission(FT6336_ADDR);
+    Wire.write(reg);
+    if (Wire.endTransmission(false) != 0) {
+      return false;
     }
+
+    if (Wire.requestFrom(FT6336_ADDR, len, static_cast<uint8_t>(true)) != len) {
+      while (Wire.available()) {
+        Wire.read();
+      }
+      Wire.beginTransmission(FT6336_ADDR);
+      Wire.endTransmission(true);
+      return false;
+    }
+
+    for (uint8_t i = 0; i < len; ++i) {
+      buffer[i] = Wire.read();
+    }
+
+    // Force a STOP condition just in case the core failed to send it.
     Wire.beginTransmission(FT6336_ADDR);
     Wire.endTransmission(true);
-    return false;
+    return true;
   }
 
-  for (uint8_t i = 0; i < len; ++i) {
-    buffer[i] = Wire.read();
+  bool write(uint8_t reg, uint8_t value) override {
+    Wire.beginTransmission(FT6336_ADDR);
+    Wire.write(reg);
+    Wire.write(value);
+    return Wire.endTransmission(true) == 0;
   }
-  
-  // Force a STOP condition just in case the core failed to send it
-  Wire.beginTransmission(FT6336_ADDR);
-  Wire.endTransmission(true);
-  
-  return true;
+};
+
+#if MOFEI_TOUCH_SOFT_I2C
+class SoftFt6336Transport final : public Ft6336Transport {
+ public:
+  bool begin(int sda, int scl) override {
+    if (sda < 0 || scl < 0 || sda == scl) {
+      return false;
+    }
+    sdaPin = sda;
+    sclPin = scl;
+    driveSdaHigh();
+    delay(TOUCH_BUS_IDLE_MS);
+    driveSclHigh();
+    delay(TOUCH_BUS_IDLE_MS);
+    return true;
+  }
+
+  void end() override {
+    if (sdaPin >= 0 && sclPin >= 0) {
+      driveSclLow();
+      driveSdaLow();
+      delayMicroseconds(10);
+      driveSclHigh();
+      driveSdaHigh();
+    }
+  }
+
+  bool read(uint8_t reg, uint8_t* buffer, uint8_t len) override {
+    if (buffer == nullptr || len == 0) {
+      return false;
+    }
+
+    start();
+    bool ok = writeByte(FT6336_ADDR << 1) && writeByte(reg);
+    stop();
+    if (!ok) {
+      return false;
+    }
+
+    start();
+    ok = writeByte((FT6336_ADDR << 1) | 0x01);
+    if (!ok) {
+      stop();
+      return false;
+    }
+    for (uint8_t i = 0; i < len; ++i) {
+      buffer[i] = readByte(i + 1 < len);
+    }
+    stop();
+    return true;
+  }
+
+  bool write(uint8_t reg, uint8_t value) override {
+    start();
+    const bool ok = writeByte(FT6336_ADDR << 1) && writeByte(reg) && writeByte(value);
+    stop();
+    delay(2);
+    return ok;
+  }
+
+ private:
+  int sdaPin = -1;
+  int sclPin = -1;
+
+  void driveSdaHigh() const { pinMode(sdaPin, INPUT_PULLUP); }
+  void driveSdaLow() const {
+    digitalWrite(sdaPin, LOW);
+    pinMode(sdaPin, OUTPUT);
+  }
+  void driveSclHigh() const { pinMode(sclPin, INPUT_PULLUP); }
+  void driveSclLow() const {
+    digitalWrite(sclPin, LOW);
+    pinMode(sclPin, OUTPUT);
+  }
+  bool readSda() const { return digitalRead(sdaPin) != LOW; }
+
+  void start() const {
+    driveSdaHigh();
+    driveSclHigh();
+    delayMicroseconds(10);
+    driveSdaLow();
+    delayMicroseconds(10);
+    driveSclLow();
+  }
+
+  void stop() const {
+    driveSclLow();
+    driveSdaLow();
+    delayMicroseconds(10);
+    driveSclHigh();
+    driveSdaHigh();
+    delayMicroseconds(10);
+  }
+
+  bool writeByte(uint8_t value) const {
+    driveSclLow();
+    for (uint8_t i = 0; i < 8; ++i) {
+      if ((value & 0x80) != 0) {
+        driveSdaHigh();
+      } else {
+        driveSdaLow();
+      }
+      value <<= 1;
+      delayMicroseconds(10);
+      driveSclHigh();
+      delayMicroseconds(10);
+      driveSclLow();
+      delayMicroseconds(10);
+    }
+
+    driveSdaHigh();
+    delayMicroseconds(10);
+    driveSclHigh();
+    delayMicroseconds(10);
+    bool acked = false;
+    for (uint8_t i = 0; i < 100; ++i) {
+      if (!readSda()) {
+        acked = true;
+        break;
+      }
+      delayMicroseconds(1);
+    }
+    driveSclLow();
+    delayMicroseconds(10);
+    return acked;
+  }
+
+  uint8_t readByte(bool keepReading) const {
+    uint8_t value = 0;
+    driveSdaHigh();
+    for (uint8_t i = 0; i < 8; ++i) {
+      driveSclLow();
+      delayMicroseconds(10);
+      driveSclHigh();
+      value <<= 1;
+      if (readSda()) {
+        value |= 0x01;
+      }
+      delayMicroseconds(10);
+    }
+
+    driveSclLow();
+    if (keepReading) {
+      driveSdaLow();
+    } else {
+      driveSdaHigh();
+    }
+    delayMicroseconds(10);
+    driveSclHigh();
+    delayMicroseconds(10);
+    driveSclLow();
+    driveSdaHigh();
+    return value;
+  }
+};
+#endif
+
+WireFt6336Transport wireTransport;
+#if MOFEI_TOUCH_SOFT_I2C
+SoftFt6336Transport softTransport;
+#endif
+
+Ft6336Transport& activeTransport(bool softwareI2c) {
+#if MOFEI_TOUCH_SOFT_I2C
+  if (softwareI2c) {
+    return softTransport;
+  }
+#else
+  (void)softwareI2c;
+#endif
+  return wireTransport;
 }
 
-bool writeFt6336(uint8_t reg, uint8_t value) {
-  Wire.beginTransmission(FT6336_ADDR);
-  Wire.write(reg);
-  Wire.write(value);
-  return Wire.endTransmission(true) == 0;
+const char* transportName(bool softwareI2c) {
+#if MOFEI_TOUCH_SOFT_I2C
+  if (softwareI2c) {
+    return "soft-i2c";
+  }
+#else
+  (void)softwareI2c;
+#endif
+  return "wire";
 }
 
 uint16_t scaleAxis(uint16_t value, uint16_t rawExtent, uint16_t logicalExtent) {
@@ -71,11 +287,83 @@ uint16_t scaleAxis(uint16_t value, uint16_t rawExtent, uint16_t logicalExtent) {
   }
   return static_cast<uint16_t>((static_cast<uint32_t>(value) * logicalExtent) / rawExtent);
 }
+
+bool isAht20LikeFrame(const uint8_t* data, uint8_t len) {
+  if (data == nullptr || len < 5) {
+    return false;
+  }
+
+  // 已观测到错误设备返回 98 38 80 76 41 这类 AHT20 风格数据帧，而不是 FT6336U 帧。
+  const bool statusLooksAht20 = (data[0] & 0x18) == 0x18 || (data[0] & 0x80) != 0;
+  return statusLooksAht20 && ((data[0] & 0xF0) != 0 || (data[0] & 0x0F) > FT6336_MAX_POINTS);
+}
+
+bool isPointWithinRawGeometry(uint16_t rawX, uint16_t rawY) {
+  return rawX < MOFEI_TOUCH_WIDTH && rawY < MOFEI_TOUCH_HEIGHT;
+}
+
+bool validateFt6336Point(const uint8_t* point, uint8_t pointIndex, const char* context) {
+  const uint8_t eventCode = point[0] >> 6;
+  const uint16_t rawX = ((static_cast<uint16_t>(point[0] & 0x0F)) << 8) | point[1];
+  const uint16_t rawY = ((static_cast<uint16_t>(point[2] & 0x0F)) << 8) | point[3];
+  if (eventCode == FT6336_EVENT_RESERVED || !isPointWithinRawGeometry(rawX, rawY)) {
+    LOG_ERR("TOUCH", "%s rejected invalid FT6336U p%u addr=0x%02X event=%u raw=%u,%u bytes: %02X %02X %02X %02X",
+            context, pointIndex, FT6336_ADDR, eventCode, rawX, rawY, point[0], point[1], point[2], point[3]);
+    return false;
+  }
+  return true;
+}
+
+Ft6336FrameStatus validateFt6336Frame(const uint8_t* data, uint8_t len, const char* context) {
+  if (data == nullptr || len < 5) {
+    return Ft6336FrameStatus::TransportError;
+  }
+
+  const uint8_t points = data[0] & 0x0F;
+  if ((data[0] & 0xF0) != 0 || points > FT6336_MAX_POINTS) {
+    if (isAht20LikeFrame(data, len)) {
+      LOG_ERR("TOUCH", "%s rejected wrong-device/AHT20-like frame addr=0x%02X: %02X %02X %02X %02X %02X", context,
+              FT6336_ADDR, data[0], data[1], data[2], data[3], data[4]);
+    } else {
+      LOG_ERR("TOUCH",
+              "%s rejected invalid FT6336U status=0x%02X points=%u addr=0x%02X frame: %02X %02X %02X %02X %02X",
+              context, data[0], points, FT6336_ADDR, data[0], data[1], data[2], data[3], data[4]);
+    }
+    return Ft6336FrameStatus::Invalid;
+  }
+
+  if (points == 0) {
+    return Ft6336FrameStatus::Valid;
+  }
+
+  if (!validateFt6336Point(&data[FT6336_TOUCH1_OFFSET], 1, context)) {
+    return Ft6336FrameStatus::Invalid;
+  }
+  if (points == 2 &&
+      (len <= FT6336_TOUCH2_OFFSET + 3 || !validateFt6336Point(&data[FT6336_TOUCH2_OFFSET], 2, context))) {
+    return Ft6336FrameStatus::Invalid;
+  }
+
+  return Ft6336FrameStatus::Valid;
+}
+
+void resetControllerIfConfigured() {
+  if (MOFEI_TOUCH_RST >= 0) {
+    pinMode(MOFEI_TOUCH_RST, OUTPUT);
+    digitalWrite(MOFEI_TOUCH_RST, LOW);
+    delay(TOUCH_RESET_LOW_MS);
+    digitalWrite(MOFEI_TOUCH_RST, HIGH);
+    delay(TOUCH_RESET_SETTLE_MS);
+  }
+}
 }  // namespace
 
 void MofeiTouchDriver::begin() {
 #if MOFEI_TOUCH_ENABLE
   ready = false;
+  touchDown = false;
+  lastReadInvalidFrame = false;
+  useSoftwareI2c = MOFEI_TOUCH_SOFT_I2C != 0;
   activeSda = MOFEI_TOUCH_SDA;
   activeScl = MOFEI_TOUCH_SCL;
 
@@ -89,23 +377,23 @@ void MofeiTouchDriver::begin() {
     pinMode(MOFEI_TOUCH_INT, INPUT_PULLUP);
     LOG_INF("TOUCH", "Mofei touch INT GPIO%d", MOFEI_TOUCH_INT);
   }
-  if (MOFEI_TOUCH_RST >= 0) {
-    pinMode(MOFEI_TOUCH_RST, OUTPUT);
-    digitalWrite(MOFEI_TOUCH_RST, LOW);
-    delay(5);
-    digitalWrite(MOFEI_TOUCH_RST, HIGH);
-    delay(60);
-  }
+  resetControllerIfConfigured();
+
+  LOG_INF("TOUCH", "Mofei FT6336U transport=%s SDA=%d SCL=%d INT=%d RST=%d PWR=%d addr=0x%02X",
+          transportName(useSoftwareI2c), MOFEI_TOUCH_SDA, MOFEI_TOUCH_SCL, MOFEI_TOUCH_INT, MOFEI_TOUCH_RST,
+          MOFEI_TOUCH_PWR, FT6336_ADDR);
 
   ready = detectOnPins(MOFEI_TOUCH_SDA, MOFEI_TOUCH_SCL);
   if (ready && !configureController()) {
     LOG_ERR("TOUCH", "Mofei FT6336U config failed on SDA=%d SCL=%d addr=0x%02X", activeSda, activeScl, FT6336_ADDR);
+    markUnavailable();
   }
 #if MOFEI_TOUCH_AUTOSCAN
   if (!ready) {
     ready = autoDetectPins();
     if (ready && !configureController()) {
       LOG_ERR("TOUCH", "Mofei FT6336U config failed on SDA=%d SCL=%d addr=0x%02X", activeSda, activeScl, FT6336_ADDR);
+      markUnavailable();
     }
   }
 #endif
@@ -132,9 +420,11 @@ bool MofeiTouchDriver::update(Event* outEvent) {
     ready = detectOnPins(MOFEI_TOUCH_SDA, MOFEI_TOUCH_SCL);
     if (ready) {
       if (!configureController()) {
-        LOG_ERR("TOUCH", "FT6336U late-init config failed");
+        LOG_ERR("TOUCH", "FT6336U late-init config failed addr=0x%02X", FT6336_ADDR);
+        markUnavailable();
+      } else {
+        LOG_INF("TOUCH", "FT6336U late-init detected SDA=%d SCL=%d addr=0x%02X", activeSda, activeScl, FT6336_ADDR);
       }
-      LOG_INF("TOUCH", "FT6336U late-init detected SDA=%d SCL=%d", activeSda, activeScl);
     }
   }
 
@@ -155,8 +445,13 @@ bool MofeiTouchDriver::update(Event* outEvent) {
 
   if (!readPoint(&x, &y, &released)) {
     if (now - lastReadErrorLogMs >= TOUCH_READ_ERROR_LOG_INTERVAL_MS) {
-      LOG_DBG("TOUCH", "FT6336U read failed on SDA=%d SCL=%d addr=0x%02X", activeSda, activeScl, FT6336_ADDR);
+      LOG_DBG("TOUCH", "FT6336U read failed transport=%s SDA=%d SCL=%d addr=0x%02X", transportName(useSoftwareI2c),
+              activeSda, activeScl, FT6336_ADDR);
       lastReadErrorLogMs = now;
+    }
+    if (lastReadInvalidFrame) {
+      markUnavailable();
+      return false;
     }
     if (touchDown && now - startMs > TOUCH_TIMEOUT_MS) {
       const Event event = finishTouch();
@@ -193,8 +488,13 @@ bool MofeiTouchDriver::update(Event* outEvent) {
 }
 
 bool MofeiTouchDriver::readPoint(uint16_t* x, uint16_t* y, bool* released) {
-  uint8_t data[5] = {};
-  if (!readFt6336(FT6336_REG_TD_STATUS, data, sizeof(data))) {
+  uint8_t data[FT6336_FRAME_LEN] = {};
+  lastReadInvalidFrame = false;
+  const bool readOk = readRegister(FT6336_REG_TD_STATUS, data, sizeof(data));
+  const Ft6336FrameStatus frameStatus =
+      readOk ? validateFt6336Frame(data, sizeof(data), "read") : Ft6336FrameStatus::TransportError;
+  if (frameStatus != Ft6336FrameStatus::Valid) {
+    lastReadInvalidFrame = frameStatus == Ft6336FrameStatus::Invalid;
     return false;
   }
 
@@ -205,10 +505,6 @@ bool MofeiTouchDriver::readPoint(uint16_t* x, uint16_t* y, bool* released) {
     *y = lastY;
     return true;
   }
-  if (points > FT6336_MAX_POINTS) {
-    LOG_DBG("TOUCH", "Invalid points=%u data: %02X %02X %02X %02X %02X", points, data[0], data[1], data[2], data[3], data[4]);
-    return false;
-  }
 
   const uint8_t eventCode = data[1] >> 6;
   uint16_t rawX = ((static_cast<uint16_t>(data[1] & 0x0F)) << 8) | data[2];
@@ -217,7 +513,7 @@ bool MofeiTouchDriver::readPoint(uint16_t* x, uint16_t* y, bool* released) {
 
   *x = rawX;
   *y = rawY;
-  *released = eventCode == 1;
+  *released = eventCode == FT6336_EVENT_PUT_UP;
   return true;
 }
 
@@ -228,26 +524,45 @@ bool MofeiTouchDriver::detectOnPins(int sda, int scl) {
 
   activeSda = sda;
   activeScl = scl;
-  Wire.end();
-  if (!Wire.begin(sda, scl, MOFEI_TOUCH_I2C_FREQ)) {
+  if (!activeTransport(useSoftwareI2c).begin(sda, scl)) {
+    LOG_DBG("TOUCH", "FT6336U detect transport=%s begin failed SDA=%d SCL=%d addr=0x%02X",
+            transportName(useSoftwareI2c), sda, scl, FT6336_ADDR);
     return false;
   }
-  Wire.setTimeOut(4);
 
-  // A successful I2C read is sufficient to confirm the device is present.
-  // Don't check the status value here — FT6336U may return unexpected values
-  // during startup before its firmware is fully loaded.
-  uint8_t status = 0;
-  if (!readFt6336(FT6336_REG_TD_STATUS, &status, 1)) {
-    Wire.end();
+  uint8_t data[FT6336_FRAME_LEN] = {};
+  const bool readOk = readRegister(FT6336_REG_TD_STATUS, data, sizeof(data));
+  if (!readOk || validateFt6336Frame(data, sizeof(data), "detect") != Ft6336FrameStatus::Valid) {
+    if (!readOk) {
+      LOG_DBG("TOUCH", "FT6336U detect transport=%s read failed SDA=%d SCL=%d addr=0x%02X",
+              transportName(useSoftwareI2c), activeSda, activeScl, FT6336_ADDR);
+    }
+    activeTransport(useSoftwareI2c).end();
     return false;
   }
+
+#if MOFEI_TOUCH_DIAGNOSTIC_LOG
+  uint8_t mode = 0xFF;
+  uint8_t gesture = 0xFF;
+  uint8_t firmwareId = 0xFF;
+  uint8_t vendorId = 0xFF;
+  const bool modeOk = readRegister(FT6336_REG_DEVICE_MODE, &mode, 1);
+  const bool gestureOk = readRegister(FT6336_REG_GESTURE_ID, &gesture, 1);
+  const bool firmwareOk = readRegister(FT6336_REG_FIRMWARE_ID, &firmwareId, 1);
+  const bool vendorOk = readRegister(FT6336_REG_VENDOR_ID, &vendorId, 1);
+  LOG_INF("TOUCH",
+          "FT6336U diagnostic transport=%s SDA=%d SCL=%d status=0x%02X mode=%s0x%02X gesture=%s0x%02X "
+          "addr=0x%02X fw=%s0x%02X vendor=%s0x%02X frame=%02X %02X %02X %02X %02X %02X",
+          transportName(useSoftwareI2c), activeSda, activeScl, data[0], modeOk ? "" : "?", mode, gestureOk ? "" : "?",
+          gesture, FT6336_ADDR, firmwareOk ? "" : "?", firmwareId, vendorOk ? "" : "?", vendorId, data[0], data[1],
+          data[2], data[3], data[4], data[5]);
+#endif
 
   return true;
 }
 
-bool MofeiTouchDriver::autoDetectPins() {
 #if MOFEI_TOUCH_AUTOSCAN
+bool MofeiTouchDriver::autoDetectPins() {
   LOG_INF("TOUCH", "FT6336U autoscan started addr=0x%02X", FT6336_ADDR);
   for (int sda : TOUCH_AUTO_PIN_CANDIDATES) {
     for (int scl : TOUCH_AUTO_PIN_CANDIDATES) {
@@ -255,34 +570,57 @@ bool MofeiTouchDriver::autoDetectPins() {
         continue;
       }
       if (detectOnPins(sda, scl)) {
-        LOG_INF("TOUCH", "FT6336U autoscan matched SDA=%d SCL=%d", activeSda, activeScl);
+        LOG_INF("TOUCH", "FT6336U autoscan matched SDA=%d SCL=%d addr=0x%02X", activeSda, activeScl, FT6336_ADDR);
         return true;
       }
     }
   }
   return false;
-#else
-  return false;
+}
 #endif
+
+bool MofeiTouchDriver::readRegister(uint8_t reg, uint8_t* buffer, uint8_t len) {
+  return activeTransport(useSoftwareI2c).read(reg, buffer, len);
+}
+
+bool MofeiTouchDriver::writeRegister(uint8_t reg, uint8_t value) {
+  return activeTransport(useSoftwareI2c).write(reg, value);
 }
 
 bool MofeiTouchDriver::configureController() {
-  const bool okMode = writeFt6336(FT6336_REG_DEVICE_MODE, FT6336_DEVICE_MODE_WORKING);
-  const bool okThreshold = writeFt6336(FT6336_REG_THGROUP, FT6336_THGROUP_DEFAULT);
-  const bool okPeriod = writeFt6336(FT6336_REG_PERIODACTIVE, FT6336_PERIODACTIVE_DEFAULT);
+  const bool okMode = writeRegister(FT6336_REG_DEVICE_MODE, FT6336_DEVICE_MODE_WORKING);
+  const bool okThreshold = writeRegister(FT6336_REG_THGROUP, FT6336_THGROUP_DEFAULT);
+  const bool okPeriod = writeRegister(FT6336_REG_PERIODACTIVE, FT6336_PERIODACTIVE_DEFAULT);
 
+  uint8_t mode = 0xFF;
+  const bool okModeRead = readRegister(FT6336_REG_DEVICE_MODE, &mode, 1);
   uint8_t firmwareId = 0;
-  const bool okFirmware = readFt6336(FT6336_REG_FIRMWARE_ID, &firmwareId, 1);
+  const bool okFirmware = readRegister(FT6336_REG_FIRMWARE_ID, &firmwareId, 1);
   uint8_t threshold = 0;
-  const bool okThresholdRead = readFt6336(FT6336_REG_THGROUP, &threshold, 1);
+  const bool okThresholdRead = readRegister(FT6336_REG_THGROUP, &threshold, 1);
   uint8_t period = 0;
-  const bool okPeriodRead = readFt6336(FT6336_REG_PERIODACTIVE, &period, 1);
+  const bool okPeriodRead = readRegister(FT6336_REG_PERIODACTIVE, &period, 1);
+  uint8_t data[FT6336_FRAME_LEN] = {};
+  const bool okFrame = readRegister(FT6336_REG_TD_STATUS, data, sizeof(data)) &&
+                       validateFt6336Frame(data, sizeof(data), "config") == Ft6336FrameStatus::Valid;
 
-  LOG_INF("TOUCH", "FT6336U init mode=%d th=%u/%u period=%u/%u fw=%s0x%02X", okMode ? 0 : -1,
-          okThresholdRead ? threshold : 0, FT6336_THGROUP_DEFAULT, okPeriodRead ? period : 0,
-          FT6336_PERIODACTIVE_DEFAULT, okFirmware ? "" : "?", firmwareId);
+  LOG_INF("TOUCH", "FT6336U init transport=%s addr=0x%02X mode=%d th=%u/%u period=%u/%u fw=%s0x%02X",
+          transportName(useSoftwareI2c), FT6336_ADDR, okModeRead ? mode : -1, okThresholdRead ? threshold : 0,
+          FT6336_THGROUP_DEFAULT, okPeriodRead ? period : 0, FT6336_PERIODACTIVE_DEFAULT, okFirmware ? "" : "?",
+          firmwareId);
 
-  return okMode && okThreshold && okPeriod;
+  if (!okMode || !okThreshold || !okPeriod || !okModeRead || !okThresholdRead || !okPeriodRead || !okFrame) {
+    return false;
+  }
+  return mode == FT6336_DEVICE_MODE_WORKING && threshold == FT6336_THGROUP_DEFAULT &&
+         period == FT6336_PERIODACTIVE_DEFAULT;
+}
+
+void MofeiTouchDriver::markUnavailable() {
+  ready = false;
+  touchDown = false;
+  lastReadInvalidFrame = false;
+  activeTransport(useSoftwareI2c).end();
 }
 
 MofeiTouchDriver::Event MofeiTouchDriver::finishTouch() {
@@ -331,8 +669,8 @@ void MofeiTouchDriver::logStatus(unsigned long now) {
   if (now - lastStatusLogMs < TOUCH_STATUS_LOG_INTERVAL_MS) {
     return;
   }
-  LOG_INF("TOUCH", "FT6336U status=%s SDA=%d SCL=%d addr=0x%02X", ready ? "ready" : "not detected", activeSda,
-          activeScl, FT6336_ADDR);
+  LOG_INF("TOUCH", "FT6336U status=%s transport=%s SDA=%d SCL=%d addr=0x%02X", ready ? "ready" : "not detected",
+          transportName(useSoftwareI2c), activeSda, activeScl, FT6336_ADDR);
   lastStatusLogMs = now;
 }
 
