@@ -9,15 +9,15 @@
 #endif
 
 #ifndef MOFEI_TOUCH_SDA
-#define MOFEI_TOUCH_SDA 13
+#define MOFEI_TOUCH_SDA 12
 #endif
 
 #ifndef MOFEI_TOUCH_SCL
-#define MOFEI_TOUCH_SCL 12
+#define MOFEI_TOUCH_SCL 11
 #endif
 
 #ifndef MOFEI_TOUCH_PWR
-#define MOFEI_TOUCH_PWR 45
+#define MOFEI_TOUCH_PWR 46
 #endif
 
 #ifndef MOFEI_TOUCH_PWR_ENABLE_LEVEL
@@ -25,11 +25,11 @@
 #endif
 
 #ifndef MOFEI_TOUCH_INT
-#define MOFEI_TOUCH_INT 44
+#define MOFEI_TOUCH_INT 45
 #endif
 
 #ifndef MOFEI_TOUCH_RST
-#define MOFEI_TOUCH_RST -1
+#define MOFEI_TOUCH_RST 7
 #endif
 
 #ifndef MOFEI_TOUCH_I2C_FREQ
@@ -50,6 +50,10 @@
 
 #ifndef MOFEI_TOUCH_DIAGNOSTIC_LOG
 #define MOFEI_TOUCH_DIAGNOSTIC_LOG MOFEI_TOUCH_SOFT_I2C
+#endif
+
+#ifndef MOFEI_TOUCH_SCAN
+#define MOFEI_TOUCH_SCAN 0
 #endif
 
 #ifndef MOFEI_TOUCH_WIDTH

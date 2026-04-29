@@ -356,6 +356,123 @@ void resetControllerIfConfigured() {
     delay(TOUCH_RESET_SETTLE_MS);
   }
 }
+
+#if MOFEI_TOUCH_SCAN
+// GPIO helpers matching SoftFt6336Transport timing
+static void scanSdaHigh(int sda) { pinMode(sda, INPUT_PULLUP); }
+static void scanSdaLow(int sda) { digitalWrite(sda, LOW); pinMode(sda, OUTPUT); }
+static void scanSclHigh(int scl) { pinMode(scl, INPUT_PULLUP); }
+static void scanSclLow(int scl) { digitalWrite(scl, LOW); pinMode(scl, OUTPUT); }
+static bool scanReadSda(int sda) { return digitalRead(sda) != LOW; }
+
+static void scanStart(int sda, int scl) {
+  scanSdaHigh(sda);
+  scanSclHigh(scl);
+  delayMicroseconds(10);
+  scanSdaLow(sda);
+  delayMicroseconds(10);
+  scanSclLow(scl);
+}
+
+static void scanStop(int sda, int scl) {
+  scanSclLow(scl);
+  scanSdaLow(sda);
+  delayMicroseconds(10);
+  scanSclHigh(scl);
+  scanSdaHigh(sda);
+  delayMicroseconds(10);
+}
+
+static bool probeAddr(int sda, int scl, uint8_t addr7bit) {
+  const uint8_t txByte = addr7bit << 1;
+  scanStart(sda, scl);
+
+  // writeByte (exact timing match with SoftFt6336Transport)
+  uint8_t val = txByte;
+  scanSclLow(scl);
+  for (uint8_t i = 0; i < 8; ++i) {
+    if ((val & 0x80) != 0) {
+      scanSdaHigh(sda);
+    } else {
+      scanSdaLow(sda);
+    }
+    val <<= 1;
+    delayMicroseconds(10);
+    scanSclHigh(scl);
+    delayMicroseconds(10);
+    scanSclLow(scl);
+    delayMicroseconds(10);
+  }
+
+  // Check ACK (same as writeByte)
+  scanSdaHigh(sda);
+  delayMicroseconds(10);
+  scanSclHigh(scl);
+  delayMicroseconds(10);
+  bool acked = false;
+  for (uint8_t i = 0; i < 100; ++i) {
+    if (!scanReadSda(sda)) {
+      acked = true;
+      break;
+    }
+    delayMicroseconds(1);
+  }
+  scanSclLow(scl);
+  delayMicroseconds(10);
+
+  scanStop(sda, scl);
+  return acked;
+}
+
+void scanGpioPair(int sda, int scl) {
+  // Full address scan on the known bus; quick probe on others
+  bool foundAny = false;
+  for (int addr = 1; addr < 127; ++addr) {
+    if (probeAddr(sda, scl, static_cast<uint8_t>(addr))) {
+      LOG_INF("SCAN", "  FOUND device at 0x%02X on SDA=%d SCL=%d", addr, sda, scl);
+      foundAny = true;
+    }
+  }
+  if (!foundAny) {
+    LOG_INF("SCAN", "  No devices found on SDA=%d SCL=%d", sda, scl);
+  }
+}
+
+void quickProbePair(int sda, int scl) {
+  static constexpr uint8_t checkAddrs[] = {0x2E, 0x38};
+  for (uint8_t addr : checkAddrs) {
+    if (probeAddr(sda, scl, addr)) {
+      LOG_INF("SCAN", "  FOUND device at 0x%02X on SDA=%d SCL=%d", addr, sda, scl);
+    }
+  }
+}
+
+void scanAllPins() {
+  LOG_INF("SCAN", "=== I2C scanner with RST release ===");
+
+  // Drive all candidate RST pins HIGH (active-low reset release for FT6336U)
+  static constexpr int8_t rstCandidates[] = {14, 15, 16, 17, 18, 21, 38, 39, 40, 41, 42, 47, 48};
+  for (int rst : rstCandidates) {
+    digitalWrite(rst, HIGH);
+    pinMode(rst, OUTPUT);
+  }
+  delay(TOUCH_RESET_SETTLE_MS);
+
+  // Full address scan on GPIO12/13
+  scanGpioPair(MOFEI_TOUCH_SDA, MOFEI_TOUCH_SCL);
+
+  // Also quick-probe other GPIO pairs (in case FT6336U is elsewhere)
+  for (int sdaPin : rstCandidates) {
+    for (int sclPin : rstCandidates) {
+      if (sdaPin <= sclPin) continue;
+      if (sdaPin == MOFEI_TOUCH_SDA && sclPin == MOFEI_TOUCH_SCL) continue;
+      quickProbePair(sdaPin, sclPin);
+    }
+  }
+  LOG_INF("SCAN", "=== Scan complete ===");
+}
+#endif  // MOFEI_TOUCH_SCAN
+
 }  // namespace
 
 void MofeiTouchDriver::begin() {
@@ -378,6 +495,10 @@ void MofeiTouchDriver::begin() {
     LOG_INF("TOUCH", "Mofei touch INT GPIO%d", MOFEI_TOUCH_INT);
   }
   resetControllerIfConfigured();
+
+#if MOFEI_TOUCH_SCAN
+  scanAllPins();
+#endif
 
   LOG_INF("TOUCH", "Mofei FT6336U transport=%s SDA=%d SCL=%d INT=%d RST=%d PWR=%d addr=0x%02X",
           transportName(useSoftwareI2c), MOFEI_TOUCH_SDA, MOFEI_TOUCH_SCL, MOFEI_TOUCH_INT, MOFEI_TOUCH_RST,
@@ -536,9 +657,17 @@ bool MofeiTouchDriver::detectOnPins(int sda, int scl) {
     if (!readOk) {
       LOG_DBG("TOUCH", "FT6336U detect transport=%s read failed SDA=%d SCL=%d addr=0x%02X",
               transportName(useSoftwareI2c), activeSda, activeScl, FT6336_ADDR);
+      activeTransport(useSoftwareI2c).end();
+      return false;
     }
-    activeTransport(useSoftwareI2c).end();
-    return false;
+    // 0x38 may be an uninitialized FT6336U returning garbage that mimics AHT20 frames.
+    // Let configureController() attempt full init and re-validate after config writes.
+    if (FT6336_ADDR == 0x38) {
+      LOG_INF("TOUCH", "FT6336U detect: non-valid frame at 0x38 addr, proceeding to init phase");
+    } else {
+      activeTransport(useSoftwareI2c).end();
+      return false;
+    }
   }
 
 #if MOFEI_TOUCH_DIAGNOSTIC_LOG

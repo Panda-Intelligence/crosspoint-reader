@@ -257,3 +257,92 @@ Local verification for this address update:
 
 This update changes the production address assumption only. It does not add production GPIO broad scanning and does not
 change `HalGPIO.cpp` tap/swipe mapping.
+
+## 0x38 Full-Init Diagnostic: 2026-04-29
+
+Hypothesis: the device at 0x38 on GPIO13/12 might be an uninitialized FT6336U (factory default address) that returns garbage
+mimicking AHT20 frames because it hasn't been reset and configured.
+
+Test setup: modified `detectOnPins()` to bypass frame validation at 0x38 and proceed to `configureController()`, which writes
+DEVICE_MODE=0, THGROUP=22, PERIODACTIVE=14, then reads back for verification.
+
+### Hardware Wire attempt (`mofei_touch_addr38_diag`)
+
+- First read (TD_STATUS) succeeded: returned `98 38 80 76 41 D9`
+- All subsequent reads and writes failed with `ESP_ERR_INVALID_STATE (259)` — Wire I2C conflict with HalPowerManager
+- Config writes never executed
+
+### Soft I2C attempt (`mofei_touch_soft_i2c_addr38_diag`)
+
+No Wire conflict. All I2C operations completed without transport errors:
+
+- All registers returned the **same value**: TD_STATUS=0x18, DEVICE_MODE=0x18, GESTURE_ID=0x18
+- VENDOR_ID read failed (returned 0xFF)
+- FIRMWARE_ID returned 0x10
+- Config writes had **zero effect**: wrote DEVICE_MODE=0, read back 24 (0x18); wrote THGROUP=22, read back 0
+- Post-config frame still showed AHT20-like data: `18 38 80 76 41`
+
+### Conclusion
+
+**0x38 on GPIO13/12 is definitively an AHT20 temperature/humidity sensor, NOT an FT6336U.** Evidence:
+1. All registers return identical values — classic behavior of a non-register-based device (AHT20 uses command protocol)
+2. Register writes have no effect — AHT20 ignores FT6336U register addresses
+3. FT6336U-specific registers (VENDOR_ID, GESTURE_ID) are unreadable
+4. Frame data is consistent with AHT20 measurement output, not FT6336U TD_STATUS
+
+## Schematic-Based Pin Correction: 2026-04-29
+
+User-provided schematic (ESP32-S3R8) shows corrected pin mapping:
+
+| Function | Old default | Schematic value |
+|----------|-----------|----------------|
+| SDA | GPIO13 | **GPIO12** |
+| SCL | GPIO12 | **GPIO11** |
+| INT | GPIO44 | **GPIO45** |
+| PWR | GPIO45 | **GPIO46** |
+| RST | -1 | **GPIO7** (shared with EPD_RST) |
+
+Code changes applied to `MofeiTouch.h`: all five defaults updated to schematic values.
+
+### Scan results on GPIO12/11 (schematic bus)
+
+- Full I2C address scan (1-127): **No devices found** — bus completely dead
+- Tested both `MOFEI_TOUCH_PWR_ENABLE_LEVEL HIGH` and `LOW`
+- Tested with and without RST=7 toggle
+- Soft I2C detection at 0x2E: read failed (no ACK)
+- Hardware Wire not tested on this bus
+
+### Cross-check: GPIO13/12 at 0x2E (`mofei_test_sda13_scl12`)
+
+- Soft I2C on GPIO13/12 (known working bus with AHT20@0x38): 0x2E read failed (no ACK)
+- Same result as GPIO12/11: FT6336U not responding at 0x2E on either bus
+
+### GPIO11 conflict note
+
+`HalStorage.cpp:26` defines `MOFEI_SD_D2 = 11` — GPIO11 is used as SD card DATA2 in 4-bit SD_MMC mode.
+Despite this, SD card mounted successfully after touch detection attempt on GPIO12/11, suggesting
+either 1-bit fallback or pin reconfiguration by SD_MMC driver.
+
+### Current state
+
+- MofeiTouch.h defaults updated to schematic values (SDA=12, SCL=11, INT=45, PWR=46, RST=7)
+- 0x2E remains production default address
+- 0x38 diagnostic bypass code present in `detectOnPins()` for future testing
+- Scan code (`MOFEI_TOUCH_SCAN`) still present in MofeiTouch.cpp
+- Multiple diagnostic build envs in platformio.ini:
+  - `mofei_touch_soft_i2c`: soft I2C with current defaults
+  - `mofei_touch_soft_i2c_addr38_diag`: soft I2C + addr 0x38
+  - `mofei_touch_addr38_diag`: hardware Wire + addr 0x38
+  - `mofei_touch_soft_i2c_power_low_diag`: active-low power
+  - `mofei_touch_soft_i2c_rst7_diag`: RST=7 with soft I2C
+  - `mofei_touch_scan`: full I2C scanner
+  - `mofei_touch_no_power_diag`: no power control
+  - `mofei_test_sda13_scl12`: GPIO13/12 at 0x2E cross-check
+  - `mofei`: production build
+
+### Blocked on
+
+GPIO12/11 (schematic-correct bus) is completely dead — no I2C devices respond. GPIO13/12 (only known
+working I2C bus) has AHT20@0x38 but nothing at 0x2E. FT6336U physical I2C pins remain unidentified.
+Waiting for user to re-verify schematic SDA/SCL net labels or visually trace PCB traces from touch FPC
+connector to ESP32-S3 pads.
