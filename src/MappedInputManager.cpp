@@ -66,6 +66,14 @@ bool MappedInputManager::wasAnyReleased() const { return gpio.wasAnyReleased(); 
 
 unsigned long MappedInputManager::getHeldTime() const { return gpio.getHeldTime(); }
 
+bool MappedInputManager::consumeTouchEvent(InputTouchEvent* outEvent) const { return gpio.consumeTouchEvent(outEvent); }
+
+void MappedInputManager::suppressTouchButtonFallback() const { gpio.suppressTouchButtonFallback(); }
+
+bool MappedInputManager::isTouchButtonHintTap(const InputTouchEvent& event) const {
+  return event.isTap() && gpio.isTouchButtonHintTap(event.x, event.y);
+}
+
 MappedInputManager::Labels MappedInputManager::mapLabels(const char* back, const char* confirm, const char* previous,
                                                          const char* next) const {
   // Build the label order based on the configured hardware mapping.

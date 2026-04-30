@@ -10,6 +10,7 @@
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr unsigned long GO_HOME_MS = 1000;
@@ -46,6 +47,41 @@ void RecentBooksActivity::onExit() {
 
 void RecentBooksActivity::loop() {
   const int pageItems = UITheme::getInstance().getNumberOfItemsPerPage(renderer, true, false, true, true);
+  const auto& metrics = UITheme::getInstance().getMetrics();
+
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    mappedInput.suppressTouchButtonFallback();
+    if (touchEvent.isTap()) {
+      const Rect listRect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing,
+                          renderer.getScreenWidth(),
+                          renderer.getScreenHeight() -
+                              (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
+                               metrics.verticalSpacing * 2)};
+      const int clickedIndex = TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight,
+                                                        static_cast<int>(selectorIndex),
+                                                        static_cast<int>(recentBooks.size()), touchEvent.x,
+                                                        touchEvent.y);
+      if (clickedIndex >= 0) {
+        selectorIndex = clickedIndex;
+        LOG_DBG("RBA", "Selected recent book by touch: %s", recentBooks[selectorIndex].path.c_str());
+        onSelectBook(recentBooks[selectorIndex].path);
+        return;
+      }
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
+      selectorIndex =
+          ButtonNavigator::nextPageIndex(static_cast<int>(selectorIndex), static_cast<int>(recentBooks.size()),
+                                         pageItems);
+      requestUpdate();
+      return;
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
+      selectorIndex =
+          ButtonNavigator::previousPageIndex(static_cast<int>(selectorIndex), static_cast<int>(recentBooks.size()),
+                                             pageItems);
+      requestUpdate();
+      return;
+    }
+  }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     if (!recentBooks.empty() && selectorIndex < static_cast<int>(recentBooks.size())) {

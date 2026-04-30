@@ -19,10 +19,46 @@
 #include "XtcReaderChapterSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr unsigned long skipPageMs = 700;
 constexpr unsigned long goHomeMs = 1000;
+
+bool turnXtcPage(const std::shared_ptr<Xtc>& xtc, uint32_t& currentPage, bool next) {
+  if (!xtc) {
+    return false;
+  }
+
+  const uint32_t pageCount = xtc->getPageCount();
+  if (pageCount == 0) {
+    currentPage = 0;
+    return false;
+  }
+
+  if (currentPage >= pageCount) {
+    if (next) {
+      return false;
+    }
+    currentPage = pageCount - 1;
+    return true;
+  }
+
+  if (next) {
+    currentPage += 1;
+    if (currentPage >= pageCount) {
+      currentPage = pageCount;
+    }
+    return true;
+  }
+
+  if (currentPage > 0) {
+    currentPage -= 1;
+  } else {
+    currentPage = 0;
+  }
+  return true;
+}
 }  // namespace
 
 void XtcReaderActivity::onEnter() {
@@ -55,6 +91,39 @@ void XtcReaderActivity::onExit() {
 }
 
 void XtcReaderActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    mappedInput.suppressTouchButtonFallback();
+    const auto action = TouchHitTest::readerActionForTouch(
+        touchEvent, Rect{0, 0, renderer.getScreenWidth(), renderer.getScreenHeight()});
+    if (action == TouchHitTest::ReaderAction::Menu) {
+      if (xtc && xtc->hasChapters() && !xtc->getChapters().empty()) {
+        startActivityForResult(
+            std::make_unique<XtcReaderChapterSelectionActivity>(renderer, mappedInput, xtc, currentPage),
+            [this](const ActivityResult& result) {
+              if (!result.isCancelled) {
+                currentPage = std::get<PageResult>(result.data).page;
+              }
+            });
+      }
+      return;
+    }
+    if (action == TouchHitTest::ReaderAction::NextPage) {
+      if (!turnXtcPage(xtc, currentPage, true)) {
+        onGoHome();
+      } else {
+        requestUpdate();
+      }
+      return;
+    }
+    if (action == TouchHitTest::ReaderAction::PreviousPage) {
+      if (turnXtcPage(xtc, currentPage, false)) {
+        requestUpdate();
+      }
+      return;
+    }
+  }
+
   // Enter chapter selection activity
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     if (xtc && xtc->hasChapters() && !xtc->getChapters().empty()) {

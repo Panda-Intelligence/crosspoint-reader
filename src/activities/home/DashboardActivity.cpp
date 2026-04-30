@@ -11,6 +11,7 @@
 #include "activities/reader/ReadingHubActivity.h"
 #include "activities/study/StudyHubActivity.h"
 #include "components/UITheme.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr int kItemCount = 11;
@@ -120,43 +121,34 @@ void DashboardActivity::openCurrentSelection() {
 }
 
 void DashboardActivity::loop() {
-#if MOFEI_DEVICE
-  MofeiTouchDriver::Event touchEvent;
-  if (gpio.consumeMofeiTouchEvent(&touchEvent)) {
-    if (touchEvent.type == MofeiTouchDriver::EventType::Tap) {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    mappedInput.suppressTouchButtonFallback();
+    if (touchEvent.isTap()) {
       const auto& metrics = UITheme::getInstance().getMetrics();
-      const int listY = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-      const int listHeight = renderer.getScreenHeight() - (metrics.topPadding + metrics.headerHeight +
-                                                           metrics.buttonHintsHeight + metrics.verticalSpacing * 2);
-
-      if (touchEvent.y >= listY && touchEvent.y < listY + listHeight) {
-        const int rowHeight = metrics.listWithSubtitleRowHeight;
-        const int pageItems = listHeight / rowHeight;
-        const int currentPage = selectedIndex / pageItems;
-        const int topIndex = currentPage * pageItems;
-
-        const int clickedRow = (touchEvent.y - listY) / rowHeight;
-        const int clickedIndex = topIndex + clickedRow;
-
-        if (clickedIndex < kItemCount) {
-          selectedIndex = clickedIndex;
-          openCurrentSelection();
-          return;
-        }
+      const Rect listRect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing,
+                          renderer.getScreenWidth(),
+                          renderer.getScreenHeight() -
+                              (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
+                               metrics.verticalSpacing * 2)};
+      const int clickedIndex =
+          TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex, kItemCount, touchEvent.x,
+                                   touchEvent.y);
+      if (clickedIndex >= 0) {
+        selectedIndex = clickedIndex;
+        openCurrentSelection();
+        return;
       }
-    } else if (touchEvent.type == MofeiTouchDriver::EventType::SwipeUp ||
-               touchEvent.type == MofeiTouchDriver::EventType::SwipeLeft) {
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
       selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);
       requestUpdate();
       return;
-    } else if (touchEvent.type == MofeiTouchDriver::EventType::SwipeDown ||
-               touchEvent.type == MofeiTouchDriver::EventType::SwipeRight) {
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
       selectedIndex = ButtonNavigator::previousIndex(selectedIndex, kItemCount);
       requestUpdate();
       return;
     }
   }
-#endif
 
   buttonNavigator.onNextRelease([this] {
     selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);

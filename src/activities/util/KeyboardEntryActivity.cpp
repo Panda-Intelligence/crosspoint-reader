@@ -8,14 +8,9 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 const char* const KeyboardEntryActivity::shiftString[2] = {"shift", "SHIFT"};
-
-namespace {
-bool pointInRect(uint16_t x, uint16_t y, const Rect& rect) {
-  return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
-}
-}  // namespace
 
 void KeyboardEntryActivity::onEnter() {
   Activity::onEnter();
@@ -35,9 +30,7 @@ void KeyboardEntryActivity::onEnter() {
   rightLongHandled = false;
   savedCursorPos = 0;
   rightStartCursorPos = 0;
-#if MOFEI_DEVICE
-  gpio.consumeMofeiTouchEvent(nullptr);
-#endif
+  mappedInput.consumeTouchEvent(nullptr);
   requestUpdate();
 }
 
@@ -303,7 +296,7 @@ bool KeyboardEntryActivity::handleTouchTap(uint16_t x, uint16_t y) {
         continue;
       }
       const int keyX = rowLeftMargin + col * (layout.keyWidth + layout.keySpacing);
-      if (pointInRect(x, y, Rect{keyX, rowY, layout.keyWidth, layout.keyHeight})) {
+      if (TouchHitTest::pointInRect(x, y, Rect{keyX, rowY, layout.keyWidth, layout.keyHeight})) {
         cursorMode = false;
         togglePos = false;
         selectedRow = row;
@@ -318,7 +311,7 @@ bool KeyboardEntryActivity::handleTouchTap(uint16_t x, uint16_t y) {
 
   for (int col = 0; col < BOTTOM_KEY_COUNT; col++) {
     const int keyX = layout.bottomLeftMargin + col * (layout.bottomKeyWidth + layout.bkSpacing);
-    if (pointInRect(x, y, Rect{keyX, layout.bottomRowY, layout.bottomKeyWidth, layout.bottomKeyHeight})) {
+    if (TouchHitTest::pointInRect(x, y, Rect{keyX, layout.bottomRowY, layout.bottomKeyWidth, layout.bottomKeyHeight})) {
       cursorMode = false;
       togglePos = false;
       selectedRow = getContentRowCount();
@@ -332,7 +325,7 @@ bool KeyboardEntryActivity::handleTouchTap(uint16_t x, uint16_t y) {
 
   if (inputType == InputType::Password && layout.toggleWidth > 0) {
     const Rect toggleRect{layout.toggleX - 8, layout.toggleY - 8, layout.toggleWidth + 16, layout.lineHeight + 16};
-    if (pointInRect(x, y, toggleRect)) {
+    if (TouchHitTest::pointInRect(x, y, toggleRect)) {
       passwordVisible = !passwordVisible;
       cursorMode = true;
       togglePos = true;
@@ -344,7 +337,7 @@ bool KeyboardEntryActivity::handleTouchTap(uint16_t x, uint16_t y) {
   }
 
   const Rect textRect{layout.effectiveMargin, layout.inputStartY, layout.textAreaWidth, layout.lineHeight * 2};
-  if (pointInRect(x, y, textRect)) {
+  if (TouchHitTest::pointInRect(x, y, textRect)) {
     cursorMode = true;
     togglePos = false;
     hintVisible = true;
@@ -369,17 +362,22 @@ void KeyboardEntryActivity::mapColContentBottom(int& col, bool goingUp) const {
 void KeyboardEntryActivity::loop() {
   const int totalRows = getTotalRowCount();
 
-#if MOFEI_DEVICE
-  MofeiTouchDriver::Event touchEvent;
-  if (gpio.consumeMofeiTouchEvent(&touchEvent) && touchEvent.type == MofeiTouchDriver::EventType::Tap) {
-    if (handleTouchTap(touchEvent.x, touchEvent.y)) {
-      return;
-    }
-    if (!gpio.isMofeiTouchButtonHintTap(touchEvent.x, touchEvent.y)) {
-      return;
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (touchEvent.isTap()) {
+      if (handleTouchTap(touchEvent.x, touchEvent.y)) {
+        mappedInput.suppressTouchButtonFallback();
+        return;
+      }
+
+      if (mappedInput.isTouchButtonHintTap(touchEvent)) {
+        // Footer hint taps intentionally fall through to the legacy button adapter.
+      } else {
+        mappedInput.suppressTouchButtonFallback();
+        return;
+      }
     }
   }
-#endif
 
   if (!cursorMode && mappedInput.wasPressed(MappedInputManager::Button::Up)) {
     upHeld = true;
