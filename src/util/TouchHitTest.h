@@ -79,10 +79,10 @@ inline bool isDownSwipe(const InputTouchEvent& event) { return event.type == Inp
 
 inline ListGestureAction listGestureActionForTouch(const InputTouchEvent& event) {
   if (isUpSwipe(event)) {
-    return ListGestureAction::PreviousItem;
+    return ListGestureAction::NextItem;
   }
   if (isDownSwipe(event)) {
-    return ListGestureAction::NextItem;
+    return ListGestureAction::PreviousItem;
   }
   return ListGestureAction::None;
 }

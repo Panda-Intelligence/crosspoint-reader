@@ -40,12 +40,12 @@ void ReadLaterActivity::loop() {
 
   InputTouchEvent touchEvent;
   if (mappedInput.consumeTouchEvent(&touchEvent)) {
-    mappedInput.suppressTouchButtonFallback();
     if (itemCount <= 0) {
       if (touchEvent.isTap()) {
+        mappedInput.suppressTouchButtonFallback();
         openCurrentSelectionOrRefresh();
+        return;
       }
-      return;
     }
 
     if (touchEvent.isTap()) {
@@ -56,18 +56,25 @@ void ReadLaterActivity::loop() {
       const int clickedIndex = TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex,
                                                         itemCount, touchEvent.x, touchEvent.y);
       if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
         selectedIndex = clickedIndex;
         openCurrentSelectionOrRefresh();
         return;
       }
-    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
-      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, itemCount);
-      requestUpdate();
-      return;
-    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
-      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, itemCount);
-      requestUpdate();
-      return;
+    } else {
+      const auto gestureAction = TouchHitTest::listGestureActionForTouch(touchEvent);
+      if (gestureAction == TouchHitTest::ListGestureAction::NextItem) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = ButtonNavigator::nextIndex(selectedIndex, itemCount);
+        requestUpdate();
+        return;
+      }
+      if (gestureAction == TouchHitTest::ListGestureAction::PreviousItem) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = ButtonNavigator::previousIndex(selectedIndex, itemCount);
+        requestUpdate();
+        return;
+      }
     }
   }
 

@@ -182,7 +182,6 @@ void FileBrowserActivity::loop() {
 
   InputTouchEvent touchEvent;
   if (mappedInput.consumeTouchEvent(&touchEvent)) {
-    mappedInput.suppressTouchButtonFallback();
     if (!files.empty() && touchEvent.isTap()) {
       const auto& metrics = UITheme::getInstance().getMetrics();
       const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
@@ -193,20 +192,27 @@ void FileBrowserActivity::loop() {
           TouchHitTest::listItemAt(listRect, metrics.listRowHeight, static_cast<int>(selectorIndex),
                                    static_cast<int>(files.size()), touchEvent.x, touchEvent.y);
       if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
         selectorIndex = clickedIndex;
         openCurrentEntry();
         return;
       }
-    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
-      selectorIndex =
-          ButtonNavigator::nextPageIndex(static_cast<int>(selectorIndex), static_cast<int>(files.size()), pageItems);
-      requestUpdate();
-      return;
-    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
-      selectorIndex = ButtonNavigator::previousPageIndex(static_cast<int>(selectorIndex),
-                                                         static_cast<int>(files.size()), pageItems);
-      requestUpdate();
-      return;
+    } else {
+      const auto gestureAction = TouchHitTest::listGestureActionForTouch(touchEvent);
+      if (gestureAction == TouchHitTest::ListGestureAction::NextItem) {
+        mappedInput.suppressTouchButtonFallback();
+        selectorIndex =
+            ButtonNavigator::nextPageIndex(static_cast<int>(selectorIndex), static_cast<int>(files.size()), pageItems);
+        requestUpdate();
+        return;
+      }
+      if (gestureAction == TouchHitTest::ListGestureAction::PreviousItem) {
+        mappedInput.suppressTouchButtonFallback();
+        selectorIndex = ButtonNavigator::previousPageIndex(static_cast<int>(selectorIndex),
+                                                           static_cast<int>(files.size()), pageItems);
+        requestUpdate();
+        return;
+      }
     }
   }
 
