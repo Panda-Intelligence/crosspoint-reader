@@ -585,12 +585,18 @@ bool MofeiTouchDriver::update(Event* outEvent) {
     return false;
   }
 
-  // Only read from I2C if the hardware INT pin is active (LOW) indicating touch,
-  // or if we are already tracking an active touch and waiting for release.
-  const bool intActive = MOFEI_TOUCH_INT >= 0 && digitalRead(MOFEI_TOUCH_INT) == LOW;
-  if (!intActive && !touchDown) {
-    return false;
+  const bool intConfigured = MOFEI_TOUCH_INT >= 0;
+  const bool intActive = intConfigured && digitalRead(MOFEI_TOUCH_INT) == LOW;
+  if (!touchDown) {
+    if (intConfigured) {
+      if (!intActive) {
+        return false;
+      }
+    } else if (now - lastPollMs < MOFEI_TOUCH_POLL_INTERVAL_MS) {
+      return false;
+    }
   }
+  lastPollMs = now;
 
   uint16_t x = 0;
   uint16_t y = 0;

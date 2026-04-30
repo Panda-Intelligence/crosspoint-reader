@@ -25,7 +25,11 @@
 #endif
 
 #ifndef MOFEI_TOUCH_INT
-#define MOFEI_TOUCH_INT 44
+#define MOFEI_TOUCH_INT -1
+#endif
+
+#ifndef MOFEI_TOUCH_POLL_INTERVAL_MS
+#define MOFEI_TOUCH_POLL_INTERVAL_MS 20
 #endif
 
 #ifndef MOFEI_TOUCH_RST
@@ -106,6 +110,7 @@ class MofeiTouchDriver {
   unsigned long lastStatusLogMs = 0;
   unsigned long lastReadErrorLogMs = 0;
   unsigned long lastRetryMs = 0;  // for late-init retry
+  unsigned long lastPollMs = 0;
   int activeSda = MOFEI_TOUCH_SDA;
   int activeScl = MOFEI_TOUCH_SCL;
   uint16_t startX = 0;
