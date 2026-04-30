@@ -200,20 +200,28 @@ void enterDeepSleep() {
 
 void updateUiFontMapping() {
   Language lang = I18N.getLanguage();
+  LOG_INF("UIFONT", "updateUiFontMapping() called. Language: %d", static_cast<int>(lang));
+
   if (lang == Language::ZH_CN || lang == Language::ZH_TW) {
-    if (StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::SMALL)) {
+    bool loaded = StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::SMALL);
+    LOG_INF("UIFONT", "Is TC SMALL loaded? %d", loaded);
+
+    if (loaded) {
       const auto& fontMap = renderer.getFontMap();
       auto it = fontMap.find(NOTOSANS_TC_12_FONT_ID);
       if (it != fontMap.end()) {
+        LOG_INF("UIFONT", "Found NOTOSANS_TC_12_FONT_ID. Remapping UI fonts...");
         renderer.insertFont(UI_10_FONT_ID, it->second);
         renderer.insertFont(UI_12_FONT_ID, it->second);
         UITheme::getInstance().reload();
         return;
+      } else {
+        LOG_ERR("UIFONT", "Font loaded but ID not in map!");
       }
     }
   }
 
-  // Fallback to default
+  LOG_INF("UIFONT", "Falling back to default UI fonts.");
   renderer.insertFont(UI_10_FONT_ID, ui10FontFamily);
   renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
   UITheme::getInstance().reload();
@@ -365,8 +373,9 @@ void loop() {
   renderer.setFadingFix(SETTINGS.fadingFix);
 
   if (logSerial && millis() - lastMemPrint >= 10000) {
-    LOG_INF("MEM", "Free: %d bytes, Total: %d bytes, Min Free: %d bytes, MaxAlloc: %d bytes", ESP.getFreeHeap(),
-            ESP.getHeapSize(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
+    LOG_INF("MEM", "SRAM Free: %d, MaxAlloc: %d | PSRAM Free: %d, MaxAlloc: %d", 
+            ESP.getFreeHeap(), ESP.getMaxAllocHeap(),
+            ESP.getFreePsram(), ESP.getMaxAllocPsram());
     lastMemPrint = millis();
   }
 

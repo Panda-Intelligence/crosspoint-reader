@@ -15,32 +15,32 @@
 
 namespace {
 constexpr int kItemCount = 11;
-
 const char* itemLabel(int index) {
   switch (index) {
     case 0:
-      return "Weather & Clock";
+      return tr(STR_DASHBOARD_WEATHER);
     case 1:
-      return "Today";
+      return tr(STR_DASHBOARD_TODAY);
     case 2:
-      return "Study Today";
+      return tr(STR_DASHBOARD_STUDY_TODAY);
     case 3:
-      return "Continue Reading";
+      return tr(STR_CONTINUE_READING);
     case 4:
-      return "Desktop";
+      return tr(STR_DASHBOARD_DESKTOP);
     case 5:
-      return "Study";
+      return tr(STR_DASHBOARD_STUDY);
     case 6:
-      return "Reading";
+      return tr(STR_DASHBOARD_READING);
     case 7:
-      return "Arcade";
+      return tr(STR_DASHBOARD_ARCADE);
     case 8:
-      return "Import / Sync";
+      return tr(STR_DASHBOARD_IMPORT);
     case 9:
-      return "Settings";
+      return tr(STR_DASHBOARD_FILES);
     case 10:
+      return tr(STR_SETTINGS_TITLE);
     default:
-      return "Network Status";
+      return "";
   }
 }
 

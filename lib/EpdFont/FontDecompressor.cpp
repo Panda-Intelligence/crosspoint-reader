@@ -174,7 +174,19 @@ const uint8_t* FontDecompressor::getBitmap(const EpdFontData* fontData, const Ep
     stats.cacheMisses++;
     const EpdFontGroup& group = fontData->groups[groupIndex];
 
+    LOG_INF("FDC", "Decompressing group %u: %u bytes", groupIndex, group.uncompressedSize);
+    
+    if (group.uncompressedSize > ESP.getMaxAllocHeap()) {
+      LOG_ERR("FDC", "Not enough contiguous memory to allocate %u bytes (MaxAlloc: %u)", group.uncompressedSize, ESP.getMaxAllocHeap());
+      hotGroup.clear();
+      hotGroupFont = nullptr;
+      hotGroupIndex = UINT16_MAX;
+      stats.getBitmapTimeUs += micros() - tStart;
+      return nullptr;
+    }
+
     hotGroup.resize(group.uncompressedSize);
+    
     if (hotGroup.empty()) {
       LOG_ERR("FDC", "Failed to allocate %u bytes for hot group %u", group.uncompressedSize, groupIndex);
       hotGroupFont = nullptr;

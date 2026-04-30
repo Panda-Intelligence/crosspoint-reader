@@ -206,6 +206,10 @@ bool StorageFontPack::load(const char* path) {
     LOG_DBG("TCFONT", "Ignoring reserved font pack header bits: %s", path);
   }
 
+  LOG_DBG("TCFONT", "Sizes: Header=%u Glyph=%u Int=%u Grp=%u Kern=%u Lig=%u", 
+          sizeof(FontPackHeader), sizeof(PackedGlyph), sizeof(PackedInterval), 
+          sizeof(PackedGroup), sizeof(EpdKernClassEntry), sizeof(EpdLigaturePair));
+
   LOG_DBG("TCFONT", "Allocating bitmap: %u bytes for %s", header.bitmapSize, path);
   bitmap_.resize(header.bitmapSize);
   
@@ -240,6 +244,11 @@ bool StorageFontPack::load(const char* path) {
   intervals_.resize(rawIntervals.size());
   for (size_t i = 0; i < rawIntervals.size(); i++) {
     intervals_[i] = {rawIntervals[i].first, rawIntervals[i].last, rawIntervals[i].offset};
+  }
+
+  if (!intervals_.empty()) {
+    LOG_DBG("TCFONT", "Interval[0]: %u-%u offset %u", intervals_.front().first, intervals_.front().last, intervals_.front().offset);
+    LOG_DBG("TCFONT", "Interval[%zu]: %u-%u offset %u", intervals_.size()-1, intervals_.back().first, intervals_.back().last, intervals_.back().offset);
   }
 
   groups_.resize(rawGroups.size());
