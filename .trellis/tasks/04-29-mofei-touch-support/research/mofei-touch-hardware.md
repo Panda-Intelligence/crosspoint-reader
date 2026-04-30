@@ -365,3 +365,38 @@ The only logical explanations remaining:
 
 Need hardware verification of the touch FPC connector voltage levels during boot, or validation on a second identical Mofei unit.
 
+## Firmware Reverse Engineering: 2026-04-29
+
+The factory touch-working firmware `firmware_V618_E426_TOUCH.bin` was reverse-engineered. Full analysis in:
+
+- [01-firmware-summary.md](firmware-analysis/01-firmware-summary.md) — Binary identity, build provenance, segment layout
+- [02-touch-pin-mapping.md](firmware-analysis/02-touch-pin-mapping.md) — Pin assignments, register config, comparison with our code
+- [03-init-sequence.md](firmware-analysis/03-init-sequence.md) — Reconstructed init sequence, I2C config
+
+### Key Finding
+
+The factory firmware uses **exactly the same pin mapping** we currently have:
+
+| Parameter | Factory | Ours |
+|---|---|---|
+| I2C Addr | 0x2E | 0x2E |
+| SDA | GPIO13 | GPIO13 |
+| SCL | GPIO12 | GPIO12 |
+| INT | GPIO44 | GPIO44 |
+| PWR | GPIO45 | GPIO45 |
+| RST | GPIO7 | GPIO7 |
+
+Both FT6336U (0x2E) and AHT20 (0x38) share GPIO13/12 in the factory firmware. The AHT20 at 0x38 on GPIO13/12 is EXPECTED — it's used for EPD temperature compensation. The touch controller at 0x2E on the same bus should respond after correct power/reset sequencing.
+
+### Remaining Variables
+
+1. **Power polarity**: Factory firmware PWR_ENABLE_LEVEL — HIGH vs LOW — unknown from binary
+2. **I2C clock**: Factory uses 100 kHz; we use 400 kHz
+3. **I2C mode**: Factory uses hardware Wire; we use soft I2C
+4. **Timing**: Exact power settle, reset pulse, and post-reset delay unknown
+5. **Hardware**: This unit may have a defective or missing touch FPC connection
+
+### Updated Conclusion
+
+The schematic pin hypothesis (SDA=12, SCL=11) is **disproven** by the factory firmware. Our original pin defaults (SDA=13, SCL=12) are correct. The remaining task is to match the factory firmware's power polarity, timing, and initialization sequence exactly, then verify on hardware.
+

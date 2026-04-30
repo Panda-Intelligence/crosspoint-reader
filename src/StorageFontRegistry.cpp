@@ -15,6 +15,8 @@ namespace {
 constexpr char FONT_MAGIC[] = {'E', 'P', 'F', '2'};
 constexpr uint16_t FONT_PACK_VERSION = 2;
 
+#pragma pack(push, 1)
+
 struct FontPackHeader {
   char magic[4];
   uint16_t version;
@@ -60,6 +62,7 @@ struct PackedGroup {
   uint16_t reserved;
   uint32_t firstGlyphIndex;
 };
+#pragma pack(pop)
 
 StorageFontPack tc12Pack;
 StorageFontPack tc14Pack;
@@ -153,7 +156,12 @@ bool readArray(FsFile& file, std::vector<T>& out, size_t count) {
   out.resize(count);
   if (count == 0) return true;
   const size_t bytes = sizeof(T) * count;
-  return file.read(out.data(), bytes) == static_cast<int>(bytes);
+  int read_bytes = file.read(out.data(), bytes);
+  if (read_bytes != static_cast<int>(bytes)) {
+    LOG_ERR("TCFONT", "readArray failed: requested %zu, read %d", bytes, read_bytes);
+    return false;
+  }
+  return true;
 }
 }  // namespace
 
@@ -176,16 +184,18 @@ bool StorageFontPack::load(const char* path) {
 
   FsFile file;
   if (!Storage.openFileForRead("TCFONT", path, file)) {
+    LOG_ERR("TCFONT", "Failed to open %s", path);
     return false;
   }
 
   FontPackHeader header = {};
   if (file.read(&header, sizeof(header)) != static_cast<int>(sizeof(header))) {
+    LOG_ERR("TCFONT", "Failed to read header of %s", path);
     return false;
   }
 
   if (memcmp(header.magic, FONT_MAGIC, sizeof(FONT_MAGIC)) != 0 || header.version != FONT_PACK_VERSION) {
-    LOG_ERR("TCFONT", "Invalid font pack header: %s", path);
+    LOG_ERR("TCFONT", "Invalid font pack header in %s: magic=%c%c%c%c v=%d", path, header.magic[0], header.magic[1], header.magic[2], header.magic[3], header.version);
     return false;
   }
 
@@ -196,24 +206,31 @@ bool StorageFontPack::load(const char* path) {
     LOG_DBG("TCFONT", "Ignoring reserved font pack header bits: %s", path);
   }
 
+  LOG_DBG("TCFONT", "Allocating bitmap: %u bytes for %s", header.bitmapSize, path);
   bitmap_.resize(header.bitmapSize);
-  if (header.bitmapSize > 0 &&
-      file.read(bitmap_.data(), header.bitmapSize) != static_cast<int>(header.bitmapSize)) {
-    return false;
+  
+  if (header.bitmapSize > 0) {
+    LOG_DBG("TCFONT", "Reading bitmap for %s...", path);
+    if (file.read(bitmap_.data(), header.bitmapSize) != static_cast<int>(header.bitmapSize)) {
+      LOG_ERR("TCFONT", "Failed to read bitmap data of %s", path);
+      return false;
+    }
   }
 
   std::vector<PackedGlyph> rawGlyphs;
   std::vector<PackedInterval> rawIntervals;
   std::vector<PackedGroup> rawGroups;
 
-  if (!readArray(file, rawGlyphs, header.glyphCount)) return false;
-  if (!readArray(file, rawIntervals, header.intervalCount)) return false;
-  if (!readArray(file, rawGroups, header.groupCount)) return false;
-  if (!readArray(file, kernLeftClasses_, header.kernLeftCount)) return false;
-  if (!readArray(file, kernRightClasses_, header.kernRightCount)) return false;
-  if (!readArray(file, kernMatrix_, header.kernMatrixCount)) return false;
-  if (!readArray(file, ligaturePairs_, header.ligatureCount)) return false;
+  LOG_DBG("TCFONT", "Reading arrays for %s...", path);
+  if (!readArray(file, rawGlyphs, header.glyphCount)) { LOG_ERR("TCFONT", "Failed glyphs"); return false; }
+  if (!readArray(file, rawIntervals, header.intervalCount)) { LOG_ERR("TCFONT", "Failed intervals"); return false; }
+  if (!readArray(file, rawGroups, header.groupCount)) { LOG_ERR("TCFONT", "Failed groups"); return false; }
+  if (!readArray(file, kernLeftClasses_, header.kernLeftCount)) { LOG_ERR("TCFONT", "Failed kernLeft"); return false; }
+  if (!readArray(file, kernRightClasses_, header.kernRightCount)) { LOG_ERR("TCFONT", "Failed kernRight"); return false; }
+  if (!readArray(file, kernMatrix_, header.kernMatrixCount)) { LOG_ERR("TCFONT", "Failed kernMatrix"); return false; }
+  if (!readArray(file, ligaturePairs_, header.ligatureCount)) { LOG_ERR("TCFONT", "Failed ligatures"); return false; }
 
+  LOG_DBG("TCFONT", "Processing arrays for %s...", path);
   glyphs_.resize(rawGlyphs.size());
   for (size_t i = 0; i < rawGlyphs.size(); i++) {
     glyphs_[i] = {rawGlyphs[i].width,  rawGlyphs[i].height, rawGlyphs[i].advanceX, rawGlyphs[i].left,
@@ -291,7 +308,27 @@ bool loadTraditionalChineseFonts(GfxRenderer& renderer) {
   Storage.mkdir("/.mofei/fonts");
 
   bool anyLoaded = false;
+  
+  // We cannot load all 4 font sizes into 8MB PSRAM simultaneously (~9.2MB total).
+  // Load ONLY tc_12 (needed for UI_10 and UI_12 fallbacks) and the currently configured reader font size.
+  const uint8_t requiredReaderSize = SETTINGS.fontSize;
+  const uint8_t requiredUiSize = CrossPointSettings::SMALL; // tc_12
+  
   for (const auto& runtime : kPackRuntimes) {
+    if (runtime.info->size != requiredReaderSize && runtime.info->size != requiredUiSize) {
+      // Unload if previously loaded to free memory
+      if (runtime.family->loaded) {
+        renderer.removeFont(runtime.info->fontId);
+        runtime.family->reset();
+      }
+      continue;
+    }
+
+    if (runtime.family->loaded) {
+      anyLoaded = true;
+      continue; // Already loaded
+    }
+
     runtime.family->reset();
 
     const auto* regular = getTraditionalChineseFontFace(runtime.info->size, EpdFontFamily::REGULAR);
@@ -315,7 +352,8 @@ bool loadTraditionalChineseFonts(GfxRenderer& renderer) {
       anyLoaded = true;
     } else {
       renderer.removeFont(runtime.info->fontId);
-      LOG_DBG("TCFONT", "Multilingual font family not found: %s", runtime.info->path);
+      LOG_DBG("TCFONT", "Multilingual font family not found or load failed: %s", runtime.info->path);
+      runtime.family->reset();
     }
   }
   if (auto* cacheManager = renderer.getFontCacheManager()) {
