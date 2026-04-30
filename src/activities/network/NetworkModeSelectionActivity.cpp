@@ -43,16 +43,20 @@ void NetworkModeSelectionActivity::loop() {
                                                              : NetworkMode::JOIN_NETWORK));
         return;
       }
-    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
-      mappedInput.suppressTouchButtonFallback();
-      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, MENU_ITEM_COUNT);
-      requestUpdate();
-      return;
-    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
-      mappedInput.suppressTouchButtonFallback();
-      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, MENU_ITEM_COUNT);
-      requestUpdate();
-      return;
+    } else {
+      const auto gestureAction = TouchHitTest::listGestureActionForTouch(touchEvent);
+      if (gestureAction == TouchHitTest::ListGestureAction::NextItem) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = ButtonNavigator::nextIndex(selectedIndex, MENU_ITEM_COUNT);
+        requestUpdate();
+        return;
+      }
+      if (gestureAction == TouchHitTest::ListGestureAction::PreviousItem) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = ButtonNavigator::previousIndex(selectedIndex, MENU_ITEM_COUNT);
+        requestUpdate();
+        return;
+      }
     }
   }
 

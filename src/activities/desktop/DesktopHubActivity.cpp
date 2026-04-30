@@ -51,7 +51,6 @@ void DesktopHubActivity::openCurrentSelection() {
 void DesktopHubActivity::loop() {
   InputTouchEvent touchEvent;
   if (mappedInput.consumeTouchEvent(&touchEvent)) {
-    mappedInput.suppressTouchButtonFallback();
     if (touchEvent.isTap()) {
       const auto& metrics = UITheme::getInstance().getMetrics();
       const Rect listRect{
@@ -61,18 +60,25 @@ void DesktopHubActivity::loop() {
       const int clickedIndex = TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex,
                                                         kItemCount, touchEvent.x, touchEvent.y);
       if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
         selectedIndex = clickedIndex;
         openCurrentSelection();
         return;
       }
-    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
-      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);
-      requestUpdate();
-      return;
-    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
-      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, kItemCount);
-      requestUpdate();
-      return;
+    } else {
+      const auto gestureAction = TouchHitTest::listGestureActionForTouch(touchEvent);
+      if (gestureAction == TouchHitTest::ListGestureAction::NextItem) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);
+        requestUpdate();
+        return;
+      }
+      if (gestureAction == TouchHitTest::ListGestureAction::PreviousItem) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = ButtonNavigator::previousIndex(selectedIndex, kItemCount);
+        requestUpdate();
+        return;
+      }
     }
   }
 
