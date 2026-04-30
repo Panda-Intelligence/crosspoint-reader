@@ -666,7 +666,11 @@ bool HalFile::rename(const char* newPath) {
       return false;
     }
     impl->arduinoFile.close();
+#ifdef SOC_SDMMC_HOST_SUPPORTED
     return SD_MMC.rename(oldPath, newPath);
+#else
+    return false;
+#endif
   }
   return impl->fsFile.rename(newPath);
 #endif
