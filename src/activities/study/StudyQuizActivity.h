@@ -20,6 +20,8 @@ class StudyQuizActivity final : public Activity {
   QuizMode mode = QuizMode::TwoChoice;
 
   void loadQuestion();
+  void cycleMode();
+  void confirmSelection();
 
  public:
   explicit StudyQuizActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)

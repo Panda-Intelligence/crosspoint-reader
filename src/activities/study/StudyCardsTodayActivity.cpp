@@ -13,6 +13,7 @@
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr int kActionCount = 4;
@@ -154,6 +155,24 @@ void StudyCardsTodayActivity::advanceCard(const bool recordResult, const bool co
   requestUpdate();
 }
 
+void StudyCardsTodayActivity::applySelectedAction() {
+  switch (actionIndex) {
+    case 0:
+      advanceCard(true, true, false);
+      break;
+    case 1:
+      advanceCard(true, false, false);
+      break;
+    case 2:
+      advanceCard(false, false, false);
+      break;
+    case 3:
+    default:
+      advanceCard(false, false, true);
+      break;
+  }
+}
+
 void StudyCardsTodayActivity::onEnter() {
   Activity::onEnter();
   STUDY_STATE.loadFromFile();
@@ -172,6 +191,63 @@ void StudyCardsTodayActivity::onEnter() {
 }
 
 void StudyCardsTodayActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && touchEvent.isTap()) {
+      mappedInput.suppressTouchButtonFallback();
+      if (!inSession) {
+        if (sessionComplete) {
+          openRecommendedNextStep();
+        } else if (STUDY_DECKS.hasCards()) {
+          startSession();
+          requestUpdate();
+        } else {
+          STUDY_DECKS.refresh();
+          requestUpdate();
+        }
+        return;
+      }
+      if (!showingBack) {
+        showingBack = true;
+        actionIndex = 0;
+        requestUpdate();
+        return;
+      }
+
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int pageWidth = renderer.getScreenWidth();
+      const int pageHeight = renderer.getScreenHeight();
+      const int pad = metrics.contentSidePadding;
+      const int contentBottom = pageHeight - metrics.buttonHintsHeight - 8;
+      const int btnW = (pageWidth - pad * 2 - 18) / 2;
+      const int btnH = 34;
+      const int btnTop = contentBottom - 74;
+      for (int i = 0; i < kActionCount; i++) {
+        const Rect buttonRect{pad + (i % 2) * (btnW + 18), btnTop + (i / 2) * (btnH + 8), btnW, btnH};
+        if (TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, buttonRect)) {
+          actionIndex = i;
+          applySelectedAction();
+          return;
+        }
+      }
+      applySelectedAction();
+      return;
+    }
+    if (!buttonHintTap && inSession && showingBack && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      actionIndex = ButtonNavigator::nextIndex(actionIndex, kActionCount);
+      requestUpdate();
+      return;
+    }
+    if (!buttonHintTap && inSession && showingBack && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      actionIndex = ButtonNavigator::previousIndex(actionIndex, kActionCount);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     if (inSession && showingBack) {
       showingBack = false;
@@ -215,21 +291,7 @@ void StudyCardsTodayActivity::loop() {
   });
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-    switch (actionIndex) {
-      case 0:
-        advanceCard(true, true, false);
-        break;
-      case 1:
-        advanceCard(true, false, false);
-        break;
-      case 2:
-        advanceCard(false, false, false);
-        break;
-      case 3:
-      default:
-        advanceCard(false, false, true);
-        break;
-    }
+    applySelectedAction();
   }
 }
 

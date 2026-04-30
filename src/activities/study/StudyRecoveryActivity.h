@@ -17,6 +17,7 @@ class StudyRecoveryActivity final : public Activity {
   const char* nextStepLabel() const;
   const char* nextStepHint() const;
   void openRecommendedNextStep();
+  void applySelectedAction();
 
  public:
   explicit StudyRecoveryActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)

@@ -19,6 +19,7 @@ class StudyCardsTodayActivity final : public Activity {
 
   void startSession();
   void advanceCard(bool recordResult, bool correct, bool saved);
+  void applySelectedAction();
   NextStep recommendedNextStep() const;
   const char* nextStepLabel() const;
   const char* nextStepHint() const;

@@ -8,6 +8,7 @@
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 const char* modeLabel(const StudyQuizActivity::QuizMode mode) {
@@ -68,6 +69,37 @@ void StudyQuizActivity::loadQuestion() {
   }
 }
 
+void StudyQuizActivity::cycleMode() {
+  switch (mode) {
+    case QuizMode::TwoChoice:
+      mode = QuizMode::TrueFalse;
+      break;
+    case QuizMode::TrueFalse:
+      mode = QuizMode::FirstLetter;
+      break;
+    case QuizMode::FirstLetter:
+    default:
+      mode = QuizMode::TwoChoice;
+      break;
+  }
+  loadQuestion();
+  requestUpdate();
+}
+
+void StudyQuizActivity::confirmSelection() {
+  if (!showingResult) {
+    showingResult = true;
+    answerCorrect = selectedOption == correctOption;
+    STUDY_STATE.recordReviewResult(answerCorrect);
+    requestUpdate();
+    return;
+  }
+
+  questionIndex = (questionIndex + 1) % static_cast<int>(STUDY_DECKS.getCards().size());
+  loadQuestion();
+  requestUpdate();
+}
+
 void StudyQuizActivity::onEnter() {
   Activity::onEnter();
   STUDY_STATE.loadFromFile();
@@ -78,6 +110,67 @@ void StudyQuizActivity::onEnter() {
 }
 
 void StudyQuizActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && touchEvent.isTap()) {
+      mappedInput.suppressTouchButtonFallback();
+      if (STUDY_DECKS.getCards().size() < 2) {
+        STUDY_DECKS.refresh();
+        loadQuestion();
+        requestUpdate();
+        return;
+      }
+      if (!showingResult) {
+        const auto& metrics = UITheme::getInstance().getMetrics();
+        const int pageWidth = renderer.getScreenWidth();
+        const int pageHeight = renderer.getScreenHeight();
+        const int pad = metrics.contentSidePadding;
+        const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+        const int cardY = contentTop + 24;
+        const int optionTop = cardY + 112 + 16;
+        const int optionH = 42;
+        const int optionW = pageWidth - pad * 2;
+        const Rect option0{pad, optionTop, optionW, optionH};
+        const Rect option1{pad, optionTop + optionH + 12, optionW, optionH};
+        if (TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, option0) ||
+            TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, option1)) {
+          selectedOption = TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, option0) ? 0 : 1;
+        } else if (touchEvent.y < contentTop + 28) {
+          cycleMode();
+          return;
+        } else if (touchEvent.y > pageHeight / 2) {
+          selectedOption = 1;
+        } else {
+          selectedOption = 0;
+        }
+      }
+      confirmSelection();
+      return;
+    }
+    if (!buttonHintTap && STUDY_DECKS.getCards().size() >= 2 && !showingResult &&
+        (touchEvent.type == InputTouchEvent::Type::SwipeLeft ||
+         touchEvent.type == InputTouchEvent::Type::SwipeRight)) {
+      mappedInput.suppressTouchButtonFallback();
+      cycleMode();
+      return;
+    }
+    if (!buttonHintTap && STUDY_DECKS.getCards().size() >= 2 && !showingResult &&
+        TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedOption = ButtonNavigator::nextIndex(selectedOption, 2);
+      requestUpdate();
+      return;
+    }
+    if (!buttonHintTap && STUDY_DECKS.getCards().size() >= 2 && !showingResult &&
+        TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedOption = ButtonNavigator::previousIndex(selectedOption, 2);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;
@@ -95,20 +188,7 @@ void StudyQuizActivity::loop() {
   if (!showingResult) {
     if (mappedInput.wasPressed(MappedInputManager::Button::Left) ||
         mappedInput.wasPressed(MappedInputManager::Button::Right)) {
-      switch (mode) {
-        case QuizMode::TwoChoice:
-          mode = QuizMode::TrueFalse;
-          break;
-        case QuizMode::TrueFalse:
-          mode = QuizMode::FirstLetter;
-          break;
-        case QuizMode::FirstLetter:
-        default:
-          mode = QuizMode::TwoChoice;
-          break;
-      }
-      loadQuestion();
-      requestUpdate();
+      cycleMode();
       return;
     }
 
@@ -124,17 +204,7 @@ void StudyQuizActivity::loop() {
   }
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-    if (!showingResult) {
-      showingResult = true;
-      answerCorrect = selectedOption == correctOption;
-      STUDY_STATE.recordReviewResult(answerCorrect);
-      requestUpdate();
-      return;
-    }
-
-    questionIndex = (questionIndex + 1) % static_cast<int>(STUDY_DECKS.getCards().size());
-    loadQuestion();
-    requestUpdate();
+    confirmSelection();
   }
 }
 

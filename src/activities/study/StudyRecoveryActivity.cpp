@@ -11,6 +11,7 @@
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr int kActionCount = 2;
@@ -79,6 +80,33 @@ void StudyRecoveryActivity::openRecommendedNextStep() {
   }
 }
 
+void StudyRecoveryActivity::applySelectedAction() {
+  const auto& cards = STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Again);
+  if (cards.empty()) {
+    return;
+  }
+  const auto card = cards[std::clamp(selectedIndex, 0, static_cast<int>(cards.size()) - 1)];
+  if (actionIndex == 0) {
+    STUDY_STATE.recordReviewResult(true);
+    STUDY_REVIEW_QUEUE.removeAt(StudyQueueKind::Again, selectedIndex);
+    completedCount++;
+  } else {
+    STUDY_STATE.recordReviewResult(false);
+    STUDY_REVIEW_QUEUE.recordAgain({card.front, card.back, "", card.deckName});
+  }
+
+  STUDY_REVIEW_QUEUE.loadFromFile();
+  const int count = static_cast<int>(STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Again).size());
+  if (count <= 0) {
+    selectedIndex = 0;
+    sessionComplete = true;
+  } else {
+    selectedIndex = std::min(selectedIndex, count - 1);
+  }
+  showingBack = false;
+  requestUpdate();
+}
+
 void StudyRecoveryActivity::onEnter() {
   Activity::onEnter();
   STUDY_REVIEW_QUEUE.loadFromFile();
@@ -92,6 +120,70 @@ void StudyRecoveryActivity::onEnter() {
 }
 
 void StudyRecoveryActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    const auto& cards = STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Again);
+    if (!buttonHintTap && touchEvent.isTap()) {
+      mappedInput.suppressTouchButtonFallback();
+      if (cards.empty()) {
+        if (sessionComplete) {
+          openRecommendedNextStep();
+        }
+        return;
+      }
+      if (!showingBack) {
+        showingBack = true;
+        actionIndex = 0;
+        requestUpdate();
+        return;
+      }
+
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int pageWidth = renderer.getScreenWidth();
+      const int pageHeight = renderer.getScreenHeight();
+      const int pad = metrics.contentSidePadding;
+      const int contentBottom = pageHeight - metrics.buttonHintsHeight - 8;
+      const int btnW = (pageWidth - pad * 2 - 18) / 2;
+      const int btnH = 34;
+      const int btnTop = contentBottom - 54;
+      for (int i = 0; i < kActionCount; i++) {
+        const Rect buttonRect{pad + i * (btnW + 18), btnTop, btnW, btnH};
+        if (TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, buttonRect)) {
+          actionIndex = i;
+          applySelectedAction();
+          return;
+        }
+      }
+      applySelectedAction();
+      return;
+    }
+    if (!buttonHintTap && !showingBack && !cards.empty() && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, static_cast<int>(cards.size()));
+      requestUpdate();
+      return;
+    }
+    if (!buttonHintTap && !showingBack && !cards.empty() && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, static_cast<int>(cards.size()));
+      requestUpdate();
+      return;
+    }
+    if (!buttonHintTap && showingBack && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      actionIndex = ButtonNavigator::nextIndex(actionIndex, kActionCount);
+      requestUpdate();
+      return;
+    }
+    if (!buttonHintTap && showingBack && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      actionIndex = ButtonNavigator::previousIndex(actionIndex, kActionCount);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     if (showingBack) {
       showingBack = false;
@@ -140,26 +232,7 @@ void StudyRecoveryActivity::loop() {
   });
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-    const auto card = cards[std::clamp(selectedIndex, 0, static_cast<int>(cards.size()) - 1)];
-    if (actionIndex == 0) {
-      STUDY_STATE.recordReviewResult(true);
-      STUDY_REVIEW_QUEUE.removeAt(StudyQueueKind::Again, selectedIndex);
-      completedCount++;
-    } else {
-      STUDY_STATE.recordReviewResult(false);
-      STUDY_REVIEW_QUEUE.recordAgain({card.front, card.back, "", card.deckName});
-    }
-
-    STUDY_REVIEW_QUEUE.loadFromFile();
-    const int count = static_cast<int>(STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Again).size());
-    if (count <= 0) {
-      selectedIndex = 0;
-      sessionComplete = true;
-    } else {
-      selectedIndex = std::min(selectedIndex, count - 1);
-    }
-    showingBack = false;
-    requestUpdate();
+    applySelectedAction();
   }
 }
 

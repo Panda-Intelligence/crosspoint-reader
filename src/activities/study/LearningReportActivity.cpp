@@ -8,6 +8,7 @@
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 void LearningReportActivity::onEnter() {
   Activity::onEnter();
@@ -17,6 +18,15 @@ void LearningReportActivity::onEnter() {
 }
 
 void LearningReportActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (touchEvent.isTap() || TouchHitTest::isForwardSwipe(touchEvent) || TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      finish();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back) ||
       mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
     finish();
