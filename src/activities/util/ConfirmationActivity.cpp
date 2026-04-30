@@ -4,6 +4,7 @@
 
 #include "../../components/UITheme.h"
 #include "HalDisplay.h"
+#include "util/TouchHitTest.h"
 
 ConfirmationActivity::ConfirmationActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
                                            const std::string& heading, const std::string& body)
@@ -56,6 +57,30 @@ void ConfirmationActivity::render(RenderLock&& lock) {
 }
 
 void ConfirmationActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      ActivityResult res;
+      res.isCancelled = false;
+      setResult(std::move(res));
+      finish();
+      return;
+    }
+    if (!buttonHintTap && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      ActivityResult res;
+      res.isCancelled = true;
+      setResult(std::move(res));
+      finish();
+      return;
+    }
+    if (!buttonHintTap) {
+      mappedInput.suppressTouchButtonFallback();
+    }
+  }
+
   if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
     ActivityResult res;
     res.isCancelled = false;

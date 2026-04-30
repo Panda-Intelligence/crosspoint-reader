@@ -10,6 +10,7 @@
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 void KOReaderAuthActivity::onWifiSelectionComplete(const bool success) {
   if (!success) {
@@ -100,6 +101,16 @@ void KOReaderAuthActivity::render(RenderLock&&) {
 
 void KOReaderAuthActivity::loop() {
   if (state == SUCCESS || state == FAILED) {
+    InputTouchEvent touchEvent;
+    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+      const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+      if (!buttonHintTap && (touchEvent.isTap() || TouchHitTest::isBackwardSwipe(touchEvent))) {
+        mappedInput.suppressTouchButtonFallback();
+        finish();
+        return;
+      }
+    }
+
     if (mappedInput.wasPressed(MappedInputManager::Button::Back) ||
         mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
       finish();

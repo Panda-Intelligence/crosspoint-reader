@@ -42,6 +42,12 @@ void ButtonRemapActivity::loop() {
     return;
   }
 
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    mappedInput.suppressTouchButtonFallback();
+    return;
+  }
+
   // Side buttons:
   // - Up: reset mapping to defaults and exit.
   // - Down: cancel without saving.

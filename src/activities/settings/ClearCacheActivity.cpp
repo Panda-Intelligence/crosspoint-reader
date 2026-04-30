@@ -8,6 +8,7 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 void ClearCacheActivity::onEnter() {
   Activity::onEnter();
@@ -120,6 +121,26 @@ void ClearCacheActivity::clearCache() {
 }
 
 void ClearCacheActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && state == WARNING && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      LOG_DBG("CLEAR_CACHE", "User cancelled by touch");
+      goBack();
+      return;
+    }
+    if (!buttonHintTap && (state == SUCCESS || state == FAILED) &&
+        (touchEvent.isTap() || TouchHitTest::isBackwardSwipe(touchEvent))) {
+      mappedInput.suppressTouchButtonFallback();
+      goBack();
+      return;
+    }
+    if (!buttonHintTap) {
+      mappedInput.suppressTouchButtonFallback();
+    }
+  }
+
   if (state == WARNING) {
     if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
       LOG_DBG("CLEAR_CACHE", "User confirmed, starting cache clear");

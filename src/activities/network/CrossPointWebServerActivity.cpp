@@ -16,6 +16,7 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/QrUtils.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 // AP Mode configuration
@@ -271,6 +272,16 @@ void CrossPointWebServerActivity::stopWebServer() {
 void CrossPointWebServerActivity::loop() {
   // Handle different states
   if (state == WebServerActivityState::SERVER_RUNNING) {
+    InputTouchEvent touchEvent;
+    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+      const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+      if (!buttonHintTap && TouchHitTest::isBackwardSwipe(touchEvent)) {
+        mappedInput.suppressTouchButtonFallback();
+        onGoHome();
+        return;
+      }
+    }
+
     // Handle DNS requests for captive portal (AP mode only)
     if (isApMode && dnsServer) {
       dnsServer->processNextRequest();

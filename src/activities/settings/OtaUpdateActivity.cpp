@@ -9,6 +9,7 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "network/OtaUpdater.h"
+#include "util/TouchHitTest.h"
 
 void OtaUpdateActivity::onWifiSelectionComplete(const bool success) {
   if (!success) {
@@ -142,6 +143,25 @@ void OtaUpdateActivity::loop() {
   // TODO @ngxson : refactor this logic later
   if (updater.getRender()) {
     requestUpdate();
+  }
+
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && state == WAITING_CONFIRMATION && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      finish();
+      return;
+    }
+    if (!buttonHintTap && (state == FAILED || state == NO_UPDATE) &&
+        (touchEvent.isTap() || TouchHitTest::isBackwardSwipe(touchEvent))) {
+      mappedInput.suppressTouchButtonFallback();
+      finish();
+      return;
+    }
+    if (!buttonHintTap) {
+      mappedInput.suppressTouchButtonFallback();
+    }
   }
 
   if (state == WAITING_CONFIRMATION) {

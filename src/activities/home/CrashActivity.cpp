@@ -6,6 +6,7 @@
 
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 void CrashActivity::onEnter() {
   Activity::onEnter();
@@ -20,6 +21,16 @@ void CrashActivity::onEnter() {
 }
 
 void CrashActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && (touchEvent.isTap() || TouchHitTest::isBackwardSwipe(touchEvent))) {
+      mappedInput.suppressTouchButtonFallback();
+      finish();
+      return;
+    }
+  }
+
   if (mappedInput.isPressed(MappedInputManager::Button::Back)) {
     finish();
   }
