@@ -12,6 +12,7 @@
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 void WifiSelectionActivity::onEnter() {
   Activity::onEnter();
@@ -312,6 +313,38 @@ void WifiSelectionActivity::loop() {
 
   // Handle save prompt state
   if (state == WifiSelectionState::SAVE_PROMPT) {
+    InputTouchEvent touchEvent;
+    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+      if (touchEvent.isTap()) {
+        const auto pageWidth = renderer.getScreenWidth();
+        const auto pageHeight = renderer.getScreenHeight();
+        const auto height = renderer.getLineHeight(UI_10_FONT_ID);
+        const auto top = (pageHeight - height * 3) / 2;
+        constexpr int buttonWidth = 60;
+        constexpr int buttonSpacing = 30;
+        constexpr int totalWidth = buttonWidth * 2 + buttonSpacing;
+        const int startX = (pageWidth - totalWidth) / 2;
+        const Rect yesRect{startX - 10, top + 70, buttonWidth + 20, height + 20};
+        const Rect noRect{startX + buttonWidth + buttonSpacing - 10, top + 70, buttonWidth + 20, height + 20};
+        if (TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, yesRect) ||
+            TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, noRect)) {
+          mappedInput.suppressTouchButtonFallback();
+          savePromptSelection = TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, yesRect) ? 0 : 1;
+          if (savePromptSelection == 0) {
+            RenderLock lock(*this);
+            WIFI_STORE.addCredential(selectedSSID, enteredPassword);
+          }
+          onComplete(true);
+          return;
+        }
+      } else if (TouchHitTest::isBackwardSwipe(touchEvent) || TouchHitTest::isForwardSwipe(touchEvent)) {
+        mappedInput.suppressTouchButtonFallback();
+        savePromptSelection = savePromptSelection == 0 ? 1 : 0;
+        requestUpdate();
+        return;
+      }
+    }
+
     if (mappedInput.wasPressed(MappedInputManager::Button::Up) ||
         mappedInput.wasPressed(MappedInputManager::Button::Left)) {
       if (savePromptSelection > 0) {
@@ -341,6 +374,43 @@ void WifiSelectionActivity::loop() {
 
   // Handle forget prompt state (connection failed with saved credentials)
   if (state == WifiSelectionState::FORGET_PROMPT) {
+    InputTouchEvent touchEvent;
+    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+      if (touchEvent.isTap()) {
+        const auto pageWidth = renderer.getScreenWidth();
+        const auto pageHeight = renderer.getScreenHeight();
+        const auto height = renderer.getLineHeight(UI_10_FONT_ID);
+        const auto top = (pageHeight - height * 3) / 2;
+        constexpr int buttonWidth = 120;
+        constexpr int buttonSpacing = 30;
+        constexpr int totalWidth = buttonWidth * 2 + buttonSpacing;
+        const int startX = (pageWidth - totalWidth) / 2;
+        const Rect cancelRect{startX - 10, top + 70, buttonWidth + 20, height + 20};
+        const Rect forgetRect{startX + buttonWidth + buttonSpacing - 10, top + 70, buttonWidth + 20, height + 20};
+        if (TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, cancelRect) ||
+            TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, forgetRect)) {
+          mappedInput.suppressTouchButtonFallback();
+          forgetPromptSelection = TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, cancelRect) ? 0 : 1;
+          if (forgetPromptSelection == 1) {
+            RenderLock lock(*this);
+            WIFI_STORE.removeCredential(selectedSSID);
+            const auto network = find_if(networks.begin(), networks.end(),
+                                         [this](const WifiNetworkInfo& net) { return net.ssid == selectedSSID; });
+            if (network != networks.end()) {
+              network->hasSavedPassword = false;
+            }
+          }
+          startWifiScan();
+          return;
+        }
+      } else if (TouchHitTest::isBackwardSwipe(touchEvent) || TouchHitTest::isForwardSwipe(touchEvent)) {
+        mappedInput.suppressTouchButtonFallback();
+        forgetPromptSelection = forgetPromptSelection == 0 ? 1 : 0;
+        requestUpdate();
+        return;
+      }
+    }
+
     if (mappedInput.wasPressed(MappedInputManager::Button::Up) ||
         mappedInput.wasPressed(MappedInputManager::Button::Left)) {
       if (forgetPromptSelection > 0) {
@@ -384,6 +454,22 @@ void WifiSelectionActivity::loop() {
 
   // Handle connection failed state
   if (state == WifiSelectionState::CONNECTION_FAILED) {
+    InputTouchEvent touchEvent;
+    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+      if (touchEvent.isTap() || TouchHitTest::isForwardSwipe(touchEvent) || TouchHitTest::isBackwardSwipe(touchEvent)) {
+        mappedInput.suppressTouchButtonFallback();
+        if (autoConnecting || usedSavedPassword) {
+          autoConnecting = false;
+          state = WifiSelectionState::FORGET_PROMPT;
+          forgetPromptSelection = 0;
+        } else {
+          state = WifiSelectionState::NETWORK_LIST;
+        }
+        requestUpdate();
+        return;
+      }
+    }
+
     if (mappedInput.wasPressed(MappedInputManager::Button::Back) ||
         mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
       // If we were auto-connecting or using a saved credential, offer to forget
@@ -403,6 +489,41 @@ void WifiSelectionActivity::loop() {
 
   // Handle network list state
   if (state == WifiSelectionState::NETWORK_LIST) {
+    InputTouchEvent touchEvent;
+    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+      const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+      if (!buttonHintTap && touchEvent.isTap()) {
+        mappedInput.suppressTouchButtonFallback();
+        if (networks.empty()) {
+          startWifiScan();
+          return;
+        }
+        const auto& metrics = UITheme::getInstance().getMetrics();
+        const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing;
+        const int contentHeight =
+            renderer.getScreenHeight() - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
+        const Rect listRect{0, contentTop, renderer.getScreenWidth(), contentHeight};
+        const int clickedIndex =
+            TouchHitTest::listItemAt(listRect, metrics.listRowHeight, static_cast<int>(selectedNetworkIndex),
+                                     static_cast<int>(networks.size()), touchEvent.x, touchEvent.y);
+        if (clickedIndex >= 0) {
+          selectedNetworkIndex = static_cast<size_t>(clickedIndex);
+          selectNetwork(static_cast<int>(selectedNetworkIndex));
+          return;
+        }
+      } else if (!buttonHintTap && !networks.empty() && TouchHitTest::isForwardSwipe(touchEvent)) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedNetworkIndex = ButtonNavigator::nextIndex(selectedNetworkIndex, networks.size());
+        requestUpdate();
+        return;
+      } else if (!buttonHintTap && !networks.empty() && TouchHitTest::isBackwardSwipe(touchEvent)) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedNetworkIndex = ButtonNavigator::previousIndex(selectedNetworkIndex, networks.size());
+        requestUpdate();
+        return;
+      }
+    }
+
     // Check for Back button to exit (cancel)
     if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
       onComplete(false);

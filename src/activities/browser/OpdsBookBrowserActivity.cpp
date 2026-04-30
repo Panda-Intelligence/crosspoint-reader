@@ -14,6 +14,7 @@
 #include "fontIds.h"
 #include "network/HttpDownloader.h"
 #include "util/StringUtils.h"
+#include "util/TouchHitTest.h"
 #include "util/UrlUtils.h"
 
 namespace {
@@ -60,6 +61,28 @@ void OpdsBookBrowserActivity::loop() {
   }
 
   if (state == BrowserState::ERROR) {
+    InputTouchEvent touchEvent;
+    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+      const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+      if (!buttonHintTap && touchEvent.isTap()) {
+        mappedInput.suppressTouchButtonFallback();
+        if (WiFi.status() == WL_CONNECTED && WiFi.localIP() != IPAddress(0, 0, 0, 0)) {
+          state = BrowserState::LOADING;
+          statusMessage = tr(STR_LOADING);
+          requestUpdate();
+          fetchFeed(currentPath);
+        } else {
+          launchWifiSelection();
+        }
+        return;
+      }
+      if (!buttonHintTap && TouchHitTest::isBackwardSwipe(touchEvent)) {
+        mappedInput.suppressTouchButtonFallback();
+        navigateBack();
+        return;
+      }
+    }
+
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
       if (WiFi.status() == WL_CONNECTED && WiFi.localIP() != IPAddress(0, 0, 0, 0)) {
         state = BrowserState::LOADING;
@@ -85,11 +108,34 @@ void OpdsBookBrowserActivity::loop() {
   if (state == BrowserState::DOWNLOADING) return;
 
   if (state == BrowserState::BROWSING) {
-    if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-      if (!entries.empty()) {
-        const auto& entry = entries[selectorIndex];
-        entry.type == OpdsEntryType::BOOK ? downloadBook(entry) : navigateToEntry(entry);
+    InputTouchEvent touchEvent;
+    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+      const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+      if (!entries.empty() && !buttonHintTap && touchEvent.isTap()) {
+        const Rect listRect{0, 60, renderer.getScreenWidth(), PAGE_ITEMS * 30};
+        const int clickedIndex = TouchHitTest::listItemAt(listRect, 30, selectorIndex, static_cast<int>(entries.size()),
+                                                          touchEvent.x, touchEvent.y);
+        if (clickedIndex >= 0) {
+          mappedInput.suppressTouchButtonFallback();
+          selectorIndex = clickedIndex;
+          openSelectedEntry();
+          return;
+        }
+      } else if (!entries.empty() && !buttonHintTap && TouchHitTest::isForwardSwipe(touchEvent)) {
+        mappedInput.suppressTouchButtonFallback();
+        selectorIndex = ButtonNavigator::nextPageIndex(selectorIndex, entries.size(), PAGE_ITEMS);
+        requestUpdate();
+        return;
+      } else if (!entries.empty() && !buttonHintTap && TouchHitTest::isBackwardSwipe(touchEvent)) {
+        mappedInput.suppressTouchButtonFallback();
+        selectorIndex = ButtonNavigator::previousPageIndex(selectorIndex, entries.size(), PAGE_ITEMS);
+        requestUpdate();
+        return;
       }
+    }
+
+    if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+      openSelectedEntry();
     } else if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
       navigateBack();
     } else if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
@@ -237,6 +283,14 @@ void OpdsBookBrowserActivity::navigateToEntry(const OpdsEntry& entry) {
   selectorIndex = 0;
   requestUpdate(true);
   fetchFeed(currentPath);
+}
+
+void OpdsBookBrowserActivity::openSelectedEntry() {
+  if (entries.empty()) {
+    return;
+  }
+  const auto& entry = entries[selectorIndex];
+  entry.type == OpdsEntryType::BOOK ? downloadBook(entry) : navigateToEntry(entry);
 }
 
 void OpdsBookBrowserActivity::navigateBack() {
