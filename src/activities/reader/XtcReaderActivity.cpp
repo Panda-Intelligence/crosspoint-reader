@@ -16,6 +16,7 @@
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
+#include "ReaderUtils.h"
 #include "XtcReaderChapterSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -68,6 +69,7 @@ void XtcReaderActivity::onEnter() {
     return;
   }
 
+  ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
   xtc->setupCacheDir();
 
   // Load saved progress
@@ -85,6 +87,7 @@ void XtcReaderActivity::onEnter() {
 void XtcReaderActivity::onExit() {
   Activity::onExit();
 
+  renderer.setOrientation(GfxRenderer::Orientation::Portrait);
   APP_STATE.readerActivityLoadCount = 0;
   APP_STATE.saveToFile();
   xtc.reset();
