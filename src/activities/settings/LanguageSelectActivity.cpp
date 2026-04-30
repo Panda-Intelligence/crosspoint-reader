@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <iterator>
 
+#include "../../ui_font_manager.h"
 #include "I18nKeys.h"
 #include "MappedInputManager.h"
 #include "fontIds.h"
@@ -82,6 +83,7 @@ void LanguageSelectActivity::handleSelection() {
   {
     RenderLock lock(*this);
     I18N.setLanguage(static_cast<Language>(SORTED_LANGUAGE_INDICES[selectedIndex]));
+    updateUiFontMapping();
   }
 
   // Return to previous page

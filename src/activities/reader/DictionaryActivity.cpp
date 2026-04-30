@@ -75,6 +75,30 @@ void DictionaryActivity::loop() {
       mappedInput.suppressTouchButtonFallback();
       toggleDictionaryDetail(showingDetail, *this);
       return;
+    } else if (buttonHintTap) {
+      uint8_t buttonIndex = 0;
+#if MOFEI_DEVICE
+      if (gpio.mapMofeiButtonHintTapToButton(touchEvent.sourceX(), touchEvent.sourceY(), &buttonIndex)) {
+        if (buttonIndex == HalGPIO::BTN_BACK) {
+          if (showingDetail) {
+            showingDetail = false;
+            requestUpdate();
+          } else {
+            finish();
+          }
+        } else if (buttonIndex == HalGPIO::BTN_CONFIRM) {
+          toggleDictionaryDetail(showingDetail, *this);
+        } else if (buttonIndex == HalGPIO::BTN_LEFT) {
+          selectedIndex = ButtonNavigator::previousIndex(selectedIndex, static_cast<int>(kEntries.size()));
+          requestUpdate();
+        } else if (buttonIndex == HalGPIO::BTN_RIGHT) {
+          selectedIndex = ButtonNavigator::nextIndex(selectedIndex, static_cast<int>(kEntries.size()));
+          requestUpdate();
+        }
+      }
+#endif
+      mappedInput.suppressTouchButtonFallback();
+      return;
     }
   }
 

@@ -158,6 +158,9 @@ void SettingsActivity::loop() {
         toggleCurrentSetting();
         requestUpdate();
         return;
+      } else if (!mappedInput.isTouchButtonHintTap(touchEvent)) {
+        mappedInput.suppressTouchButtonFallback();
+        return;
       }
     } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
       mappedInput.suppressTouchButtonFallback();

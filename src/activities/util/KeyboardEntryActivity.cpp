@@ -375,7 +375,38 @@ void KeyboardEntryActivity::loop() {
       }
 
       if (mappedInput.isTouchButtonHintTap(touchEvent)) {
-        // Footer hint taps intentionally fall through to the legacy button adapter.
+        uint8_t buttonIndex = 0;
+#if MOFEI_DEVICE
+        if (gpio.mapMofeiButtonHintTapToButton(touchEvent.sourceX(), touchEvent.sourceY(), &buttonIndex)) {
+          if (buttonIndex == HalGPIO::BTN_BACK) {
+            onCancel();
+          } else if (buttonIndex == HalGPIO::BTN_CONFIRM) {
+            // "Toggle" button
+            if (inputType == InputType::Password) {
+              passwordVisible = !passwordVisible;
+            } else {
+              urlMode = !urlMode;
+            }
+            requestUpdate();
+          } else if (buttonIndex == HalGPIO::BTN_LEFT) {
+            // "Up" label, but we'll use it to move cursor left
+            if (cursorPos > 0) {
+              cursorPos--;
+              cursorMode = true;
+              requestUpdate();
+            }
+          } else if (buttonIndex == HalGPIO::BTN_RIGHT) {
+            // "Down" label, but we'll use it to move cursor right
+            if (cursorPos < text.length()) {
+              cursorPos++;
+              cursorMode = true;
+              requestUpdate();
+            }
+          }
+        }
+#endif
+        mappedInput.suppressTouchButtonFallback();
+        return;
       } else {
         mappedInput.suppressTouchButtonFallback();
         return;

@@ -138,6 +138,9 @@ void DashboardActivity::loop() {
         selectedIndex = clickedIndex;
         openCurrentSelection();
         return;
+      } else if (!mappedInput.isTouchButtonHintTap(touchEvent)) {
+        mappedInput.suppressTouchButtonFallback();
+        return;
       }
     } else {
       const auto gestureAction = TouchHitTest::listGestureActionForTouch(touchEvent);

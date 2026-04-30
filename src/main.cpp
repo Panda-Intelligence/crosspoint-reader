@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <Epub.h>
-#include <FontCacheManager.h>
+#include "ExternalFontIds.h"
+#include "FontCacheManager.h"
 #include <FontDecompressor.h>
 #include <GfxRenderer.h>
 #include <HalDisplay.h>
@@ -197,6 +198,27 @@ void enterDeepSleep() {
   powerManager.startDeepSleep(gpio);
 }
 
+void updateUiFontMapping() {
+  Language lang = I18N.getLanguage();
+  if (lang == Language::ZH_CN || lang == Language::ZH_TW) {
+    if (StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::SMALL)) {
+      const auto& fontMap = renderer.getFontMap();
+      auto it = fontMap.find(NOTOSANS_TC_12_FONT_ID);
+      if (it != fontMap.end()) {
+        renderer.insertFont(UI_10_FONT_ID, it->second);
+        renderer.insertFont(UI_12_FONT_ID, it->second);
+        UITheme::getInstance().reload();
+        return;
+      }
+    }
+  }
+
+  // Fallback to default
+  renderer.insertFont(UI_10_FONT_ID, ui10FontFamily);
+  renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
+  UITheme::getInstance().reload();
+}
+
 void setupDisplayAndFonts() {
   display.begin();
   renderer.begin();
@@ -228,6 +250,9 @@ void setupDisplayAndFonts() {
   renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
   renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
   StorageFontRegistry::loadTraditionalChineseFonts(renderer);
+  
+  updateUiFontMapping();
+  
   LOG_DBG("MAIN", "Fonts setup");
 }
 
