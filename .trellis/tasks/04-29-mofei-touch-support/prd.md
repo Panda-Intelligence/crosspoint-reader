@@ -1,6 +1,7 @@
 # Mofei Touch Support
 
 Date: 2026-04-29
+Updated: 2026-04-30
 Owner: Codex
 
 ## Problem
@@ -10,6 +11,12 @@ Mofei firmware previously initialized the FT6336U touch controller on GPIO13/GPI
 User-provided working-system evidence now identifies the Mofei FT6336U touch address as 7-bit `0x2E`. Production firmware must default `MOFEI_TOUCH_ADDR` to `0x2E`; the vendor/sample `0x38` address is diagnostic-only unless later Mofei-specific evidence overrides the working-system report.
 
 User correction: a previously installed system on this same device supported touch. Therefore the hardware should be treated as touch-capable. The current firmware evidence only proves that this firmware path is reading the wrong `0x38` device or missing required board-specific touch initialization; it does not prove the board lacks touch hardware.
+
+Follow-up status: another tool has now recovered touch recognition on the device. The project is still architected around
+button-first Xteink X3/X4 input, so Mofei touch currently reaches most screens only through virtual button injection. Native
+touch handling exists only in isolated Mofei-specific consumers such as Dashboard and KeyboardEntry. The remaining work is
+to turn recognized FT6336U events into a device-independent touch event path and to let touch-display screens consume
+coordinates and gestures directly without scattering `MofeiTouchDriver` or `#if MOFEI_DEVICE` code through each activity.
 
 ## Evidence
 
@@ -40,13 +47,32 @@ User correction: a previously installed system on this same device supported tou
 7. Keep changes narrowly scoped to Mofei touch support and the task context/docs needed to explain it.
 8. Do not conclude that the hardware lacks touch support. Since the original system supported touch, unresolved evidence must be framed as missing firmware GPIO/init path.
 
+## Touch Event Requirements
+
+1. Introduce a device-independent touch event contract at the HAL/input boundary. Activity code must consume this contract
+   instead of `MofeiTouchDriver::Event`.
+2. Keep the legacy touch-to-button adapter for existing button-first screens, but define event ownership so a touch event
+   is not applied twice as both native touch and injected virtual button input in the same loop.
+3. Add shared hit-testing helpers for common e-ink UI shapes: list rows, button hint/footer zones, and full-screen reader
+   tap zones. Prefer reusing existing renderer metrics and component `Rect` values over hardcoded screen coordinates.
+4. Replace one-off native touch blocks in Dashboard and KeyboardEntry with the new input abstraction.
+5. Add native touch support for the primary Mofei touch-display flows:
+   - hub and menu screens: Dashboard, Home, ReadingHub, StudyHub, DesktopHub, ArcadeHub, Settings, Network selection menus
+   - list/browser screens: FileBrowser, RecentBooks, OPDS/server lists, chapter lists, read-later/saved-card style lists
+   - reader screens: tap zones for previous/next/menu and swipe gestures for page movement
+   - text-entry screens: keep coordinate-accurate keyboard taps
+6. Preserve physical button behavior on X3/X4 and Mofei. Touch support must augment input, not regress existing button
+   navigation.
+7. Keep Mofei-specific FT6336U details inside HAL/input code. Screen activities may branch on generic touch event types
+   or shared helper results, not on touch chip registers or Mofei driver internals.
+
 ## Non-Goals
 
-- Do not rewrite reader UI navigation.
 - Do not add a new touch library unless the existing driver cannot support the documented FT6336U protocol.
 - Do not change display orientation or Mofei display write order.
 - Do not invent unverified GPIO mappings.
 - Do not run broad arbitrary GPIO I2C scans in production firmware.
+- Do not remove physical button support or make Mofei touch the only input path.
 
 ## Acceptance Criteria
 
@@ -57,8 +83,15 @@ User correction: a previously installed system on this same device supported tou
 - Build verification passes for the Mofei environment.
 - Static analysis or a narrow compile gate is run locally; if full `pio check` is blocked by existing repository issues, record the exact boundary.
 - If the device cannot be flashed, record the exact esptool error and the physical recovery step required before claiming any on-device touch result.
+- Activities can consume a generic touch event without including `MofeiTouch.h`.
+- Native touch handling works for at least the representative flows in each category: a hub/menu screen, a list/browser
+  screen, a reader screen, and KeyboardEntry.
+- A screen that consumes native touch does not also perform the fallback virtual button action for the same touch event.
+- Existing button navigation still compiles and remains available on X3/X4 and Mofei.
 
 ## Suggested Verification
 
 - `scripts/mofei_flash_validate.sh --build-only`
+- `pio run -e mofei`
+- `git diff --check`
 - If build-only is green and a device port is available, flash with `scripts/mofei_flash_validate.sh --port <port>` and inspect serial logs for touch detection.
