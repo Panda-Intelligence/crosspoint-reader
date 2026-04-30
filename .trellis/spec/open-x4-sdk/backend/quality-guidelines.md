@@ -70,6 +70,104 @@ build flags or environments.
 
 <!-- Patterns that must always be used -->
 
+### Preserve Native Touch Event Ownership
+
+Mofei touch input must cross the HAL boundary as the generic
+`InputTouchEvent` contract, not as `MofeiTouchDriver::Event` or FT6336U
+register data.
+
+#### 1. Scope / Trigger
+
+Use this rule whenever a screen handles taps, swipes, hit-testing, or button
+hint taps from touch input. It prevents the same physical touch from being
+processed twice: once as a native coordinate event and again as the legacy
+touch-to-button fallback.
+
+#### 2. Signatures
+
+```cpp
+struct InputTouchEvent {
+  enum class Type : uint8_t { None, Tap, SwipeLeft, SwipeRight, SwipeUp, SwipeDown };
+  Type type;
+  uint16_t x;
+  uint16_t y;
+  bool isTap() const;
+};
+
+bool MappedInputManager::consumeTouchEvent(InputTouchEvent* outEvent) const;
+void MappedInputManager::suppressTouchButtonFallback() const;
+bool MappedInputManager::isTouchButtonHintTap(const InputTouchEvent& event) const;
+```
+
+#### 3. Contracts
+
+- HAL/input code converts chip-specific events into `InputTouchEvent`.
+- Activity code may branch on generic touch types and shared hit-test helpers.
+- Activity code must not include `MofeiTouch.h` or inspect FT6336U registers.
+- A native consumer owns a touch after `consumeTouchEvent()` returns `true`.
+- If the screen handles that touch natively, it must call
+  `suppressTouchButtonFallback()` before any later `wasPressed()` or
+  `wasReleased()` checks in the same loop.
+- Button-hint/footer taps may intentionally be left to fallback by checking
+  `isTouchButtonHintTap()` and not suppressing them.
+
+#### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Native screen handles tap or swipe | Suppress fallback and return or avoid button checks for that event |
+| Touch is a button-hint tap | Let fallback run unless the screen handles the hint itself |
+| Screen only supports buttons | Do not consume the touch; HAL fallback keeps buttons working |
+| Reader orientation differs from touch orientation | Transform through shared helpers before hit-testing |
+
+#### 5. Good/Base/Bad Cases
+
+- Good: `EpubReaderActivity` consumes a touch, transforms it with
+  `TouchHitTest::eventForRendererOrientation()`, then suppresses fallback.
+- Base: a button-only screen ignores `consumeTouchEvent()` and relies on the
+  existing virtual button adapter.
+- Bad: an activity consumes a tap, opens a menu, then lets the same tap also
+  reach `wasReleased(Button::Confirm)`.
+
+#### 6. Tests Required
+
+- Run `pio run -e mofei` for compile coverage.
+- Run `pio check -e mofei --fail-on-defect low --fail-on-defect medium --fail-on-defect high`
+  after broad input changes.
+- On device, flash `env:mofei` and confirm serial logs show
+  `FT6336U status=ready ... addr=0x2E`.
+
+#### 7. Wrong vs Correct
+
+Wrong:
+
+```cpp
+MofeiTouchDriver::Event event;
+if (touch.update(&event) && event.type == MofeiTouchDriver::EventType::Tap) {
+  openItem(event.x, event.y);
+}
+if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+  openSelectedItem();
+}
+```
+
+Correct:
+
+```cpp
+InputTouchEvent event;
+if (mappedInput.consumeTouchEvent(&event)) {
+  const bool buttonHintTap = mappedInput.isTouchButtonHintTap(event);
+  if (!buttonHintTap && event.isTap()) {
+    mappedInput.suppressTouchButtonFallback();
+    openItem(event.x, event.y);
+    return;
+  }
+}
+if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+  openSelectedItem();
+}
+```
+
 ### Treat Mofei GPIO45 As A Sensitive Strap-Capable Output
 
 For Mofei touch power, GPIO45 is documented by `docs/mofei/ic.png` as
