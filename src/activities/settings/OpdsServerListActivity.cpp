@@ -10,6 +10,7 @@
 #include "activities/browser/OpdsBookBrowserActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 int OpdsServerListActivity::getItemCount() const {
   int count = static_cast<int>(OPDS_STORE.getCount());
@@ -32,6 +33,39 @@ void OpdsServerListActivity::onEnter() {
 void OpdsServerListActivity::onExit() { Activity::onExit(); }
 
 void OpdsServerListActivity::loop() {
+  const int itemCount = getItemCount();
+
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (itemCount > 0 && touchEvent.isTap()) {
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+      const int contentHeight =
+          renderer.getScreenHeight() - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
+      const Rect listRect{0, contentTop, renderer.getScreenWidth(), contentHeight};
+      const int clickedIndex = TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex,
+                                                        itemCount, touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = clickedIndex;
+        handleSelection();
+        return;
+      }
+    } else if (itemCount > 0 && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, true);
+      selectedIndex = ButtonNavigator::nextPageIndex(selectedIndex, itemCount, pageItems);
+      requestUpdate();
+      return;
+    } else if (itemCount > 0 && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, true);
+      selectedIndex = ButtonNavigator::previousPageIndex(selectedIndex, itemCount, pageItems);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     if (pickerMode) {
       activityManager.goHome();
@@ -46,7 +80,6 @@ void OpdsServerListActivity::loop() {
     return;
   }
 
-  const int itemCount = getItemCount();
   if (itemCount > 0) {
     buttonNavigator.onNext([this, itemCount] {
       selectedIndex = ButtonNavigator::nextIndex(selectedIndex, itemCount);

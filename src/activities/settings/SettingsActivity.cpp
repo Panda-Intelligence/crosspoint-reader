@@ -18,6 +18,7 @@
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_DISPLAY, StrId::STR_CAT_READER,
                                                               StrId::STR_CAT_CONTROLS, StrId::STR_CAT_SYSTEM};
@@ -48,6 +49,25 @@ std::string readerFontValueText(const SettingInfo& setting) {
 std::string tcFontPackSummary() {
   return std::to_string(StorageFontRegistry::countLoadedTraditionalChineseFonts()) + "/" +
          std::to_string(StorageFontRegistry::getTraditionalChineseFontPacks().size());
+}
+
+int categoryIndexAt(const GfxRenderer& renderer, const Rect& tabRect, uint16_t x, uint16_t y,
+                    const StrId* categoryNames, int categoryCount) {
+  if (!TouchHitTest::pointInRect(x, y, tabRect)) {
+    return -1;
+  }
+
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  int currentX = tabRect.x + metrics.contentSidePadding;
+  for (int i = 0; i < categoryCount; i++) {
+    const char* label = I18N.get(categoryNames[i]);
+    const int tabWidth = renderer.getTextWidth(UI_12_FONT_ID, label, EpdFontFamily::BOLD) + metrics.tabSpacing;
+    if (x >= currentX && x < currentX + tabWidth) {
+      return i;
+    }
+    currentX += tabWidth;
+  }
+  return -1;
 }
 }  // namespace
 
@@ -114,6 +134,50 @@ void SettingsActivity::onExit() {
 void SettingsActivity::loop() {
   bool hasChangedCategory = false;
 
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const auto& metrics = UITheme::getInstance().getMetrics();
+    if (touchEvent.isTap()) {
+      const int pageWidth = renderer.getScreenWidth();
+      const int pageHeight = renderer.getScreenHeight();
+      const Rect tabRect{0, metrics.topPadding + metrics.headerHeight, pageWidth, metrics.tabBarHeight};
+      const int tappedCategory = categoryIndexAt(renderer, tabRect, touchEvent.x, touchEvent.y, categoryNames,
+                                                categoryCount);
+      if (tappedCategory >= 0) {
+        mappedInput.suppressTouchButtonFallback();
+        enterCategory(tappedCategory);
+        selectedSettingIndex = 0;
+        requestUpdate();
+        return;
+      }
+
+      const Rect listRect{0, metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing,
+                          pageWidth,
+                          pageHeight - (metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight +
+                                        metrics.buttonHintsHeight + metrics.verticalSpacing * 2)};
+      const int clickedIndex =
+          TouchHitTest::listItemAt(listRect, metrics.listRowHeight, selectedSettingIndex - 1, settingsCount,
+                                   touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedSettingIndex = clickedIndex + 1;
+        toggleCurrentSetting();
+        requestUpdate();
+        return;
+      }
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedSettingIndex = ButtonNavigator::nextIndex(selectedSettingIndex, settingsCount + 1);
+      requestUpdate();
+      return;
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedSettingIndex = ButtonNavigator::previousIndex(selectedSettingIndex, settingsCount + 1);
+      requestUpdate();
+      return;
+    }
+  }
+
   // Handle actions with early return
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
     if (selectedSettingIndex == 0) {
@@ -163,22 +227,31 @@ void SettingsActivity::loop() {
 
   if (hasChangedCategory) {
     selectedSettingIndex = (selectedSettingIndex == 0) ? 0 : 1;
-    switch (selectedCategoryIndex) {
-      case 0:
-        currentSettings = &displaySettings;
-        break;
-      case 1:
-        currentSettings = &readerSettings;
-        break;
-      case 2:
-        currentSettings = &controlsSettings;
-        break;
-      case 3:
-        currentSettings = &systemSettings;
-        break;
-    }
-    settingsCount = static_cast<int>(currentSettings->size());
+    enterCategory(selectedCategoryIndex);
   }
+}
+
+void SettingsActivity::enterCategory(const int categoryIndex) {
+  selectedCategoryIndex = categoryIndex;
+  switch (selectedCategoryIndex) {
+    case 0:
+      currentSettings = &displaySettings;
+      break;
+    case 1:
+      currentSettings = &readerSettings;
+      break;
+    case 2:
+      currentSettings = &controlsSettings;
+      break;
+    case 3:
+      currentSettings = &systemSettings;
+      break;
+    default:
+      selectedCategoryIndex = 0;
+      currentSettings = &displaySettings;
+      break;
+  }
+  settingsCount = static_cast<int>(currentSettings->size());
 }
 
 void SettingsActivity::toggleCurrentSetting() {

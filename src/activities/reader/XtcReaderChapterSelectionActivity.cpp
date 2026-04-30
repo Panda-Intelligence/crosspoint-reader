@@ -8,20 +8,36 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
+
+namespace {
+constexpr int kChapterLineHeight = 30;
+constexpr int kChapterStartY = 60;
+
+Rect chapterContentRect(const GfxRenderer& renderer) {
+  const auto orientation = renderer.getOrientation();
+  const bool isLandscapeCw = orientation == GfxRenderer::Orientation::LandscapeClockwise;
+  const bool isLandscapeCcw = orientation == GfxRenderer::Orientation::LandscapeCounterClockwise;
+  const bool isPortraitInverted = orientation == GfxRenderer::Orientation::PortraitInverted;
+  const int hintGutterWidth = (isLandscapeCw || isLandscapeCcw) ? 30 : 0;
+  const int contentX = isLandscapeCw ? hintGutterWidth : 0;
+  const int hintGutterHeight = isPortraitInverted ? 50 : 0;
+  return Rect{contentX, hintGutterHeight, renderer.getScreenWidth() - hintGutterWidth,
+              renderer.getScreenHeight() - hintGutterHeight};
+}
+}  // namespace
 
 int XtcReaderChapterSelectionActivity::getPageItems() const {
-  constexpr int lineHeight = 30;
-
   const int screenHeight = renderer.getScreenHeight();
   const auto orientation = renderer.getOrientation();
   // In inverted portrait, the hint row is drawn near the logical top.
   // Reserve vertical space so the list starts below the hints.
   const bool isPortraitInverted = orientation == GfxRenderer::Orientation::PortraitInverted;
   const int hintGutterHeight = isPortraitInverted ? 50 : 0;
-  const int startY = 60 + hintGutterHeight;
-  const int availableHeight = screenHeight - startY - lineHeight;
+  const int startY = kChapterStartY + hintGutterHeight;
+  const int availableHeight = screenHeight - startY - kChapterLineHeight;
   // Clamp to at least one item to prevent empty page math.
-  return std::max(1, availableHeight / lineHeight);
+  return std::max(1, availableHeight / kChapterLineHeight);
 }
 
 int XtcReaderChapterSelectionActivity::findChapterIndexForPage(uint32_t page) const {
@@ -56,12 +72,43 @@ void XtcReaderChapterSelectionActivity::loop() {
   const int pageItems = getPageItems();
   const int totalItems = static_cast<int>(xtc->getChapters().size());
 
-  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+  auto selectCurrentChapter = [this] {
     const auto& chapters = xtc->getChapters();
     if (!chapters.empty() && selectorIndex >= 0 && selectorIndex < static_cast<int>(chapters.size())) {
       setResult(PageResult{chapters[selectorIndex].startPage});
       finish();
     }
+  };
+
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (totalItems > 0 && touchEvent.isTap()) {
+      const Rect contentRect = chapterContentRect(renderer);
+      const Rect listRect{contentRect.x, contentRect.y + kChapterStartY, contentRect.width,
+                          contentRect.height - kChapterStartY};
+      const int clickedIndex = TouchHitTest::listItemAt(listRect, kChapterLineHeight, selectorIndex, totalItems,
+                                                        touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
+        selectorIndex = clickedIndex;
+        selectCurrentChapter();
+        return;
+      }
+    } else if (totalItems > 0 && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectorIndex = ButtonNavigator::nextPageIndex(selectorIndex, totalItems, pageItems);
+      requestUpdate();
+      return;
+    } else if (totalItems > 0 && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectorIndex = ButtonNavigator::previousPageIndex(selectorIndex, totalItems, pageItems);
+      requestUpdate();
+      return;
+    }
+  }
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    selectCurrentChapter();
   } else if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     ActivityResult result;
     result.isCancelled = true;
@@ -123,11 +170,13 @@ void XtcReaderChapterSelectionActivity::render(RenderLock&&) {
 
   const auto pageStartIndex = selectorIndex / pageItems * pageItems;
   // Highlight only the content area, not the hint gutters.
-  renderer.fillRect(contentX, 60 + contentY + (selectorIndex % pageItems) * 30 - 2, contentWidth - 1, 30);
+  renderer.fillRect(contentX, kChapterStartY + contentY + (selectorIndex % pageItems) * kChapterLineHeight - 2,
+                    contentWidth - 1, kChapterLineHeight);
   for (int i = pageStartIndex; i < static_cast<int>(chapters.size()) && i < pageStartIndex + pageItems; i++) {
     const auto& chapter = chapters[i];
     const char* title = chapter.name.empty() ? tr(STR_UNNAMED) : chapter.name.c_str();
-    renderer.drawText(UI_10_FONT_ID, contentX + 20, 60 + contentY + (i % pageItems) * 30, title, i != selectorIndex);
+    renderer.drawText(UI_10_FONT_ID, contentX + 20, kChapterStartY + contentY + (i % pageItems) * kChapterLineHeight,
+                      title, i != selectorIndex);
   }
 
   // Skip button hints in landscape CW mode (they overlap content)
