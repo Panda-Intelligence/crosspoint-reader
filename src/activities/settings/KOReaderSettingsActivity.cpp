@@ -11,6 +11,7 @@
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr int MENU_ITEMS = 5;
@@ -28,6 +29,36 @@ void KOReaderSettingsActivity::onEnter() {
 void KOReaderSettingsActivity::onExit() { Activity::onExit(); }
 
 void KOReaderSettingsActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (touchEvent.isTap()) {
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+      const int contentHeight =
+          renderer.getScreenHeight() - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
+      const Rect listRect{0, contentTop, renderer.getScreenWidth(), contentHeight};
+      const int clickedIndex =
+          TouchHitTest::listItemAt(listRect, metrics.listRowHeight, static_cast<int>(selectedIndex), MENU_ITEMS,
+                                   touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = static_cast<size_t>(clickedIndex);
+        handleSelection();
+        return;
+      }
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = static_cast<size_t>((selectedIndex + 1) % MENU_ITEMS);
+      requestUpdate();
+      return;
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = static_cast<size_t>((selectedIndex + MENU_ITEMS - 1) % MENU_ITEMS);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;

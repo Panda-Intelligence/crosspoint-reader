@@ -9,6 +9,7 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr int MENU_ITEMS = 6;
@@ -57,6 +58,36 @@ void StatusBarSettingsActivity::onEnter() {
 void StatusBarSettingsActivity::onExit() { Activity::onExit(); }
 
 void StatusBarSettingsActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (touchEvent.isTap()) {
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+      const int contentHeight =
+          renderer.getScreenHeight() - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
+      const Rect listRect{0, contentTop, renderer.getScreenWidth(), contentHeight};
+      const int clickedIndex = TouchHitTest::listItemAt(listRect, metrics.listRowHeight, selectedIndex, MENU_ITEMS,
+                                                        touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = clickedIndex;
+        handleSelection();
+        requestUpdate();
+        return;
+      }
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, MENU_ITEMS);
+      requestUpdate();
+      return;
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, MENU_ITEMS);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;

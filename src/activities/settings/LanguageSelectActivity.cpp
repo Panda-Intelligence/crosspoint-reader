@@ -9,6 +9,7 @@
 #include "I18nKeys.h"
 #include "MappedInputManager.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 void LanguageSelectActivity::onEnter() {
   Activity::onEnter();
@@ -26,6 +27,35 @@ void LanguageSelectActivity::onEnter() {
 void LanguageSelectActivity::onExit() { Activity::onExit(); }
 
 void LanguageSelectActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (touchEvent.isTap()) {
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+      const int contentHeight =
+          renderer.getScreenHeight() - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing;
+      const Rect listRect{0, contentTop, renderer.getScreenWidth(), contentHeight};
+      const int clickedIndex = TouchHitTest::listItemAt(listRect, metrics.listRowHeight, selectedIndex, totalItems,
+                                                        touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = clickedIndex;
+        handleSelection();
+        return;
+      }
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::nextIndex(static_cast<int>(selectedIndex), totalItems);
+      requestUpdate();
+      return;
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::previousIndex(static_cast<int>(selectedIndex), totalItems);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     onBack();
     return;

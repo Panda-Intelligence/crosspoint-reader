@@ -8,6 +8,7 @@
 #include "StorageFontRegistry.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 size_t reloadRowIndex() { return StorageFontRegistry::getTraditionalChineseFontPacks().size(); }
@@ -40,6 +41,38 @@ void TraditionalChineseFontsActivity::onEnter() {
 void TraditionalChineseFontsActivity::onExit() { Activity::onExit(); }
 
 void TraditionalChineseFontsActivity::loop() {
+  const auto itemCount = static_cast<int>(reloadRowIndex() + 1);
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (touchEvent.isTap()) {
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+      const int contentHeight =
+          renderer.getScreenHeight() - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
+      const Rect listRect{0, contentTop, renderer.getScreenWidth(), contentHeight};
+      const int clickedIndex =
+          TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, static_cast<int>(selectedIndex),
+                                   itemCount, touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = static_cast<size_t>(clickedIndex);
+        handleSelection();
+        requestUpdate();
+        return;
+      }
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = static_cast<size_t>(ButtonNavigator::nextIndex(static_cast<int>(selectedIndex), itemCount));
+      requestUpdate();
+      return;
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = static_cast<size_t>(ButtonNavigator::previousIndex(static_cast<int>(selectedIndex), itemCount));
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;
@@ -50,7 +83,6 @@ void TraditionalChineseFontsActivity::loop() {
     return;
   }
 
-  const auto itemCount = static_cast<int>(reloadRowIndex() + 1);
   buttonNavigator.onNextRelease([this, itemCount] {
     selectedIndex = static_cast<size_t>(ButtonNavigator::nextIndex(static_cast<int>(selectedIndex), itemCount));
     requestUpdate();

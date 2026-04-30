@@ -11,6 +11,7 @@
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 // Editable fields: Name, URL, Username, Password.
@@ -48,6 +49,38 @@ void OpdsSettingsActivity::onEnter() {
 void OpdsSettingsActivity::onExit() { Activity::onExit(); }
 
 void OpdsSettingsActivity::loop() {
+  const int menuItems = getMenuItemCount();
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (touchEvent.isTap()) {
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int contentTop =
+          metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing + metrics.tabBarHeight;
+      const int contentHeight =
+          renderer.getScreenHeight() - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
+      const Rect listRect{0, contentTop, renderer.getScreenWidth(), contentHeight};
+      const int clickedIndex =
+          TouchHitTest::listItemAt(listRect, metrics.listRowHeight, static_cast<int>(selectedIndex), menuItems,
+                                   touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = static_cast<size_t>(clickedIndex);
+        handleSelection();
+        return;
+      }
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = static_cast<size_t>((selectedIndex + 1) % menuItems);
+      requestUpdate();
+      return;
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = static_cast<size_t>((selectedIndex + menuItems - 1) % menuItems);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;
@@ -58,7 +91,6 @@ void OpdsSettingsActivity::loop() {
     return;
   }
 
-  const int menuItems = getMenuItemCount();
   buttonNavigator.onNext([this, menuItems] {
     selectedIndex = (selectedIndex + 1) % menuItems;
     requestUpdate();
