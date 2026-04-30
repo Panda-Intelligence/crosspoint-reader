@@ -123,8 +123,8 @@ void DashboardActivity::openCurrentSelection() {
 void DashboardActivity::loop() {
   InputTouchEvent touchEvent;
   if (mappedInput.consumeTouchEvent(&touchEvent)) {
-    const InputTouchEvent dashboardTouch = TouchHitTest::eventForRendererOrientation(touchEvent, renderer);
-    if (dashboardTouch.isTap()) {
+    LOG_DBG("DASH", "touch type=%u x=%u y=%u", static_cast<unsigned>(touchEvent.type), touchEvent.x, touchEvent.y);
+    if (touchEvent.isTap()) {
       const auto& metrics = UITheme::getInstance().getMetrics();
       const Rect listRect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing,
                           renderer.getScreenWidth(),
@@ -133,23 +133,27 @@ void DashboardActivity::loop() {
                                metrics.verticalSpacing * 2)};
       const int clickedIndex =
           TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex, kItemCount,
-                                   dashboardTouch.x, dashboardTouch.y);
+                                   touchEvent.x, touchEvent.y);
       if (clickedIndex >= 0) {
         mappedInput.suppressTouchButtonFallback();
         selectedIndex = clickedIndex;
         openCurrentSelection();
         return;
       }
-    } else if (TouchHitTest::isForwardSwipe(dashboardTouch)) {
-      mappedInput.suppressTouchButtonFallback();
-      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);
-      requestUpdate();
-      return;
-    } else if (TouchHitTest::isBackwardSwipe(dashboardTouch)) {
-      mappedInput.suppressTouchButtonFallback();
-      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, kItemCount);
-      requestUpdate();
-      return;
+    } else {
+      const auto gestureAction = TouchHitTest::listGestureActionForTouch(touchEvent);
+      if (gestureAction == TouchHitTest::ListGestureAction::NextItem) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);
+        requestUpdate();
+        return;
+      }
+      if (gestureAction == TouchHitTest::ListGestureAction::PreviousItem) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = ButtonNavigator::previousIndex(selectedIndex, kItemCount);
+        requestUpdate();
+        return;
+      }
     }
   }
 

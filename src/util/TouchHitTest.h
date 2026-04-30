@@ -8,6 +8,7 @@
 namespace TouchHitTest {
 
 enum class ReaderAction { None, PreviousPage, NextPage, Menu };
+enum class ListGestureAction { None, PreviousItem, NextItem };
 
 inline bool pointInRect(uint16_t x, uint16_t y, const Rect& rect) {
   if (rect.width <= 0 || rect.height <= 0) {
@@ -70,6 +71,20 @@ inline bool isForwardSwipe(const InputTouchEvent& event) {
 
 inline bool isBackwardSwipe(const InputTouchEvent& event) {
   return event.type == InputTouchEvent::Type::SwipeDown || event.type == InputTouchEvent::Type::SwipeRight;
+}
+
+inline bool isUpSwipe(const InputTouchEvent& event) { return event.type == InputTouchEvent::Type::SwipeUp; }
+
+inline bool isDownSwipe(const InputTouchEvent& event) { return event.type == InputTouchEvent::Type::SwipeDown; }
+
+inline ListGestureAction listGestureActionForTouch(const InputTouchEvent& event) {
+  if (isUpSwipe(event)) {
+    return ListGestureAction::PreviousItem;
+  }
+  if (isDownSwipe(event)) {
+    return ListGestureAction::NextItem;
+  }
+  return ListGestureAction::None;
 }
 
 inline InputTouchEvent::Type transformSwipeForOrientation(InputTouchEvent::Type type,
