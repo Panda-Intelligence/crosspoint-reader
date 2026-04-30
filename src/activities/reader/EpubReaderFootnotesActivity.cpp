@@ -8,6 +8,24 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
+
+namespace {
+constexpr int kFootnoteStartY = 60;
+constexpr int kFootnoteLineHeight = 36;
+
+Rect footnoteContentRect(const GfxRenderer& renderer) {
+  const auto orientation = renderer.getOrientation();
+  const bool isLandscapeCw = orientation == GfxRenderer::Orientation::LandscapeClockwise;
+  const bool isLandscapeCcw = orientation == GfxRenderer::Orientation::LandscapeCounterClockwise;
+  const bool isPortraitInverted = orientation == GfxRenderer::Orientation::PortraitInverted;
+  const int hintGutterWidth = (isLandscapeCw || isLandscapeCcw) ? 30 : 0;
+  const int contentX = isLandscapeCw ? hintGutterWidth : 0;
+  const int hintGutterHeight = isPortraitInverted ? 50 : 0;
+  return Rect{contentX, hintGutterHeight, renderer.getScreenWidth() - hintGutterWidth,
+              renderer.getScreenHeight() - hintGutterHeight};
+}
+}  // namespace
 
 void EpubReaderFootnotesActivity::onEnter() {
   Activity::onEnter();
@@ -17,7 +35,46 @@ void EpubReaderFootnotesActivity::onEnter() {
 
 void EpubReaderFootnotesActivity::onExit() { Activity::onExit(); }
 
+void EpubReaderFootnotesActivity::openSelectedFootnote() {
+  if (selectedIndex >= 0 && selectedIndex < static_cast<int>(footnotes.size())) {
+    setResult(FootnoteResult{footnotes[selectedIndex].href});
+    finish();
+  }
+}
+
 void EpubReaderFootnotesActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && !footnotes.empty() && touchEvent.isTap()) {
+      const Rect contentRect = footnoteContentRect(renderer);
+      const int visibleCount = std::max(1, contentRect.height / kFootnoteLineHeight);
+      const Rect listRect{contentRect.x, contentRect.y + kFootnoteStartY, contentRect.width,
+                          contentRect.height - kFootnoteStartY};
+      const int clickedRow =
+          TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, listRect)
+              ? (touchEvent.y - listRect.y) / kFootnoteLineHeight
+              : -1;
+      const int clickedIndex = clickedRow >= 0 && clickedRow < visibleCount ? scrollOffset + clickedRow : -1;
+      if (clickedIndex >= 0 && clickedIndex < static_cast<int>(footnotes.size())) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = clickedIndex;
+        openSelectedFootnote();
+        return;
+      }
+    } else if (!buttonHintTap && !footnotes.empty() && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, static_cast<int>(footnotes.size()));
+      requestUpdate();
+      return;
+    } else if (!buttonHintTap && !footnotes.empty() && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, static_cast<int>(footnotes.size()));
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     ActivityResult result;
     result.isCancelled = true;
@@ -27,10 +84,7 @@ void EpubReaderFootnotesActivity::loop() {
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    if (selectedIndex >= 0 && selectedIndex < static_cast<int>(footnotes.size())) {
-      setResult(FootnoteResult{footnotes[selectedIndex].href});
-      finish();
-    }
+    openSelectedFootnote();
     return;
   }
 
@@ -79,20 +133,19 @@ void EpubReaderFootnotesActivity::render(RenderLock&&) {
     return;
   }
 
-  constexpr int lineHeight = 36;
   const int screenWidth = renderer.getScreenWidth();
   const int marginLeft = contentX + 20;
 
-  const int visibleCount = std::max(1, (renderer.getScreenHeight() - contentY) / lineHeight);
+  const int visibleCount = std::max(1, (renderer.getScreenHeight() - contentY) / kFootnoteLineHeight);
   if (selectedIndex < scrollOffset) scrollOffset = selectedIndex;
   if (selectedIndex >= scrollOffset + visibleCount) scrollOffset = selectedIndex - visibleCount + 1;
 
   for (int i = scrollOffset; i < static_cast<int>(footnotes.size()) && i < scrollOffset + visibleCount; i++) {
-    const int y = 60 + contentY + (i - scrollOffset) * lineHeight;
+    const int y = kFootnoteStartY + contentY + (i - scrollOffset) * kFootnoteLineHeight;
     const bool isSelected = (i == selectedIndex);
 
     if (isSelected) {
-      renderer.fillRect(0, y, screenWidth, lineHeight, true);
+      renderer.fillRect(0, y, screenWidth, kFootnoteLineHeight, true);
     }
 
     // Show footnote number and abbreviated href

@@ -6,6 +6,24 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
+
+namespace {
+constexpr int kMenuStartY = 75;
+constexpr int kMenuLineHeight = 30;
+
+Rect menuContentRect(const GfxRenderer& renderer) {
+  const auto orientation = renderer.getOrientation();
+  const bool isLandscapeCw = orientation == GfxRenderer::Orientation::LandscapeClockwise;
+  const bool isLandscapeCcw = orientation == GfxRenderer::Orientation::LandscapeCounterClockwise;
+  const bool isPortraitInverted = orientation == GfxRenderer::Orientation::PortraitInverted;
+  const int hintGutterWidth = (isLandscapeCw || isLandscapeCcw) ? 30 : 0;
+  const int contentX = isLandscapeCw ? hintGutterWidth : 0;
+  const int hintGutterHeight = isPortraitInverted ? 50 : 0;
+  return Rect{contentX, hintGutterHeight, renderer.getScreenWidth() - hintGutterWidth,
+              renderer.getScreenHeight() - hintGutterHeight};
+}
+}  // namespace
 
 EpubReaderMenuActivity::EpubReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
                                                const std::string& title, const int currentPage, const int totalPages,
@@ -44,7 +62,55 @@ void EpubReaderMenuActivity::onEnter() {
 
 void EpubReaderMenuActivity::onExit() { Activity::onExit(); }
 
+void EpubReaderMenuActivity::selectCurrentItem() {
+  const auto selectedAction = menuItems[selectedIndex].action;
+  if (selectedAction == MenuAction::ROTATE_SCREEN) {
+    // Cycle orientation preview locally; actual rotation happens on menu exit.
+    pendingOrientation = (pendingOrientation + 1) % orientationLabels.size();
+    requestUpdate();
+    return;
+  }
+
+  if (selectedAction == MenuAction::AUTO_PAGE_TURN) {
+    selectedPageTurnOption = (selectedPageTurnOption + 1) % pageTurnLabels.size();
+    requestUpdate();
+    return;
+  }
+
+  setResult(MenuResult{static_cast<int>(selectedAction), pendingOrientation, selectedPageTurnOption});
+  finish();
+}
+
 void EpubReaderMenuActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && touchEvent.isTap()) {
+      const Rect contentRect = menuContentRect(renderer);
+      const Rect listRect{contentRect.x, contentRect.y + kMenuStartY, contentRect.width,
+                          contentRect.height - kMenuStartY};
+      const int clickedIndex = TouchHitTest::listItemAt(listRect, kMenuLineHeight, selectedIndex,
+                                                        static_cast<int>(menuItems.size()), touchEvent.x,
+                                                        touchEvent.y);
+      if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = clickedIndex;
+        selectCurrentItem();
+        return;
+      }
+    } else if (!buttonHintTap && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, static_cast<int>(menuItems.size()));
+      requestUpdate();
+      return;
+    } else if (!buttonHintTap && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, static_cast<int>(menuItems.size()));
+      requestUpdate();
+      return;
+    }
+  }
+
   // Handle navigation
   buttonNavigator.onNext([this] {
     selectedIndex = ButtonNavigator::nextIndex(selectedIndex, static_cast<int>(menuItems.size()));
@@ -57,22 +123,7 @@ void EpubReaderMenuActivity::loop() {
   });
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    const auto selectedAction = menuItems[selectedIndex].action;
-    if (selectedAction == MenuAction::ROTATE_SCREEN) {
-      // Cycle orientation preview locally; actual rotation happens on menu exit.
-      pendingOrientation = (pendingOrientation + 1) % orientationLabels.size();
-      requestUpdate();
-      return;
-    }
-
-    if (selectedAction == MenuAction::AUTO_PAGE_TURN) {
-      selectedPageTurnOption = (selectedPageTurnOption + 1) % pageTurnLabels.size();
-      requestUpdate();
-      return;
-    }
-
-    setResult(MenuResult{static_cast<int>(selectedAction), pendingOrientation, selectedPageTurnOption});
-    finish();
+    selectCurrentItem();
     return;
   } else if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     ActivityResult result;
@@ -120,16 +171,15 @@ void EpubReaderMenuActivity::render(RenderLock&&) {
   renderer.drawCenteredText(UI_10_FONT_ID, 45, progressLine.c_str());
 
   // Menu Items
-  const int startY = 75 + contentY;
-  constexpr int lineHeight = 30;
+  const int startY = kMenuStartY + contentY;
 
   for (size_t i = 0; i < menuItems.size(); ++i) {
-    const int displayY = startY + (i * lineHeight);
+    const int displayY = startY + (i * kMenuLineHeight);
     const bool isSelected = (static_cast<int>(i) == selectedIndex);
 
     if (isSelected) {
       // Highlight only the content area so we don't paint over hint gutters.
-      renderer.fillRect(contentX, displayY, contentWidth - 1, lineHeight, true);
+      renderer.fillRect(contentX, displayY, contentWidth - 1, kMenuLineHeight, true);
     }
 
     renderer.drawText(UI_10_FONT_ID, contentX + 20, displayY, I18N.get(menuItems[i].labelId), !isSelected);

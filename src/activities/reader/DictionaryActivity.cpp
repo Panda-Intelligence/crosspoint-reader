@@ -6,6 +6,7 @@
 
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 struct DictionaryEntry {
@@ -20,6 +21,19 @@ constexpr std::array<DictionaryEntry, 5> kEntries = {{
     {"gregarious", "Fond of company; sociable"},
     {"pedagogue", "A strict or formal teacher"},
 }};
+
+Rect dictionaryListRect(const GfxRenderer& renderer) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  return Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, renderer.getScreenWidth(),
+              renderer.getScreenHeight() -
+                  (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
+                   metrics.verticalSpacing * 2)};
+}
+
+void toggleDictionaryDetail(bool& showingDetail, Activity& activity) {
+  showingDetail = !showingDetail;
+  activity.requestUpdate();
+}
 }  // namespace
 
 void DictionaryActivity::onEnter() {
@@ -30,6 +44,41 @@ void DictionaryActivity::onEnter() {
 }
 
 void DictionaryActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && !showingDetail && touchEvent.isTap()) {
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int clickedIndex =
+          TouchHitTest::listItemAt(dictionaryListRect(renderer), metrics.listWithSubtitleRowHeight, selectedIndex,
+                                   static_cast<int>(kEntries.size()), touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = clickedIndex;
+        toggleDictionaryDetail(showingDetail, *this);
+        return;
+      }
+    } else if (!buttonHintTap && !showingDetail && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, static_cast<int>(kEntries.size()));
+      requestUpdate();
+      return;
+    } else if (!buttonHintTap && !showingDetail && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, static_cast<int>(kEntries.size()));
+      requestUpdate();
+      return;
+    } else if (!buttonHintTap && showingDetail && touchEvent.isTap() &&
+               TouchHitTest::pointInRect(touchEvent.x, touchEvent.y,
+                                         Rect{0, 0, renderer.getScreenWidth(),
+                                              renderer.getScreenHeight() -
+                                                  UITheme::getInstance().getMetrics().buttonHintsHeight})) {
+      mappedInput.suppressTouchButtonFallback();
+      toggleDictionaryDetail(showingDetail, *this);
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     if (showingDetail) {
       showingDetail = false;
@@ -53,8 +102,7 @@ void DictionaryActivity::loop() {
   }
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-    showingDetail = !showingDetail;
-    requestUpdate();
+    toggleDictionaryDetail(showingDetail, *this);
   }
 }
 
@@ -69,10 +117,7 @@ void DictionaryActivity::render(RenderLock&&) {
 
   if (!showingDetail) {
     GUI.drawList(
-        renderer,
-        Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, pageWidth,
-             pageHeight - (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
-                           metrics.verticalSpacing * 2)},
+        renderer, dictionaryListRect(renderer),
         static_cast<int>(kEntries.size()), selectedIndex, [](int index) { return std::string(kEntries[index].word); },
         [](int index) { return std::string(kEntries[index].meaning); });
   } else {

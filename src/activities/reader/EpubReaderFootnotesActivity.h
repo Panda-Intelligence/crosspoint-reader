@@ -22,6 +22,8 @@ class EpubReaderFootnotesActivity final : public Activity {
   bool isReaderActivity() const override { return true; }
 
  private:
+  void openSelectedFootnote();
+
   const std::vector<FootnoteEntry>& footnotes;
   int selectedIndex = 0;
   int scrollOffset = 0;
