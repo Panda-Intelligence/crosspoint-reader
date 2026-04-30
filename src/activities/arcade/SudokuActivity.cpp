@@ -234,7 +234,7 @@ void SudokuActivity::render(RenderLock&&) {
 
       const uint8_t value = board[r][c];
       if (value != 0) {
-        char text[2] = {static_cast<char>('0' + value), '\0'};
+        const char text[2] = {static_cast<char>('0' + value), '\0'};
         const int textY = y + (cell / 2) - 8;
         if (conflict || cursor) {
           // Inverted text for cursor/conflict

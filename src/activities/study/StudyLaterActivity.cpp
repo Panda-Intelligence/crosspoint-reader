@@ -27,13 +27,8 @@ int StudyLaterActivity::itemCount() const {
   }
 
   const std::string activeDeck = decks[std::clamp(deckIndex, 0, static_cast<int>(decks.size()) - 1)];
-  int count = 0;
-  for (const auto& card : cards) {
-    if (card.deckName == activeDeck) {
-      count++;
-    }
-  }
-  return count;
+  return std::count_if(cards.begin(), cards.end(),
+                       [&activeDeck](const StudyQueuedCard& card) { return card.deckName == activeDeck; });
 }
 
 int StudyLaterActivity::deckCount() const {
@@ -99,7 +94,7 @@ void StudyLaterActivity::loop() {
         }
         if (STUDY_REVIEW_QUEUE.removeAt(StudyQueueKind::Later, selectedQueueIndex())) {
           const int count = itemCount();
-          selectedIndex = count <= 0 ? 0 : std::min(selectedIndex, count - 1);
+          selectedIndex = std::min(selectedIndex, std::max(0, count - 1));
           showingBack = false;
           requestUpdate();
           return;
@@ -173,11 +168,7 @@ void StudyLaterActivity::loop() {
 
     if (STUDY_REVIEW_QUEUE.removeAt(StudyQueueKind::Later, selectedQueueIndex())) {
       const int count = itemCount();
-      if (count <= 0) {
-        selectedIndex = 0;
-      } else {
-        selectedIndex = std::min(selectedIndex, count - 1);
-      }
+      selectedIndex = std::min(selectedIndex, std::max(0, count - 1));
       showingBack = false;
       requestUpdate();
     }

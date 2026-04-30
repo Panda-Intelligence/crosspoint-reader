@@ -16,13 +16,13 @@ struct ChallengeRow {
   bool completed;
 };
 
-void drawMetricCard(GfxRenderer& renderer, int x, int y, int w, int h, const char* label, const char* value) {
+void drawMetricCard(const GfxRenderer& renderer, int x, int y, int w, int h, const char* label, const char* value) {
   renderer.drawRoundedRect(x, y, w, h, 1, 8, true);
   renderer.drawText(SMALL_FONT_ID, x + 12, y + 8, label);
   renderer.drawText(UI_10_FONT_ID, x + 12, y + h - 24, value, true, EpdFontFamily::BOLD);
 }
 
-void drawChallengeRow(GfxRenderer& renderer, int x, int y, int w, const ChallengeRow& row) {
+void drawChallengeRow(const GfxRenderer& renderer, int x, int y, int w, const ChallengeRow& row) {
   renderer.drawRoundedRect(x, y, w, 44, 1, 8, true);
   renderer.drawText(UI_10_FONT_ID, x + 14, y + 8, row.title, true, EpdFontFamily::BOLD);
   renderer.drawText(SMALL_FONT_ID, x + 14, y + 24, row.detail);

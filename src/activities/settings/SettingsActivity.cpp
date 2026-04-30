@@ -105,12 +105,8 @@ void SettingsActivity::onEnter() {
   systemSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
 #if MOFEI_APP
-  if (!readerSettings.empty()) {
-    readerSettings.insert(readerSettings.begin() + 1,
-                          SettingInfo::Action(StrId::STR_TC_FONT_PACKS, SettingAction::TraditionalChineseFonts));
-  } else {
-    readerSettings.push_back(SettingInfo::Action(StrId::STR_TC_FONT_PACKS, SettingAction::TraditionalChineseFonts));
-  }
+  readerSettings.insert(readerSettings.begin() + 1,
+                        SettingInfo::Action(StrId::STR_TC_FONT_PACKS, SettingAction::TraditionalChineseFonts));
 #endif
 
   // Reset selection to first category

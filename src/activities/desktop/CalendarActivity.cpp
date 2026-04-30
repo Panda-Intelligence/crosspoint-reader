@@ -23,7 +23,7 @@ const char* weekdayFull(int weekday) {
   return kFull[std::clamp(weekday, 0, 6)];
 }
 
-void drawLine(GfxRenderer& renderer, int x, int y, const char* text, bool bold = false) {
+void drawLine(const GfxRenderer& renderer, int x, int y, const char* text, bool bold = false) {
   renderer.drawText(UI_10_FONT_ID, x, y, text, true, bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
 }
 

@@ -19,7 +19,7 @@ namespace {
 constexpr int kActionCount = 4;
 constexpr const char* kActions[kActionCount] = {"Know", "Again", "Later", "Save"};
 
-void drawProgressBar(GfxRenderer& renderer, int x, int y, int width, int height, int percent) {
+void drawProgressBar(const GfxRenderer& renderer, int x, int y, int width, int height, int percent) {
   const int r = height / 2;
   renderer.drawRoundedRect(x, y, width, height, 1, r, true);
   const int fillWidth = (width - 2) * std::clamp(percent, 0, 100) / 100;
@@ -28,7 +28,7 @@ void drawProgressBar(GfxRenderer& renderer, int x, int y, int width, int height,
   }
 }
 
-void drawActionButton(GfxRenderer& renderer, int x, int y, int w, int h, const char* label, bool selected) {
+void drawActionButton(const GfxRenderer& renderer, int x, int y, int w, int h, const char* label, bool selected) {
   if (selected) {
     renderer.fillRoundedRect(x, y, w, h, 8, Color::Black);
   } else {
@@ -41,7 +41,7 @@ void drawActionButton(GfxRenderer& renderer, int x, int y, int w, int h, const c
                     selected ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
 }
 
-std::string truncatedLine(GfxRenderer& renderer, int fontId, const std::string& text, int maxWidth,
+std::string truncatedLine(const GfxRenderer& renderer, int fontId, const std::string& text, int maxWidth,
                           EpdFontFamily::Style style = EpdFontFamily::REGULAR) {
   return renderer.truncatedText(fontId, text.c_str(), maxWidth, style);
 }

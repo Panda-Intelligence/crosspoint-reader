@@ -67,12 +67,12 @@ void DeckImportStatusActivity::loop() {
         requestUpdate();
         return;
       }
-    } else if (!deckEntries.empty() && TouchHitTest::isForwardSwipe(touchEvent)) {
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
       mappedInput.suppressTouchButtonFallback();
       selectedIndex = ButtonNavigator::nextIndex(selectedIndex, static_cast<int>(deckEntries.size()));
       requestUpdate();
       return;
-    } else if (!deckEntries.empty() && TouchHitTest::isBackwardSwipe(touchEvent)) {
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
       mappedInput.suppressTouchButtonFallback();
       selectedIndex = ButtonNavigator::previousIndex(selectedIndex, static_cast<int>(deckEntries.size()));
       requestUpdate();

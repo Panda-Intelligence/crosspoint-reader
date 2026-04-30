@@ -23,7 +23,7 @@ const char* modeLabel(const StudyQuizActivity::QuizMode mode) {
   }
 }
 
-void drawOptionButton(GfxRenderer& renderer, int x, int y, int w, int h, const std::string& text, bool selected,
+void drawOptionButton(const GfxRenderer& renderer, int x, int y, int w, int h, const std::string& text, bool selected,
                       bool reveal, bool correct) {
   if (reveal && correct) {
     renderer.fillRoundedRect(x, y, w, h, 8, Color::Black);

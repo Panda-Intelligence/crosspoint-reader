@@ -25,7 +25,7 @@ void ReadLaterStore::refresh() {
   for (const auto& file : files) {
     std::string name = file.c_str();
     if (name.empty()) continue;
-    if (!name.empty() && name.back() == '/') continue;
+    if (name.back() == '/') continue;
 
     std::string path = std::string(READ_LATER_DIR) + "/" + name;
     size_t bytes = 0;

@@ -17,7 +17,7 @@ namespace {
 constexpr int kActionCount = 2;
 constexpr const char* kActions[kActionCount] = {"Know", "Again"};
 
-void drawActionButton(GfxRenderer& renderer, int x, int y, int w, int h, const char* label, bool selected) {
+void drawActionButton(const GfxRenderer& renderer, int x, int y, int w, int h, const char* label, bool selected) {
   if (selected) {
     renderer.fillRoundedRect(x, y, w, h, 8, Color::Black);
   } else {

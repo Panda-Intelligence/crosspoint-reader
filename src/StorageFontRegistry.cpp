@@ -3,6 +3,7 @@
 #include <HalStorage.h>
 #include <Logging.h>
 
+#include <algorithm>
 #include <cstring>
 
 #include "CrossPointSettings.h"
@@ -188,6 +189,13 @@ bool StorageFontPack::load(const char* path) {
     return false;
   }
 
+  if (header.flags != 0 ||
+      std::any_of(std::begin(header.reserved), std::end(header.reserved), [](const uint8_t value) {
+        return value != 0;
+      })) {
+    LOG_DBG("TCFONT", "Ignoring reserved font pack header bits: %s", path);
+  }
+
   bitmap_.resize(header.bitmapSize);
   if (header.bitmapSize > 0 &&
       file.read(bitmap_.data(), header.bitmapSize) != static_cast<int>(header.bitmapSize)) {
@@ -219,6 +227,9 @@ bool StorageFontPack::load(const char* path) {
 
   groups_.resize(rawGroups.size());
   for (size_t i = 0; i < rawGroups.size(); i++) {
+    if (rawGroups[i].reserved != 0) {
+      LOG_DBG("TCFONT", "Ignoring reserved font pack group bits: %s", path);
+    }
     groups_[i] = {rawGroups[i].compressedOffset, rawGroups[i].compressedSize, rawGroups[i].uncompressedSize,
                   rawGroups[i].glyphCount, rawGroups[i].firstGlyphIndex};
   }
@@ -260,21 +271,19 @@ const std::array<TraditionalChineseFontFaceInfo, 16>& getTraditionalChineseFontF
 }
 
 const TraditionalChineseFontPackInfo* getTraditionalChineseFontPack(uint8_t fontSize) {
-  for (const auto& pack : kTraditionalChineseFontPacks) {
-    if (pack.size == fontSize) {
-      return &pack;
-    }
-  }
-  return nullptr;
+  const auto it = std::find_if(kTraditionalChineseFontPacks.begin(), kTraditionalChineseFontPacks.end(),
+                               [fontSize](const TraditionalChineseFontPackInfo& pack) {
+                                 return pack.size == fontSize;
+                               });
+  return it == kTraditionalChineseFontPacks.end() ? nullptr : &*it;
 }
 
 const TraditionalChineseFontFaceInfo* getTraditionalChineseFontFace(uint8_t fontSize, EpdFontFamily::Style style) {
-  for (const auto& face : kTraditionalChineseFontFaces) {
-    if (face.size == fontSize && face.style == style) {
-      return &face;
-    }
-  }
-  return nullptr;
+  const auto it = std::find_if(kTraditionalChineseFontFaces.begin(), kTraditionalChineseFontFaces.end(),
+                               [fontSize, style](const TraditionalChineseFontFaceInfo& face) {
+                                 return face.size == fontSize && face.style == style;
+                               });
+  return it == kTraditionalChineseFontFaces.end() ? nullptr : &*it;
 }
 
 bool loadTraditionalChineseFonts(GfxRenderer& renderer) {
@@ -326,10 +335,11 @@ bool isTraditionalChineseFontFaceInstalled(uint8_t fontSize, EpdFontFamily::Styl
 }
 
 bool isTraditionalChineseFontLoaded(uint8_t fontSize) {
-  for (const auto& runtime : kPackRuntimes) {
-    if (runtime.info->size == fontSize) return runtime.family->loaded;
-  }
-  return false;
+  const auto it = std::find_if(kPackRuntimes.begin(), kPackRuntimes.end(),
+                               [fontSize](const PackRuntime& runtime) {
+                                 return runtime.info->size == fontSize;
+                               });
+  return it != kPackRuntimes.end() && (*it).family->loaded;
 }
 
 bool isTraditionalChineseFontFaceLoaded(uint8_t fontSize, EpdFontFamily::Style style) {
@@ -352,33 +362,22 @@ bool isTraditionalChineseFontFaceLoaded(uint8_t fontSize, EpdFontFamily::Style s
 }
 
 size_t countLoadedTraditionalChineseFonts() {
-  size_t count = 0;
-  for (const auto& runtime : kPackRuntimes) {
-    if (runtime.family->loaded) {
-      count++;
-    }
-  }
-  return count;
+  return std::count_if(kPackRuntimes.begin(), kPackRuntimes.end(),
+                       [](const PackRuntime& runtime) { return runtime.family->loaded; });
 }
 
 size_t countInstalledTraditionalChineseStyles(uint8_t fontSize) {
-  size_t count = 0;
-  for (const auto& face : kTraditionalChineseFontFaces) {
-    if (face.size == fontSize && Storage.exists(face.path)) {
-      count++;
-    }
-  }
-  return count;
+  return std::count_if(kTraditionalChineseFontFaces.begin(), kTraditionalChineseFontFaces.end(),
+                       [fontSize](const TraditionalChineseFontFaceInfo& face) {
+                         return face.size == fontSize && Storage.exists(face.path);
+                       });
 }
 
 size_t countLoadedTraditionalChineseStyles(uint8_t fontSize) {
-  size_t count = 0;
-  for (const auto& face : kTraditionalChineseFontFaces) {
-    if (face.size == fontSize && isTraditionalChineseFontFaceLoaded(fontSize, face.style)) {
-      count++;
-    }
-  }
-  return count;
+  return std::count_if(kTraditionalChineseFontFaces.begin(), kTraditionalChineseFontFaces.end(),
+                       [fontSize](const TraditionalChineseFontFaceInfo& face) {
+                         return face.size == fontSize && isTraditionalChineseFontFaceLoaded(fontSize, face.style);
+                       });
 }
 
 }  // namespace StorageFontRegistry

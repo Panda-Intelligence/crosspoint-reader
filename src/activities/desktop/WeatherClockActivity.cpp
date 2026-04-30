@@ -13,12 +13,12 @@
 namespace {
 constexpr int kPageCount = 3;
 
-void drawBulletLine(GfxRenderer& renderer, int x, int y, int bulletR, const char* text) {
+void drawBulletLine(const GfxRenderer& renderer, int x, int y, int bulletR, const char* text) {
   renderer.fillRoundedRect(x, y + 3, bulletR * 2, bulletR * 2, bulletR, Color::Black);
   renderer.drawText(SMALL_FONT_ID, x + bulletR * 2 + 6, y, text);
 }
 
-void drawMetricCard(GfxRenderer& renderer, int x, int y, int w, int h, const char* label, const char* value) {
+void drawMetricCard(const GfxRenderer& renderer, int x, int y, int w, int h, const char* label, const char* value) {
   renderer.drawRoundedRect(x, y, w, h, 1, 8, true);
   const int lw = renderer.getTextWidth(SMALL_FONT_ID, label);
   renderer.drawText(SMALL_FONT_ID, x + (w - lw) / 2, y + 6, label);

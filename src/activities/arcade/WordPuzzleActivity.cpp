@@ -251,7 +251,7 @@ void WordPuzzleActivity::render(RenderLock&&) {
       renderer.fillRoundedRect(x + 3, y + 3, cell - 6, cell - 6, 6, fillColor);
       renderer.drawRoundedRect(x + 3, y + 3, cell - 6, cell - 6, cursorSelected ? 2 : 1, 6, true);
 
-      char text[2] = {board[row][col], '\0'};
+      const char text[2] = {board[row][col], '\0'};
       const int textWidth = renderer.getTextWidth(UI_12_FONT_ID, text, EpdFontFamily::BOLD);
       const int textHeight = renderer.getTextHeight(UI_12_FONT_ID);
       renderer.drawText(UI_12_FONT_ID, x + (cell - textWidth) / 2, y + (cell - textHeight) / 2 - 2, text, blackText,
