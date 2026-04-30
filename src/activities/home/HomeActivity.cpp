@@ -19,6 +19,7 @@
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 int HomeActivity::getMenuItemCount() const {
   int count = 4;  // File Browser, Recents, File transfer, Settings
@@ -174,6 +175,47 @@ void HomeActivity::freeCoverBuffer() {
 void HomeActivity::loop() {
   const int menuCount = getMenuItemCount();
 
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    mappedInput.suppressTouchButtonFallback();
+    const auto& metrics = UITheme::getInstance().getMetrics();
+    const int recentCount = static_cast<int>(recentBooks.size());
+    if (touchEvent.isTap()) {
+      const Rect recentRect{0, metrics.homeTopPadding, renderer.getScreenWidth(), metrics.homeCoverTileHeight};
+      const int visibleRecentCount = std::min(recentCount, metrics.homeRecentBooksCount);
+      if (visibleRecentCount > 0 && TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, recentRect)) {
+        int clickedRecent = (touchEvent.x * visibleRecentCount) / std::max(1, recentRect.width);
+        if (clickedRecent >= visibleRecentCount) {
+          clickedRecent = visibleRecentCount - 1;
+        }
+        selectorIndex = clickedRecent;
+        openCurrentSelection();
+        return;
+      }
+
+      const int menuItemCount = menuCount - recentCount;
+      const int menuTop = metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.verticalSpacing;
+      for (int i = 0; i < menuItemCount; ++i) {
+        const int tileY = menuTop + i * (metrics.menuRowHeight + metrics.menuSpacing);
+        const Rect tileRect{metrics.contentSidePadding, tileY, renderer.getScreenWidth() - metrics.contentSidePadding * 2,
+                            metrics.menuRowHeight};
+        if (TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, tileRect)) {
+          selectorIndex = recentCount + i;
+          openCurrentSelection();
+          return;
+        }
+      }
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
+      selectorIndex = ButtonNavigator::nextIndex(selectorIndex, menuCount);
+      requestUpdate();
+      return;
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
+      selectorIndex = ButtonNavigator::previousIndex(selectorIndex, menuCount);
+      requestUpdate();
+      return;
+    }
+  }
+
   buttonNavigator.onNext([this, menuCount] {
     selectorIndex = ButtonNavigator::nextIndex(selectorIndex, menuCount);
     requestUpdate();
@@ -185,28 +227,7 @@ void HomeActivity::loop() {
   });
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    // Calculate dynamic indices based on which options are available
-    int idx = 0;
-    int menuSelectedIndex = selectorIndex - static_cast<int>(recentBooks.size());
-    const int fileBrowserIdx = idx++;
-    const int recentsIdx = idx++;
-    const int opdsLibraryIdx = hasOpdsServers ? idx++ : -1;
-    const int fileTransferIdx = idx++;
-    const int settingsIdx = idx;
-
-    if (selectorIndex < recentBooks.size()) {
-      onSelectBook(recentBooks[selectorIndex].path);
-    } else if (menuSelectedIndex == fileBrowserIdx) {
-      onFileBrowserOpen();
-    } else if (menuSelectedIndex == recentsIdx) {
-      onRecentsOpen();
-    } else if (menuSelectedIndex == opdsLibraryIdx) {
-      onOpdsBrowserOpen();
-    } else if (menuSelectedIndex == fileTransferIdx) {
-      onFileTransferOpen();
-    } else if (menuSelectedIndex == settingsIdx) {
-      onSettingsOpen();
-    }
+    openCurrentSelection();
   }
 }
 
@@ -258,6 +279,31 @@ void HomeActivity::render(RenderLock&&) {
 }
 
 void HomeActivity::onSelectBook(const std::string& path) { activityManager.goToReader(path); }
+
+void HomeActivity::openCurrentSelection() {
+  // Calculate dynamic indices based on which options are available.
+  int idx = 0;
+  int menuSelectedIndex = selectorIndex - static_cast<int>(recentBooks.size());
+  const int fileBrowserIdx = idx++;
+  const int recentsIdx = idx++;
+  const int opdsLibraryIdx = hasOpdsServers ? idx++ : -1;
+  const int fileTransferIdx = idx++;
+  const int settingsIdx = idx;
+
+  if (selectorIndex < static_cast<int>(recentBooks.size())) {
+    onSelectBook(recentBooks[selectorIndex].path);
+  } else if (menuSelectedIndex == fileBrowserIdx) {
+    onFileBrowserOpen();
+  } else if (menuSelectedIndex == recentsIdx) {
+    onRecentsOpen();
+  } else if (menuSelectedIndex == opdsLibraryIdx) {
+    onOpdsBrowserOpen();
+  } else if (menuSelectedIndex == fileTransferIdx) {
+    onFileTransferOpen();
+  } else if (menuSelectedIndex == settingsIdx) {
+    onSettingsOpen();
+  }
+}
 
 void HomeActivity::onFileBrowserOpen() { activityManager.goToFileBrowser(); }
 

@@ -13,6 +13,7 @@
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 CrossPointPosition makeLocalPositionWithParagraph(const int spineIndex, const int page, const int totalPages,
@@ -360,6 +361,63 @@ void KOReaderSyncActivity::render(RenderLock&&) {
 }
 
 void KOReaderSyncActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+
+    if (state == NO_CREDENTIALS || state == SYNC_FAILED || state == UPLOAD_COMPLETE) {
+      if (!buttonHintTap && (touchEvent.isTap() || TouchHitTest::isBackwardSwipe(touchEvent))) {
+        mappedInput.suppressTouchButtonFallback();
+        ActivityResult result;
+        result.isCancelled = true;
+        setResult(std::move(result));
+        finish();
+        return;
+      }
+    } else if (state == SHOWING_RESULT) {
+      if (!buttonHintTap && touchEvent.isTap()) {
+        const Rect applyRect{0, 348, renderer.getScreenWidth(), 30};
+        const Rect uploadRect{0, 378, renderer.getScreenWidth(), 30};
+        if (TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, applyRect) ||
+            TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, uploadRect)) {
+          mappedInput.suppressTouchButtonFallback();
+          selectedOption = TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, applyRect) ? 0 : 1;
+          if (selectedOption == 0) {
+            setResult(SyncResult{remotePosition.spineIndex, remotePosition.pageNumber});
+            finish();
+          } else {
+            performUpload();
+          }
+          return;
+        }
+      } else if (!buttonHintTap &&
+                 (touchEvent.type == InputTouchEvent::Type::SwipeUp ||
+                  touchEvent.type == InputTouchEvent::Type::SwipeDown ||
+                  touchEvent.type == InputTouchEvent::Type::SwipeLeft ||
+                  touchEvent.type == InputTouchEvent::Type::SwipeRight)) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedOption = (selectedOption + 1) % 2;
+        requestUpdate();
+        return;
+      }
+      if (!buttonHintTap) {
+        mappedInput.suppressTouchButtonFallback();
+      }
+    } else if (state == NO_REMOTE_PROGRESS) {
+      if (!buttonHintTap && TouchHitTest::isBackwardSwipe(touchEvent)) {
+        mappedInput.suppressTouchButtonFallback();
+        ActivityResult result;
+        result.isCancelled = true;
+        setResult(std::move(result));
+        finish();
+        return;
+      }
+      if (!buttonHintTap) {
+        mappedInput.suppressTouchButtonFallback();
+      }
+    }
+  }
+
   if (state == NO_CREDENTIALS || state == SYNC_FAILED || state == UPLOAD_COMPLETE) {
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
       ActivityResult result;
