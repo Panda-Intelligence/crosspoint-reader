@@ -5,6 +5,7 @@
 #include "ReadLaterStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 std::string ReadLaterActivity::sizeLabel(const size_t bytes) const {
   if (bytes < 1024) {
@@ -23,13 +24,57 @@ void ReadLaterActivity::onEnter() {
   requestUpdate();
 }
 
+void ReadLaterActivity::openCurrentSelectionOrRefresh() {
+  if (!READ_LATER_STORE.getItems().empty()) {
+    activityManager.goToReader(READ_LATER_STORE.getItems()[selectedIndex].path);
+  } else {
+    READ_LATER_STORE.refresh();
+    selectedIndex = 0;
+    requestUpdate();
+  }
+}
+
 void ReadLaterActivity::loop() {
+  const int itemCount = static_cast<int>(READ_LATER_STORE.getItems().size());
+  const auto& metrics = UITheme::getInstance().getMetrics();
+
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    mappedInput.suppressTouchButtonFallback();
+    if (itemCount <= 0) {
+      if (touchEvent.isTap()) {
+        openCurrentSelectionOrRefresh();
+      }
+      return;
+    }
+
+    if (touchEvent.isTap()) {
+      const Rect listRect{
+          0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, renderer.getScreenWidth(),
+          renderer.getScreenHeight() -
+              (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)};
+      const int clickedIndex = TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex,
+                                                        itemCount, touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        selectedIndex = clickedIndex;
+        openCurrentSelectionOrRefresh();
+        return;
+      }
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
+      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, itemCount);
+      requestUpdate();
+      return;
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
+      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, itemCount);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;
   }
-
-  const int itemCount = static_cast<int>(READ_LATER_STORE.getItems().size());
 
   if (itemCount > 0) {
     buttonNavigator.onNextRelease([this, itemCount] {
@@ -44,13 +89,7 @@ void ReadLaterActivity::loop() {
   }
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-    if (!READ_LATER_STORE.getItems().empty()) {
-      activityManager.goToReader(READ_LATER_STORE.getItems()[selectedIndex].path);
-    } else {
-      READ_LATER_STORE.refresh();
-      selectedIndex = 0;
-      requestUpdate();
-    }
+    openCurrentSelectionOrRefresh();
   }
 }
 

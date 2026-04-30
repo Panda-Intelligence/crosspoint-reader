@@ -15,6 +15,7 @@ class StudyHubActivity final : public Activity {
   bool hasStudyStateFile = false;
 
   void refreshImportStatus();
+  void openCurrentSelection();
 
  public:
   explicit StudyHubActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)

@@ -7,6 +7,7 @@
 #include "WeatherClockActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr int kItemCount = 3;
@@ -30,7 +31,51 @@ void DesktopHubActivity::onEnter() {
   requestUpdate();
 }
 
+void DesktopHubActivity::openCurrentSelection() {
+  switch (selectedIndex) {
+    case 0:
+      activityManager.replaceActivity(std::make_unique<WeatherClockActivity>(renderer, mappedInput));
+      break;
+    case 1:
+      activityManager.replaceActivity(std::make_unique<CalendarActivity>(renderer, mappedInput));
+      break;
+    case 2:
+      activityManager.replaceActivity(std::make_unique<ClockFocusActivity>(renderer, mappedInput));
+      break;
+    default:
+      requestUpdate();
+      break;
+  }
+}
+
 void DesktopHubActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    mappedInput.suppressTouchButtonFallback();
+    if (touchEvent.isTap()) {
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const Rect listRect{
+          0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, renderer.getScreenWidth(),
+          renderer.getScreenHeight() -
+              (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)};
+      const int clickedIndex = TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex,
+                                                        kItemCount, touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        selectedIndex = clickedIndex;
+        openCurrentSelection();
+        return;
+      }
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
+      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);
+      requestUpdate();
+      return;
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
+      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, kItemCount);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;
@@ -47,20 +92,7 @@ void DesktopHubActivity::loop() {
   });
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-    switch (selectedIndex) {
-      case 0:
-        activityManager.replaceActivity(std::make_unique<WeatherClockActivity>(renderer, mappedInput));
-        break;
-      case 1:
-        activityManager.replaceActivity(std::make_unique<CalendarActivity>(renderer, mappedInput));
-        break;
-      case 2:
-        activityManager.replaceActivity(std::make_unique<ClockFocusActivity>(renderer, mappedInput));
-        break;
-      default:
-        requestUpdate();
-        break;
-    }
+    openCurrentSelection();
   }
 }
 
@@ -75,8 +107,8 @@ void DesktopHubActivity::render(RenderLock&&) {
   GUI.drawList(
       renderer,
       Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, pageWidth,
-           pageHeight - (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
-                         metrics.verticalSpacing * 2)},
+           pageHeight -
+               (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)},
       kItemCount, selectedIndex, [](int index) { return std::string(itemLabel(index)); },
       [](int index) {
         switch (index) {

@@ -15,6 +15,7 @@
 #include "WordPuzzleActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 using GameEntry = ArcadeHubActivity::GameEntry;
@@ -43,7 +44,63 @@ void ArcadeHubActivity::onEnter() {
   requestUpdate();
 }
 
+void ArcadeHubActivity::openCurrentSelection() {
+  if (selectedIndex == 0) {
+    activityManager.replaceActivity(std::make_unique<Game2048Activity>(renderer, mappedInput));
+  } else if (selectedIndex == 1) {
+    activityManager.replaceActivity(std::make_unique<SudokuActivity>(renderer, mappedInput));
+  } else if (selectedIndex == 2) {
+    activityManager.replaceActivity(std::make_unique<SokobanActivity>(renderer, mappedInput));
+  } else if (selectedIndex == 3) {
+    activityManager.replaceActivity(std::make_unique<MemoryGameActivity>(renderer, mappedInput));
+  } else if (selectedIndex == 4) {
+    activityManager.replaceActivity(std::make_unique<WordPuzzleActivity>(renderer, mappedInput));
+  } else if (selectedIndex == 5) {
+    activityManager.replaceActivity(std::make_unique<DailyMazeActivity>(renderer, mappedInput));
+  } else if (selectedIndex == 6) {
+    activityManager.replaceActivity(std::make_unique<ArcadeChallengesActivity>(renderer, mappedInput));
+  } else {
+    showingDetail = true;
+    requestUpdate();
+  }
+}
+
 void ArcadeHubActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    mappedInput.suppressTouchButtonFallback();
+    if (showingDetail) {
+      if (touchEvent.isTap()) {
+        showingDetail = false;
+        requestUpdate();
+      }
+      return;
+    }
+
+    if (touchEvent.isTap()) {
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const Rect listRect{
+          0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, renderer.getScreenWidth(),
+          renderer.getScreenHeight() -
+              (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)};
+      const int clickedIndex = TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex,
+                                                        itemCount(), touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        selectedIndex = clickedIndex;
+        openCurrentSelection();
+        return;
+      }
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
+      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, itemCount());
+      requestUpdate();
+      return;
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
+      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, itemCount());
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     if (showingDetail) {
       showingDetail = false;
@@ -73,24 +130,7 @@ void ArcadeHubActivity::loop() {
   });
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-    if (selectedIndex == 0) {
-      activityManager.replaceActivity(std::make_unique<Game2048Activity>(renderer, mappedInput));
-    } else if (selectedIndex == 1) {
-      activityManager.replaceActivity(std::make_unique<SudokuActivity>(renderer, mappedInput));
-    } else if (selectedIndex == 2) {
-      activityManager.replaceActivity(std::make_unique<SokobanActivity>(renderer, mappedInput));
-    } else if (selectedIndex == 3) {
-      activityManager.replaceActivity(std::make_unique<MemoryGameActivity>(renderer, mappedInput));
-    } else if (selectedIndex == 4) {
-      activityManager.replaceActivity(std::make_unique<WordPuzzleActivity>(renderer, mappedInput));
-    } else if (selectedIndex == 5) {
-      activityManager.replaceActivity(std::make_unique<DailyMazeActivity>(renderer, mappedInput));
-    } else if (selectedIndex == 6) {
-      activityManager.replaceActivity(std::make_unique<ArcadeChallengesActivity>(renderer, mappedInput));
-    } else {
-      showingDetail = true;
-      requestUpdate();
-    }
+    openCurrentSelection();
   }
 }
 

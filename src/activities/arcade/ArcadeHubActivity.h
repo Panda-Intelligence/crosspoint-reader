@@ -23,6 +23,7 @@ class ArcadeHubActivity final : public Activity {
   int selectedIndex = 0;
   bool showingDetail = false;
 
+  void openCurrentSelection();
   static const GameEntry& entry(int index);
   static int itemCount();
 };

@@ -7,14 +7,15 @@
 #include "LearningReportActivity.h"
 #include "ReviewQueueActivity.h"
 #include "SavedCardsActivity.h"
-#include "StudyLaterActivity.h"
-#include "StudyRecoveryActivity.h"
-#include "StudyDeckStore.h"
-#include "StudyQuizActivity.h"
-#include "StudyReviewQueueStore.h"
 #include "StudyCardsTodayActivity.h"
+#include "StudyDeckStore.h"
+#include "StudyLaterActivity.h"
+#include "StudyQuizActivity.h"
+#include "StudyRecoveryActivity.h"
+#include "StudyReviewQueueStore.h"
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr int kItemCount = 8;
@@ -64,7 +65,64 @@ void StudyHubActivity::onEnter() {
   requestUpdate();
 }
 
+void StudyHubActivity::openCurrentSelection() {
+  switch (selectedIndex) {
+    case 0:
+      activityManager.replaceActivity(std::make_unique<StudyCardsTodayActivity>(renderer, mappedInput));
+      break;
+    case 1:
+      activityManager.replaceActivity(std::make_unique<StudyRecoveryActivity>(renderer, mappedInput));
+      break;
+    case 2:
+      activityManager.replaceActivity(std::make_unique<StudyQuizActivity>(renderer, mappedInput));
+      break;
+    case 3:
+      activityManager.replaceActivity(std::make_unique<StudyLaterActivity>(renderer, mappedInput));
+      break;
+    case 4:
+      activityManager.replaceActivity(std::make_unique<SavedCardsActivity>(renderer, mappedInput));
+      break;
+    case 5:
+      activityManager.replaceActivity(std::make_unique<LearningReportActivity>(renderer, mappedInput));
+      break;
+    case 6:
+      activityManager.replaceActivity(std::make_unique<ReviewQueueActivity>(renderer, mappedInput));
+      break;
+    case 7:
+    default:
+      activityManager.replaceActivity(std::make_unique<DeckImportStatusActivity>(renderer, mappedInput));
+      break;
+  }
+}
+
 void StudyHubActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    mappedInput.suppressTouchButtonFallback();
+    if (touchEvent.isTap()) {
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const Rect listRect{
+          0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, renderer.getScreenWidth(),
+          renderer.getScreenHeight() -
+              (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)};
+      const int clickedIndex = TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex,
+                                                        kItemCount, touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        selectedIndex = clickedIndex;
+        openCurrentSelection();
+        return;
+      }
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
+      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);
+      requestUpdate();
+      return;
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
+      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, kItemCount);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;
@@ -81,33 +139,7 @@ void StudyHubActivity::loop() {
   });
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
-    switch (selectedIndex) {
-      case 0:
-        activityManager.replaceActivity(std::make_unique<StudyCardsTodayActivity>(renderer, mappedInput));
-        break;
-      case 1:
-        activityManager.replaceActivity(std::make_unique<StudyRecoveryActivity>(renderer, mappedInput));
-        break;
-      case 2:
-        activityManager.replaceActivity(std::make_unique<StudyQuizActivity>(renderer, mappedInput));
-        break;
-      case 3:
-        activityManager.replaceActivity(std::make_unique<StudyLaterActivity>(renderer, mappedInput));
-        break;
-      case 4:
-        activityManager.replaceActivity(std::make_unique<SavedCardsActivity>(renderer, mappedInput));
-        break;
-      case 5:
-        activityManager.replaceActivity(std::make_unique<LearningReportActivity>(renderer, mappedInput));
-        break;
-      case 6:
-        activityManager.replaceActivity(std::make_unique<ReviewQueueActivity>(renderer, mappedInput));
-        break;
-      case 7:
-      default:
-        activityManager.replaceActivity(std::make_unique<DeckImportStatusActivity>(renderer, mappedInput));
-        break;
-    }
+    openCurrentSelection();
   }
 }
 
@@ -132,9 +164,8 @@ void StudyHubActivity::render(RenderLock&&) {
             if (importedCardCount <= 0) {
               return std::string("Import deck files to start");
             }
-            return "Due today: " + std::to_string(state.dueToday > state.completedToday
-                                                      ? state.dueToday - state.completedToday
-                                                      : 0);
+            return "Due today: " +
+                   std::to_string(state.dueToday > state.completedToday ? state.dueToday - state.completedToday : 0);
           case 1:
             return againQueueCount > 0 ? ("Wrong cards: " + std::to_string(againQueueCount))
                                        : std::string("No recovery backlog");
@@ -150,8 +181,8 @@ void StudyHubActivity::render(RenderLock&&) {
           case 5:
             return std::string("Weak area and mastery");
           case 6:
-            return "Again: " + std::to_string(againQueueCount) + "  Total: " +
-                   std::to_string(againQueueCount + laterQueueCount + savedQueueCount);
+            return "Again: " + std::to_string(againQueueCount) +
+                   "  Total: " + std::to_string(againQueueCount + laterQueueCount + savedQueueCount);
           case 7:
           default:
             if (importedDeckCount > 0) {

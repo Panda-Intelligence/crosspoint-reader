@@ -12,6 +12,7 @@ class FileBrowserActivity final : public Activity {
  private:
   // Deletion
   void clearFileMetadata(const std::string& fullPath);
+  void openCurrentEntry();
 
   ButtonNavigator buttonNavigator;
 

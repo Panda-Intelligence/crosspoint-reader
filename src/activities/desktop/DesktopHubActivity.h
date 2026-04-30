@@ -7,6 +7,8 @@ class DesktopHubActivity final : public Activity {
   ButtonNavigator buttonNavigator;
   int selectedIndex = 0;
 
+  void openCurrentSelection();
+
  public:
   explicit DesktopHubActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
       : Activity("Desktop", renderer, mappedInput) {}

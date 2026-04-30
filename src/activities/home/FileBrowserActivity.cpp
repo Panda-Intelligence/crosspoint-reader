@@ -13,6 +13,7 @@
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr unsigned long GO_HOME_MS = 1000;
@@ -140,6 +141,24 @@ void FileBrowserActivity::clearFileMetadata(const std::string& fullPath) {
   }
 }
 
+void FileBrowserActivity::openCurrentEntry() {
+  if (files.empty()) return;
+
+  const std::string& entry = files[selectorIndex];
+  const bool isDirectory = (entry.back() == '/');
+
+  if (basepath.back() != '/') basepath += "/";
+
+  if (isDirectory) {
+    basepath += entry.substr(0, entry.length() - 1);
+    loadFiles();
+    selectorIndex = 0;
+    requestUpdate();
+  } else {
+    onSelectBook(basepath + entry);
+  }
+}
+
 void FileBrowserActivity::loop() {
   // Long press BACK (1s+) goes to root folder
   // but Long press BACK (1s+) from ReaderActivity sends us here with the MappedInput already set.
@@ -161,14 +180,42 @@ void FileBrowserActivity::loop() {
   const int pathReserved = renderer.getLineHeight(SMALL_FONT_ID) + UITheme::getInstance().getMetrics().verticalSpacing;
   const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false, pathReserved);
 
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    mappedInput.suppressTouchButtonFallback();
+    if (!files.empty() && touchEvent.isTap()) {
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+      const int contentHeight =
+          renderer.getScreenHeight() - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing - pathReserved;
+      const Rect listRect{0, contentTop, renderer.getScreenWidth(), contentHeight};
+      const int clickedIndex =
+          TouchHitTest::listItemAt(listRect, metrics.listRowHeight, static_cast<int>(selectorIndex),
+                                   static_cast<int>(files.size()), touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        selectorIndex = clickedIndex;
+        openCurrentEntry();
+        return;
+      }
+    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
+      selectorIndex =
+          ButtonNavigator::nextPageIndex(static_cast<int>(selectorIndex), static_cast<int>(files.size()), pageItems);
+      requestUpdate();
+      return;
+    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
+      selectorIndex = ButtonNavigator::previousPageIndex(static_cast<int>(selectorIndex),
+                                                         static_cast<int>(files.size()), pageItems);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    if (files.empty()) return;
+    const bool isDirectory = !files.empty() && files[selectorIndex].back() == '/';
 
-    const std::string& entry = files[selectorIndex];
-    bool isDirectory = (entry.back() == '/');
-
-    if (mappedInput.getHeldTime() >= GO_HOME_MS && !isDirectory) {
+    if (!files.empty() && mappedInput.getHeldTime() >= GO_HOME_MS && !isDirectory) {
       // --- LONG PRESS ACTION: DELETE FILE ---
+      const std::string& entry = files[selectorIndex];
       std::string cleanBasePath = basepath;
       if (cleanBasePath.back() != '/') cleanBasePath += "/";
       const std::string fullPath = cleanBasePath + entry;
@@ -202,16 +249,7 @@ void FileBrowserActivity::loop() {
       return;
     } else {
       // --- SHORT PRESS ACTION: OPEN/NAVIGATE ---
-      if (basepath.back() != '/') basepath += "/";
-
-      if (isDirectory) {
-        basepath += entry.substr(0, entry.length() - 1);
-        loadFiles();
-        selectorIndex = 0;
-        requestUpdate();
-      } else {
-        onSelectBook(basepath + entry);
-      }
+      openCurrentEntry();
     }
     return;
   }
