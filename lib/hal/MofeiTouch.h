@@ -25,11 +25,11 @@
 #endif
 
 #ifndef MOFEI_TOUCH_INT
-#define MOFEI_TOUCH_INT -1
+#define MOFEI_TOUCH_INT 44
 #endif
 
 #ifndef MOFEI_TOUCH_POLL_INTERVAL_MS
-#define MOFEI_TOUCH_POLL_INTERVAL_MS 20
+#define MOFEI_TOUCH_POLL_INTERVAL_MS 10
 #endif
 
 #ifndef MOFEI_TOUCH_RST
@@ -53,7 +53,7 @@
 #endif
 
 #ifndef MOFEI_TOUCH_DIAGNOSTIC_LOG
-#define MOFEI_TOUCH_DIAGNOSTIC_LOG MOFEI_TOUCH_SOFT_I2C
+#define MOFEI_TOUCH_DIAGNOSTIC_LOG 0
 #endif
 
 #ifndef MOFEI_TOUCH_SCAN
@@ -107,10 +107,12 @@ class MofeiTouchDriver {
   bool touchDown = false;
   bool lastReadInvalidFrame = false;
   bool useSoftwareI2c = false;
+  uint8_t lastLoggedFrameStatus = 0xFF;
   unsigned long lastStatusLogMs = 0;
   unsigned long lastReadErrorLogMs = 0;
   unsigned long lastRetryMs = 0;  // for late-init retry
   unsigned long lastPollMs = 0;
+  unsigned long lastDiagnosticSampleMs = 0;
   int activeSda = MOFEI_TOUCH_SDA;
   int activeScl = MOFEI_TOUCH_SCL;
   uint16_t startX = 0;
@@ -119,7 +121,7 @@ class MofeiTouchDriver {
   uint16_t lastY = 0;
   unsigned long startMs = 0;
 
-  bool readPoint(uint16_t* x, uint16_t* y, bool* released);
+  bool readPoint(uint16_t* x, uint16_t* y, bool* released, bool* hasPoint);
   bool detectOnPins(int sda, int scl);
 #if MOFEI_TOUCH_AUTOSCAN
   bool autoDetectPins();
@@ -131,6 +133,7 @@ class MofeiTouchDriver {
   Event finishTouch();
   void normalizePoint(uint16_t* x, uint16_t* y) const;
   void logStatus(unsigned long now);
+  void logDiagnosticSample(unsigned long now);
 };
 
 #endif

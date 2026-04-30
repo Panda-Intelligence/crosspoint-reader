@@ -23,11 +23,15 @@ constexpr uint8_t FT6336_THGROUP_DEFAULT = 22;
 constexpr uint8_t FT6336_PERIODACTIVE_DEFAULT = 14;
 constexpr uint8_t FT6336_EVENT_PUT_UP = 1;
 constexpr uint8_t FT6336_EVENT_RESERVED = 3;
+constexpr uint8_t FT6336_NO_FRAME_STATUS = 0xFF;
 constexpr uint16_t SWIPE_THRESHOLD_PX = 80;
 constexpr uint16_t TAP_MAX_MOVE_PX = 60;
 constexpr unsigned long TOUCH_TIMEOUT_MS = 1200;
 constexpr unsigned long TOUCH_STATUS_LOG_INTERVAL_MS = 10000;
 constexpr unsigned long TOUCH_READ_ERROR_LOG_INTERVAL_MS = 5000;
+constexpr unsigned long TOUCH_DIAGNOSTIC_SAMPLE_INTERVAL_MS = 2000;
+constexpr uint16_t MOFEI_TOUCH_ALT_WIDTH = MOFEI_TOUCH_HEIGHT;
+constexpr uint16_t MOFEI_TOUCH_ALT_HEIGHT = MOFEI_TOUCH_WIDTH;
 constexpr unsigned long TOUCH_POWER_SETTLE_MS = 1000;  // FT6336U needs ~1s after power-on before I2C is ready
 #if MOFEI_TOUCH_AUTOSCAN
 // GPIO 0-2: keys; 3-8: EPD SPI; 9: BAT; 10-11,14-18,21: SD-MMC; 19-20: USB.
@@ -299,7 +303,26 @@ bool isAht20LikeFrame(const uint8_t* data, uint8_t len) {
 }
 
 bool isPointWithinRawGeometry(uint16_t rawX, uint16_t rawY) {
-  return rawX < MOFEI_TOUCH_WIDTH && rawY < MOFEI_TOUCH_HEIGHT;
+  return (rawX < MOFEI_TOUCH_WIDTH && rawY < MOFEI_TOUCH_HEIGHT) ||
+         (rawX < MOFEI_TOUCH_ALT_WIDTH && rawY < MOFEI_TOUCH_ALT_HEIGHT);
+}
+
+const char* eventTypeName(MofeiTouchDriver::EventType type) {
+  switch (type) {
+    case MofeiTouchDriver::EventType::Tap:
+      return "tap";
+    case MofeiTouchDriver::EventType::SwipeLeft:
+      return "swipe-left";
+    case MofeiTouchDriver::EventType::SwipeRight:
+      return "swipe-right";
+    case MofeiTouchDriver::EventType::SwipeUp:
+      return "swipe-up";
+    case MofeiTouchDriver::EventType::SwipeDown:
+      return "swipe-down";
+    case MofeiTouchDriver::EventType::None:
+    default:
+      return "none";
+  }
 }
 
 bool validateFt6336Point(const uint8_t* point, uint8_t pointIndex, const char* context) {
@@ -512,6 +535,7 @@ void MofeiTouchDriver::begin() {
   ready = false;
   touchDown = false;
   lastReadInvalidFrame = false;
+  lastLoggedFrameStatus = FT6336_NO_FRAME_STATUS;
   useSoftwareI2c = MOFEI_TOUCH_SOFT_I2C != 0;
   activeSda = MOFEI_TOUCH_SDA;
   activeScl = MOFEI_TOUCH_SCL;
@@ -584,25 +608,21 @@ bool MofeiTouchDriver::update(Event* outEvent) {
   if (!ready) {
     return false;
   }
+  logDiagnosticSample(now);
 
   const bool intConfigured = MOFEI_TOUCH_INT >= 0;
   const bool intActive = intConfigured && digitalRead(MOFEI_TOUCH_INT) == LOW;
-  if (!touchDown) {
-    if (intConfigured) {
-      if (!intActive) {
-        return false;
-      }
-    } else if (now - lastPollMs < MOFEI_TOUCH_POLL_INTERVAL_MS) {
-      return false;
-    }
+  if (!touchDown && !intActive && now - lastPollMs < MOFEI_TOUCH_POLL_INTERVAL_MS) {
+    return false;
   }
   lastPollMs = now;
 
   uint16_t x = 0;
   uint16_t y = 0;
   bool released = false;
+  bool hasPoint = false;
 
-  if (!readPoint(&x, &y, &released)) {
+  if (!readPoint(&x, &y, &released, &hasPoint)) {
     if (now - lastReadErrorLogMs >= TOUCH_READ_ERROR_LOG_INTERVAL_MS) {
       LOG_DBG("TOUCH", "FT6336U read failed transport=%s SDA=%d SCL=%d addr=0x%02X", transportName(useSoftwareI2c),
               activeSda, activeScl, FT6336_ADDR);
@@ -624,6 +644,19 @@ bool MofeiTouchDriver::update(Event* outEvent) {
 
   if (released) {
     if (!touchDown) {
+      if (hasPoint) {
+        touchDown = true;
+        startX = x;
+        startY = y;
+        lastX = x;
+        lastY = y;
+        startMs = millis();
+        const Event event = finishTouch();
+        if (outEvent != nullptr) {
+          *outEvent = event;
+        }
+        return event.type != EventType::None;
+      }
       return false;
     }
     lastX = x;
@@ -640,6 +673,7 @@ bool MofeiTouchDriver::update(Event* outEvent) {
     startX = x;
     startY = y;
     startMs = millis();
+    LOG_DBG("TOUCH", "FT6336U touch start x=%u y=%u", x, y);
   }
   
   lastX = x;
@@ -647,7 +681,7 @@ bool MofeiTouchDriver::update(Event* outEvent) {
   return false;
 }
 
-bool MofeiTouchDriver::readPoint(uint16_t* x, uint16_t* y, bool* released) {
+bool MofeiTouchDriver::readPoint(uint16_t* x, uint16_t* y, bool* released, bool* hasPoint) {
   uint8_t data[FT6336_FRAME_LEN] = {};
   lastReadInvalidFrame = false;
   const bool readOk = readRegister(FT6336_REG_TD_STATUS, data, sizeof(data));
@@ -659,6 +693,12 @@ bool MofeiTouchDriver::readPoint(uint16_t* x, uint16_t* y, bool* released) {
   }
 
   const uint8_t points = data[0] & 0x0F;
+  *hasPoint = points > 0;
+  if (points > 0 || data[0] != lastLoggedFrameStatus) {
+    LOG_DBG("TOUCH", "FT6336U frame status=0x%02X points=%u bytes=%02X %02X %02X %02X %02X", data[0], points, data[0],
+            data[1], data[2], data[3], data[4]);
+    lastLoggedFrameStatus = data[0];
+  }
   if (points == 0) {
     *released = true;
     *x = lastX;
@@ -674,6 +714,9 @@ bool MofeiTouchDriver::readPoint(uint16_t* x, uint16_t* y, bool* released) {
   *x = rawX;
   *y = rawY;
   *released = eventCode == FT6336_EVENT_PUT_UP;
+  LOG_DBG("TOUCH", "FT6336U point event=%u raw=%u,%u x=%u y=%u released=%d", eventCode,
+          ((static_cast<uint16_t>(data[1] & 0x0F)) << 8) | data[2],
+          ((static_cast<uint16_t>(data[3] & 0x0F)) << 8) | data[4], *x, *y, *released);
   return true;
 }
 
@@ -808,6 +851,8 @@ MofeiTouchDriver::Event MofeiTouchDriver::finishTouch() {
     event.type = EventType::Tap;
   }
 
+  LOG_DBG("TOUCH", "FT6336U finish type=%s start=%u,%u last=%u,%u delta=%d,%d", eventTypeName(event.type), startX,
+          startY, lastX, lastY, dx, dy);
   touchDown = false;
   return event;
 }
@@ -815,22 +860,32 @@ MofeiTouchDriver::Event MofeiTouchDriver::finishTouch() {
 void MofeiTouchDriver::normalizePoint(uint16_t* x, uint16_t* y) const {
   uint16_t tx = *x;
   uint16_t ty = *y;
+  uint16_t rawWidth = MOFEI_TOUCH_WIDTH;
+  uint16_t rawHeight = MOFEI_TOUCH_HEIGHT;
+
+  if (tx >= MOFEI_TOUCH_WIDTH && tx < MOFEI_TOUCH_ALT_WIDTH && ty < MOFEI_TOUCH_ALT_HEIGHT) {
+    rawWidth = MOFEI_TOUCH_ALT_WIDTH;
+    rawHeight = MOFEI_TOUCH_ALT_HEIGHT;
+  }
 
 #if MOFEI_TOUCH_SWAP_XY
   const uint16_t tmp = tx;
   tx = ty;
   ty = tmp;
+  const uint16_t tmpExtent = rawWidth;
+  rawWidth = rawHeight;
+  rawHeight = tmpExtent;
 #endif
 
 #if MOFEI_TOUCH_INVERT_X
-  tx = tx >= MOFEI_TOUCH_WIDTH ? 0 : (MOFEI_TOUCH_WIDTH - 1 - tx);
+  tx = tx >= rawWidth ? 0 : (rawWidth - 1 - tx);
 #endif
 #if MOFEI_TOUCH_INVERT_Y
-  ty = ty >= MOFEI_TOUCH_HEIGHT ? 0 : (MOFEI_TOUCH_HEIGHT - 1 - ty);
+  ty = ty >= rawHeight ? 0 : (rawHeight - 1 - ty);
 #endif
 
-  *x = scaleAxis(tx, MOFEI_TOUCH_WIDTH, MOFEI_TOUCH_LOGICAL_WIDTH);
-  *y = scaleAxis(ty, MOFEI_TOUCH_HEIGHT, MOFEI_TOUCH_LOGICAL_HEIGHT);
+  *x = scaleAxis(tx, rawWidth, MOFEI_TOUCH_LOGICAL_WIDTH);
+  *y = scaleAxis(ty, rawHeight, MOFEI_TOUCH_LOGICAL_HEIGHT);
 }
 
 void MofeiTouchDriver::logStatus(unsigned long now) {
@@ -840,6 +895,39 @@ void MofeiTouchDriver::logStatus(unsigned long now) {
   LOG_INF("TOUCH", "FT6336U status=%s transport=%s SDA=%d SCL=%d addr=0x%02X", ready ? "ready" : "not detected",
           transportName(useSoftwareI2c), activeSda, activeScl, FT6336_ADDR);
   lastStatusLogMs = now;
+}
+
+void MofeiTouchDriver::logDiagnosticSample(unsigned long now) {
+#if MOFEI_TOUCH_DIAGNOSTIC_LOG
+  if (now - lastDiagnosticSampleMs < TOUCH_DIAGNOSTIC_SAMPLE_INTERVAL_MS) {
+    return;
+  }
+  lastDiagnosticSampleMs = now;
+
+  uint8_t data[FT6336_FRAME_LEN] = {};
+  const bool frameOk = readRegister(FT6336_REG_TD_STATUS, data, sizeof(data));
+  uint8_t gesture = 0xFF;
+  const bool gestureOk = readRegister(FT6336_REG_GESTURE_ID, &gesture, 1);
+  uint8_t mode = 0xFF;
+  const bool modeOk = readRegister(FT6336_REG_DEVICE_MODE, &mode, 1);
+  uint8_t threshold = 0xFF;
+  const bool thresholdOk = readRegister(FT6336_REG_THGROUP, &threshold, 1);
+  uint8_t period = 0xFF;
+  const bool periodOk = readRegister(FT6336_REG_PERIODACTIVE, &period, 1);
+  uint8_t firmwareId = 0xFF;
+  const bool firmwareOk = readRegister(FT6336_REG_FIRMWARE_ID, &firmwareId, 1);
+  uint8_t vendorId = 0xFF;
+  const bool vendorOk = readRegister(FT6336_REG_VENDOR_ID, &vendorId, 1);
+  const uint8_t status = frameOk ? data[0] : 0xFF;
+  LOG_DBG("TOUCH",
+          "FT6336U sample frame=%d status=0x%02X gesture=%s0x%02X mode=%s0x%02X th=%s0x%02X period=%s0x%02X "
+          "fw=%s0x%02X vendor=%s0x%02X bytes=%02X %02X %02X %02X %02X %02X",
+          frameOk, status, gestureOk ? "" : "?", gesture, modeOk ? "" : "?", mode, thresholdOk ? "" : "?",
+          threshold, periodOk ? "" : "?", period, firmwareOk ? "" : "?", firmwareId, vendorOk ? "" : "?", vendorId,
+          data[0], data[1], data[2], data[3], data[4], data[5]);
+#else
+  (void)now;
+#endif
 }
 
 #endif
