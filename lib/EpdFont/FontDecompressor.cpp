@@ -33,8 +33,11 @@ void FontDecompressor::freePageBuffer() {
 }
 
 void FontDecompressor::freeHotGroup() {
-  hotGroup.clear();
-  hotGroup.shrink_to_fit();
+  if (hotGroupBuf) {
+    heap_caps_free(hotGroupBuf);
+    hotGroupBuf = nullptr;
+  }
+  hotGroupCapacity = 0;
   hotGroupFont = nullptr;
   hotGroupIndex = UINT16_MAX;
   hotGlyphBuf.clear();
@@ -170,36 +173,34 @@ const uint8_t* FontDecompressor::getBitmap(const EpdFontData* fontData, const Ep
   }
 
   // Check if hot group already has this group decompressed — if not, decompress it
-  if (!(!hotGroup.empty() && hotGroupFont == fontData && hotGroupIndex == groupIndex)) {
+  if (!(hotGroupBuf && hotGroupFont == fontData && hotGroupIndex == groupIndex)) {
     stats.cacheMisses++;
     const EpdFontGroup& group = fontData->groups[groupIndex];
 
-    LOG_INF("FDC", "Decompressing group %u: %u bytes", groupIndex, group.uncompressedSize);
-    
-    if (group.uncompressedSize > ESP.getMaxAllocHeap()) {
-      LOG_ERR("FDC", "Not enough contiguous memory to allocate %u bytes (MaxAlloc: %u)", group.uncompressedSize, ESP.getMaxAllocHeap());
-      hotGroup.clear();
-      hotGroupFont = nullptr;
-      hotGroupIndex = UINT16_MAX;
-      stats.getBitmapTimeUs += micros() - tStart;
-      return nullptr;
+    if (group.uncompressedSize > hotGroupCapacity) {
+      if (hotGroupBuf) heap_caps_free(hotGroupBuf);
+#ifdef BOARD_HAS_PSRAM
+      hotGroupBuf = static_cast<uint8_t*>(heap_caps_malloc(group.uncompressedSize, MALLOC_CAP_SPIRAM));
+#else
+      hotGroupBuf = static_cast<uint8_t*>(malloc(group.uncompressedSize));
+#endif
+      if (!hotGroupBuf) {
+        hotGroupBuf = static_cast<uint8_t*>(malloc(group.uncompressedSize));
+      }
+      
+      if (!hotGroupBuf) {
+        LOG_ERR("FDC", "Failed to allocate %u bytes for hot group %u", group.uncompressedSize, groupIndex);
+        hotGroupCapacity = 0;
+        hotGroupFont = nullptr;
+        hotGroupIndex = UINT16_MAX;
+        stats.getBitmapTimeUs += micros() - tStart;
+        return nullptr;
+      }
+      hotGroupCapacity = group.uncompressedSize;
     }
 
-    hotGroup.resize(group.uncompressedSize);
-    
-    if (hotGroup.empty()) {
-      LOG_ERR("FDC", "Failed to allocate %u bytes for hot group %u", group.uncompressedSize, groupIndex);
-      hotGroupFont = nullptr;
-      hotGroupIndex = UINT16_MAX;
-      stats.getBitmapTimeUs += micros() - tStart;
-      return nullptr;
-    }
-
-    if (!decompressGroup(fontData, groupIndex, hotGroup.data(), group.uncompressedSize)) {
-      hotGroup.clear();
-      hotGroup.shrink_to_fit();
-      hotGroupFont = nullptr;
-      hotGroupIndex = UINT16_MAX;
+    if (!decompressGroup(fontData, groupIndex, hotGroupBuf, group.uncompressedSize)) {
+      freeHotGroup();
       stats.getBitmapTimeUs += micros() - tStart;
       return nullptr;
     }
@@ -221,7 +222,7 @@ const uint8_t* FontDecompressor::getBitmap(const EpdFontData* fontData, const Ep
   }
 
   uint32_t alignedOff = getAlignedOffset(fontData, groupIndex, glyphIndex);
-  compactSingleGlyph(&hotGroup[alignedOff], hotGlyphBuf.data(), glyph->width, glyph->height);
+  compactSingleGlyph(&hotGroupBuf[alignedOff], hotGlyphBuf.data(), glyph->width, glyph->height);
   stats.getBitmapTimeUs += micros() - tStart;
   return hotGlyphBuf.data();
 }

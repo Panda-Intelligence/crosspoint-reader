@@ -69,7 +69,8 @@ class FontDecompressor {
   // Kept in byte-aligned format; individual glyphs are compacted on demand into hotGlyphBuf.
   const EpdFontData* hotGroupFont = nullptr;
   uint16_t hotGroupIndex = UINT16_MAX;
-  std::vector<uint8_t> hotGroup;
+  uint8_t* hotGroupBuf = nullptr;
+  uint32_t hotGroupCapacity = 0;
 
   // Scratch buffer for compacting a single glyph from the hot group.
   // Valid until the next getBitmap() call.

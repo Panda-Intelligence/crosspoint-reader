@@ -319,12 +319,11 @@ bool loadTraditionalChineseFonts(GfxRenderer& renderer) {
   bool anyLoaded = false;
   
   // We cannot load all 4 font sizes into 8MB PSRAM simultaneously (~9.2MB total).
-  // Load ONLY tc_12 (needed for UI_10 and UI_12 fallbacks) and the currently configured reader font size.
-  const uint8_t requiredReaderSize = SETTINGS.fontSize;
+  // The user requested to ONLY load the 12pt font for now.
   const uint8_t requiredUiSize = CrossPointSettings::SMALL; // tc_12
   
   for (const auto& runtime : kPackRuntimes) {
-    if (runtime.info->size != requiredReaderSize && runtime.info->size != requiredUiSize) {
+    if (runtime.info->size != requiredUiSize) {
       // Unload if previously loaded to free memory
       if (runtime.family->loaded) {
         renderer.removeFont(runtime.info->fontId);
