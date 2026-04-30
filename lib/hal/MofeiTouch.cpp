@@ -25,7 +25,6 @@ constexpr uint8_t FT6336_EVENT_PUT_UP = 1;
 constexpr uint8_t FT6336_EVENT_RESERVED = 3;
 constexpr uint8_t FT6336_NO_FRAME_STATUS = 0xFF;
 constexpr uint16_t SWIPE_THRESHOLD_PX = 80;
-constexpr uint16_t TAP_MAX_MOVE_PX = 60;
 constexpr unsigned long TOUCH_TIMEOUT_MS = 1200;
 constexpr unsigned long TOUCH_STATUS_LOG_INTERVAL_MS = 10000;
 constexpr unsigned long TOUCH_READ_ERROR_LOG_INTERVAL_MS = 5000;
@@ -847,7 +846,7 @@ MofeiTouchDriver::Event MofeiTouchDriver::finishTouch() {
     event.type = dx < 0 ? EventType::SwipeLeft : EventType::SwipeRight;
   } else if (absDy >= SWIPE_THRESHOLD_PX && absDy > absDx) {
     event.type = dy < 0 ? EventType::SwipeUp : EventType::SwipeDown;
-  } else if (absDx <= TAP_MAX_MOVE_PX && absDy <= TAP_MAX_MOVE_PX) {
+  } else {
     event.type = EventType::Tap;
   }
 
