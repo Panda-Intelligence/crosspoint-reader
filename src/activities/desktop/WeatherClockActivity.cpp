@@ -8,6 +8,7 @@
 #include "DesktopSummaryStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr int kPageCount = 3;
@@ -34,6 +35,29 @@ void WeatherClockActivity::onEnter() {
 }
 
 void WeatherClockActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && touchEvent.isTap()) {
+      mappedInput.suppressTouchButtonFallback();
+      DESKTOP_SUMMARY.refresh();
+      requestUpdate();
+      return;
+    }
+    if (!buttonHintTap && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      pageIndex = ButtonNavigator::nextIndex(pageIndex, kPageCount);
+      requestUpdate();
+      return;
+    }
+    if (!buttonHintTap && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      pageIndex = ButtonNavigator::previousIndex(pageIndex, kPageCount);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;

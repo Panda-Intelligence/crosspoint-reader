@@ -9,6 +9,7 @@
 #include "ArcadeProgressStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 // Symbol labels for each pair value (1..kPairs)
@@ -103,6 +104,52 @@ void MemoryGameActivity::onEnter() {
 
 void MemoryGameActivity::loop() {
   syncFlipReset();
+
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && touchEvent.isTap()) {
+      mappedInput.suppressTouchButtonFallback();
+      if (matchedPairs == kPairs) {
+        initCards();
+        requestUpdate();
+        return;
+      }
+      if (!awaitingFlipReset) {
+        const auto& metrics = UITheme::getInstance().getMetrics();
+        const int pageWidth = renderer.getScreenWidth();
+        const int pageHeight = renderer.getScreenHeight();
+        const int gridTop = metrics.topPadding + metrics.headerHeight + 20;
+        const int gridBottom = pageHeight - metrics.buttonHintsHeight - 20;
+        const int gridHeight = gridBottom - gridTop;
+        const int cellH = gridHeight / kRows;
+        const int cellW = std::min((pageWidth - 60) / kCols, cellH);
+        const int startX = (pageWidth - cellW * kCols) / 2;
+        int row = 0;
+        int col = 0;
+        if (TouchHitTest::gridCellAt(Rect{startX, gridTop, cellW * kCols, cellH * kRows}, kRows, kCols, touchEvent.x,
+                                     touchEvent.y, &row, &col)) {
+          cursorIndex = row * kCols + col;
+          tryFlip(cursorIndex);
+          return;
+        }
+      }
+    } else if (!buttonHintTap && !awaitingFlipReset) {
+      mappedInput.suppressTouchButtonFallback();
+      const int total = kCols * kRows;
+      if (touchEvent.type == InputTouchEvent::Type::SwipeLeft) {
+        cursorIndex = (cursorIndex + 1) % total;
+      } else if (touchEvent.type == InputTouchEvent::Type::SwipeRight) {
+        cursorIndex = (cursorIndex - 1 + total) % total;
+      } else if (touchEvent.type == InputTouchEvent::Type::SwipeUp) {
+        cursorIndex = (cursorIndex - kCols + total) % total;
+      } else if (touchEvent.type == InputTouchEvent::Type::SwipeDown) {
+        cursorIndex = (cursorIndex + kCols) % total;
+      }
+      requestUpdate();
+      return;
+    }
+  }
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();

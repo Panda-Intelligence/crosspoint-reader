@@ -9,6 +9,7 @@
 #include "ArcadeProgressStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 void Game2048Activity::resetGame() {
   for (auto& row : grid) {
@@ -159,6 +160,34 @@ void Game2048Activity::onEnter() {
 }
 
 void Game2048Activity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    bool moved = false;
+    if (!buttonHintTap && touchEvent.type == InputTouchEvent::Type::SwipeLeft) {
+      mappedInput.suppressTouchButtonFallback();
+      moved = move(Direction::Left);
+    } else if (!buttonHintTap && touchEvent.type == InputTouchEvent::Type::SwipeRight) {
+      mappedInput.suppressTouchButtonFallback();
+      moved = move(Direction::Right);
+    } else if (!buttonHintTap && touchEvent.type == InputTouchEvent::Type::SwipeUp) {
+      mappedInput.suppressTouchButtonFallback();
+      moved = move(Direction::Up);
+    } else if (!buttonHintTap && touchEvent.type == InputTouchEvent::Type::SwipeDown) {
+      mappedInput.suppressTouchButtonFallback();
+      moved = move(Direction::Down);
+    } else if (!buttonHintTap && touchEvent.isTap()) {
+      mappedInput.suppressTouchButtonFallback();
+      resetGame();
+      requestUpdate();
+      return;
+    }
+    if (moved) {
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;

@@ -8,6 +8,7 @@
 #include "ArcadeProgressStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr const char* kLevelTemplate[SokobanActivity::kRows] = {
@@ -102,6 +103,51 @@ void SokobanActivity::onEnter() {
 }
 
 void SokobanActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && touchEvent.isTap()) {
+      mappedInput.suppressTouchButtonFallback();
+      if (completed) {
+        loadLevel();
+        requestUpdate();
+        return;
+      }
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int pageWidth = renderer.getScreenWidth();
+      const int pageHeight = renderer.getScreenHeight();
+      const int gridTop = metrics.topPadding + metrics.headerHeight + 20;
+      const int gridBottom = pageHeight - metrics.buttonHintsHeight - 20;
+      const int cell = std::min((gridBottom - gridTop) / kRows, (pageWidth - 80) / kCols);
+      const int startX = (pageWidth - cell * kCols) / 2;
+      int row = 0;
+      int col = 0;
+      if (TouchHitTest::gridCellAt(Rect{startX, gridTop, cell * kCols, cell * kRows}, kRows, kCols, touchEvent.x,
+                                   touchEvent.y, &row, &col)) {
+        const int rowDelta = row - playerPos.row;
+        const int colDelta = col - playerPos.col;
+        if (std::abs(rowDelta) > std::abs(colDelta)) {
+          movePlayer(rowDelta > 0 ? 1 : -1, 0);
+        } else if (colDelta != 0) {
+          movePlayer(0, colDelta > 0 ? 1 : -1);
+        }
+        return;
+      }
+    } else if (!buttonHintTap) {
+      mappedInput.suppressTouchButtonFallback();
+      if (touchEvent.type == InputTouchEvent::Type::SwipeLeft) {
+        movePlayer(0, -1);
+      } else if (touchEvent.type == InputTouchEvent::Type::SwipeRight) {
+        movePlayer(0, 1);
+      } else if (touchEvent.type == InputTouchEvent::Type::SwipeUp) {
+        movePlayer(-1, 0);
+      } else if (touchEvent.type == InputTouchEvent::Type::SwipeDown) {
+        movePlayer(1, 0);
+      }
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;

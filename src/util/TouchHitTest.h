@@ -40,6 +40,28 @@ inline int listItemAt(const Rect& listRect, int rowHeight, int selectedIndex, in
   return clickedIndex < itemCount ? clickedIndex : -1;
 }
 
+inline bool gridCellAt(const Rect& gridRect, int rows, int cols, uint16_t x, uint16_t y, int* outRow, int* outCol) {
+  if (rows <= 0 || cols <= 0 || outRow == nullptr || outCol == nullptr || !pointInRect(x, y, gridRect)) {
+    return false;
+  }
+
+  const int cellW = gridRect.width / cols;
+  const int cellH = gridRect.height / rows;
+  if (cellW <= 0 || cellH <= 0) {
+    return false;
+  }
+
+  const int col = (x - gridRect.x) / cellW;
+  const int row = (y - gridRect.y) / cellH;
+  if (row < 0 || row >= rows || col < 0 || col >= cols) {
+    return false;
+  }
+
+  *outRow = row;
+  *outCol = col;
+  return true;
+}
+
 inline bool isForwardSwipe(const InputTouchEvent& event) {
   return event.type == InputTouchEvent::Type::SwipeUp || event.type == InputTouchEvent::Type::SwipeLeft;
 }

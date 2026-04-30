@@ -9,6 +9,7 @@
 #include "ArcadeProgressStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 struct PuzzleDefinition {
@@ -151,6 +152,45 @@ void WordPuzzleActivity::onEnter() {
 }
 
 void WordPuzzleActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && touchEvent.isTap()) {
+      mappedInput.suppressTouchButtonFallback();
+      if (completed) {
+        selectCurrentCell();
+        return;
+      }
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int pageWidth = renderer.getScreenWidth();
+      const int pageHeight = renderer.getScreenHeight();
+      const int gridTop = metrics.topPadding + metrics.headerHeight + 20;
+      const int gridBottom = pageHeight - metrics.buttonHintsHeight - 92;
+      const int cell = std::min((pageWidth - 72) / kSize, (gridBottom - gridTop) / kSize);
+      const int startX = (pageWidth - cell * kSize) / 2;
+      int row = 0;
+      int col = 0;
+      if (TouchHitTest::gridCellAt(Rect{startX, gridTop, cell * kSize, cell * kSize}, kSize, kSize, touchEvent.x,
+                                   touchEvent.y, &row, &col)) {
+        cursor = {row, col};
+        selectCurrentCell();
+        return;
+      }
+    } else if (!buttonHintTap) {
+      mappedInput.suppressTouchButtonFallback();
+      if (touchEvent.type == InputTouchEvent::Type::SwipeLeft) {
+        moveCursor(0, -1);
+      } else if (touchEvent.type == InputTouchEvent::Type::SwipeRight) {
+        moveCursor(0, 1);
+      } else if (touchEvent.type == InputTouchEvent::Type::SwipeUp) {
+        moveCursor(-1, 0);
+      } else if (touchEvent.type == InputTouchEvent::Type::SwipeDown) {
+        moveCursor(1, 0);
+      }
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;

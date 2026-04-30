@@ -5,6 +5,7 @@
 
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 struct FocusPreset {
@@ -58,6 +59,38 @@ void ClockFocusActivity::onEnter() {
 }
 
 void ClockFocusActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && touchEvent.isTap()) {
+      mappedInput.suppressTouchButtonFallback();
+      if (hasFinished) {
+        resetTimer();
+      } else if (isRunning) {
+        isRunning = false;
+      } else {
+        isRunning = true;
+        lastTickMs = millis();
+      }
+      requestUpdate();
+      return;
+    }
+    if (!buttonHintTap && !isRunning && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      presetIndex = ButtonNavigator::nextIndex(presetIndex, kPresetCount);
+      resetTimer();
+      requestUpdate();
+      return;
+    }
+    if (!buttonHintTap && !isRunning && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      presetIndex = ButtonNavigator::previousIndex(presetIndex, kPresetCount);
+      resetTimer();
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;

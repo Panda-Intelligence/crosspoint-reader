@@ -7,6 +7,7 @@
 #include "ArcadeProgressStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr SudokuActivity::Board kPuzzle = {{
@@ -112,6 +113,51 @@ void SudokuActivity::onEnter() {
 }
 
 void SudokuActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && touchEvent.isTap()) {
+      mappedInput.suppressTouchButtonFallback();
+      if (completed) {
+        loadPuzzle();
+        requestUpdate();
+        return;
+      }
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int pageWidth = renderer.getScreenWidth();
+      const int pageHeight = renderer.getScreenHeight();
+      const int gridTop = metrics.topPadding + metrics.headerHeight + 12;
+      const int gridBottom = pageHeight - metrics.buttonHintsHeight - 28;
+      const int cell = std::min((gridBottom - gridTop) / kSize, (pageWidth - 60) / kSize);
+      const int startX = (pageWidth - cell * kSize) / 2;
+      int row = 0;
+      int col = 0;
+      if (TouchHitTest::gridCellAt(Rect{startX, gridTop, cell * kSize, cell * kSize}, kSize, kSize, touchEvent.x,
+                                   touchEvent.y, &row, &col)) {
+        cursorRow = row;
+        cursorCol = col;
+        cycleCellValue();
+        if (completed) {
+          ARCADE_PROGRESS.recordWin(ArcadeGameId::Sudoku);
+        }
+        requestUpdate();
+        return;
+      }
+    } else if (!buttonHintTap) {
+      mappedInput.suppressTouchButtonFallback();
+      if (touchEvent.type == InputTouchEvent::Type::SwipeLeft) {
+        moveCursor(0, -1);
+      } else if (touchEvent.type == InputTouchEvent::Type::SwipeRight) {
+        moveCursor(0, 1);
+      } else if (touchEvent.type == InputTouchEvent::Type::SwipeUp) {
+        moveCursor(-1, 0);
+      } else if (touchEvent.type == InputTouchEvent::Type::SwipeDown) {
+        moveCursor(1, 0);
+      }
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;

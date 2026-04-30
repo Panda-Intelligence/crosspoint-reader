@@ -7,6 +7,7 @@
 #include "ArcadeProgressStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 struct ChallengeRow {
@@ -39,6 +40,30 @@ void ArcadeChallengesActivity::onEnter() {
 }
 
 void ArcadeChallengesActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && touchEvent.isTap()) {
+      mappedInput.suppressTouchButtonFallback();
+      ARCADE_PROGRESS.loadFromFile();
+      ARCADE_PROGRESS.syncToCurrentDay();
+      requestUpdate();
+      return;
+    }
+    if (!buttonHintTap && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      pageIndex = ButtonNavigator::nextIndex(pageIndex, kPageCount);
+      requestUpdate();
+      return;
+    }
+    if (!buttonHintTap && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      pageIndex = ButtonNavigator::previousIndex(pageIndex, kPageCount);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;
