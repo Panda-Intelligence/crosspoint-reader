@@ -51,17 +51,15 @@ void OpdsSettingsActivity::onExit() { Activity::onExit(); }
 void OpdsSettingsActivity::loop() {
   const int menuItems = getMenuItemCount();
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     if (touchEvent.isTap()) {
       const auto& metrics = UITheme::getInstance().getMetrics();
-      const int contentTop =
-          metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing + metrics.tabBarHeight;
+      const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing + metrics.tabBarHeight;
       const int contentHeight =
           renderer.getScreenHeight() - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
       const Rect listRect{0, contentTop, renderer.getScreenWidth(), contentHeight};
-      const int clickedIndex =
-          TouchHitTest::listItemAt(listRect, metrics.listRowHeight, static_cast<int>(selectedIndex), menuItems,
-                                   touchEvent.x, touchEvent.y);
+      const int clickedIndex = TouchHitTest::listItemAt(
+          listRect, metrics.listRowHeight, static_cast<int>(selectedIndex), menuItems, touchEvent.x, touchEvent.y);
       if (clickedIndex >= 0) {
         mappedInput.suppressTouchButtonFallback();
         selectedIndex = static_cast<size_t>(clickedIndex);

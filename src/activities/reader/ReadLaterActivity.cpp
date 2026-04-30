@@ -39,7 +39,7 @@ void ReadLaterActivity::loop() {
   const auto& metrics = UITheme::getInstance().getMetrics();
 
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     if (itemCount <= 0) {
       if (touchEvent.isTap()) {
         mappedInput.suppressTouchButtonFallback();

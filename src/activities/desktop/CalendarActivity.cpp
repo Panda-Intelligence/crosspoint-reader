@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <I18n.h>
+
 #include <algorithm>
 #include <ctime>
 
@@ -64,7 +65,7 @@ void CalendarActivity::onEnter() {
 
 void CalendarActivity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
     if (!buttonHintTap && touchEvent.isTap()) {
       mappedInput.suppressTouchButtonFallback();
@@ -124,8 +125,7 @@ void CalendarActivity::render(RenderLock&&) {
   const int todayWday = localTm.tm_wday;
 
   // Month name for header
-  static const char* kMonths[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+  static const char* kMonths[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
   char headerBuf[32];
   snprintf(headerBuf, sizeof(headerBuf), "%s %04d", kMonths[localTm.tm_mon], year);
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, headerBuf);
@@ -240,8 +240,7 @@ void CalendarActivity::render(RenderLock&&) {
 
       char line[48];
       if (futureDay <= dim) {
-        snprintf(line, sizeof(line), "%s %d  %s", weekdayFull(weekday), futureDay,
-                 isToday ? "Today" : "—");
+        snprintf(line, sizeof(line), "%s %d  %s", weekdayFull(weekday), futureDay, isToday ? "Today" : "—");
       } else {
         snprintf(line, sizeof(line), "%s %d  Next month", weekdayFull(weekday), futureDay - dim);
       }

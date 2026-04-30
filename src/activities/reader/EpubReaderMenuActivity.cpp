@@ -83,15 +83,14 @@ void EpubReaderMenuActivity::selectCurrentItem() {
 
 void EpubReaderMenuActivity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
     if (!buttonHintTap && touchEvent.isTap()) {
       const Rect contentRect = menuContentRect(renderer);
       const Rect listRect{contentRect.x, contentRect.y + kMenuStartY, contentRect.width,
                           contentRect.height - kMenuStartY};
       const int clickedIndex = TouchHitTest::listItemAt(listRect, kMenuLineHeight, selectedIndex,
-                                                        static_cast<int>(menuItems.size()), touchEvent.x,
-                                                        touchEvent.y);
+                                                        static_cast<int>(menuItems.size()), touchEvent.x, touchEvent.y);
       if (clickedIndex >= 0) {
         mappedInput.suppressTouchButtonFallback();
         selectedIndex = clickedIndex;

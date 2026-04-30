@@ -36,7 +36,7 @@ void OpdsServerListActivity::loop() {
   const int itemCount = getItemCount();
 
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     if (itemCount > 0 && touchEvent.isTap()) {
       const auto& metrics = UITheme::getInstance().getMetrics();
       const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;

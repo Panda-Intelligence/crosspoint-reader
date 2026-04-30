@@ -26,7 +26,7 @@ void NetworkModeSelectionActivity::onExit() { Activity::onExit(); }
 
 void NetworkModeSelectionActivity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     if (touchEvent.isTap()) {
       const auto& metrics = UITheme::getInstance().getMetrics();
       const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
@@ -38,9 +38,9 @@ void NetworkModeSelectionActivity::loop() {
       if (clickedIndex >= 0) {
         mappedInput.suppressTouchButtonFallback();
         selectedIndex = clickedIndex;
-        onModeSelected(clickedIndex == 1 ? NetworkMode::CONNECT_CALIBRE
-                                         : (clickedIndex == 2 ? NetworkMode::CREATE_HOTSPOT
-                                                             : NetworkMode::JOIN_NETWORK));
+        onModeSelected(clickedIndex == 1
+                           ? NetworkMode::CONNECT_CALIBRE
+                           : (clickedIndex == 2 ? NetworkMode::CREATE_HOTSPOT : NetworkMode::JOIN_NETWORK));
         return;
       }
     } else {

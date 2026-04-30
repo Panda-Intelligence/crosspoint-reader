@@ -43,7 +43,7 @@ void ButtonRemapActivity::loop() {
   }
 
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     mappedInput.suppressTouchButtonFallback();
     return;
   }

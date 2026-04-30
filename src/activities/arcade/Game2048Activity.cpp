@@ -161,7 +161,7 @@ void Game2048Activity::onEnter() {
 
 void Game2048Activity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
     bool moved = false;
     if (!buttonHintTap && touchEvent.type == InputTouchEvent::Type::SwipeLeft) {
@@ -269,8 +269,7 @@ void Game2048Activity::render(RenderLock&&) {
         char buffer[8];
         snprintf(buffer, sizeof(buffer), "%u", value);
         const int textH = renderer.getTextHeight(UI_10_FONT_ID);
-        renderer.drawCenteredText(UI_10_FONT_ID, tileY + (tileH - textH) / 2, buffer, !whiteText,
-                                  EpdFontFamily::BOLD);
+        renderer.drawCenteredText(UI_10_FONT_ID, tileY + (tileH - textH) / 2, buffer, !whiteText, EpdFontFamily::BOLD);
       }
     }
   }

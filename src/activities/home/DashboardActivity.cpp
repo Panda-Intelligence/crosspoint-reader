@@ -4,10 +4,10 @@
 
 #include "DesktopSummaryStore.h"
 #include "StudyStateStore.h"
-#include "activities/desktop/CalendarActivity.h"
-#include "activities/desktop/WeatherClockActivity.h"
 #include "activities/arcade/ArcadeHubActivity.h"
+#include "activities/desktop/CalendarActivity.h"
 #include "activities/desktop/DesktopHubActivity.h"
+#include "activities/desktop/WeatherClockActivity.h"
 #include "activities/reader/ReadingHubActivity.h"
 #include "activities/study/StudyHubActivity.h"
 #include "components/UITheme.h"
@@ -122,20 +122,17 @@ void DashboardActivity::openCurrentSelection() {
 
 void DashboardActivity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
-    const InputTouchEvent orientedTouch = TouchHitTest::eventForRendererOrientation(touchEvent, renderer);
-    LOG_DBG("DASH", "touch type=%u raw=%u,%u oriented=%u,%u", static_cast<unsigned>(orientedTouch.type),
-            touchEvent.x, touchEvent.y, orientedTouch.x, orientedTouch.y);
-    if (orientedTouch.isTap()) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
+    LOG_DBG("DASH", "touch type=%u raw=%u,%u screen=%u,%u", static_cast<unsigned>(touchEvent.type),
+            touchEvent.sourceX(), touchEvent.sourceY(), touchEvent.x, touchEvent.y);
+    if (touchEvent.isTap()) {
       const auto& metrics = UITheme::getInstance().getMetrics();
-      const Rect listRect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing,
-                          renderer.getScreenWidth(),
-                          renderer.getScreenHeight() -
-                              (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
-                               metrics.verticalSpacing * 2)};
-      const int clickedIndex =
-          TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex, kItemCount,
-                                   orientedTouch.x, orientedTouch.y);
+      const Rect listRect{
+          0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, renderer.getScreenWidth(),
+          renderer.getScreenHeight() -
+              (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)};
+      const int clickedIndex = TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex,
+                                                        kItemCount, touchEvent.x, touchEvent.y);
       if (clickedIndex >= 0) {
         mappedInput.suppressTouchButtonFallback();
         selectedIndex = clickedIndex;
@@ -143,7 +140,7 @@ void DashboardActivity::loop() {
         return;
       }
     } else {
-      const auto gestureAction = TouchHitTest::listGestureActionForTouch(orientedTouch);
+      const auto gestureAction = TouchHitTest::listGestureActionForTouch(touchEvent);
       if (gestureAction == TouchHitTest::ListGestureAction::NextItem) {
         mappedInput.suppressTouchButtonFallback();
         selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);
@@ -187,8 +184,8 @@ void DashboardActivity::render(RenderLock&&) {
   GUI.drawList(
       renderer,
       Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, pageWidth,
-           pageHeight - (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
-                         metrics.verticalSpacing * 2)},
+           pageHeight -
+               (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)},
       kItemCount, selectedIndex, [](int index) { return std::string(itemLabel(index)); },
       [&summary, &study](int index) {
         switch (index) {
@@ -203,7 +200,8 @@ void DashboardActivity::render(RenderLock&&) {
             if (summary.againCards > 0) {
               return "Again queue: " + std::to_string(summary.againCards);
             }
-            return summary.dueCards > 0 ? ("Due cards: " + std::to_string(summary.dueCards)) : std::string("All caught up");
+            return summary.dueCards > 0 ? ("Due cards: " + std::to_string(summary.dueCards))
+                                        : std::string("All caught up");
           case 5:
             return "Cards " + std::to_string(summary.loadedCards) + "  Later " + std::to_string(summary.laterCards);
           default:

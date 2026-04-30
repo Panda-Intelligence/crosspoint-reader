@@ -19,7 +19,7 @@ void LearningReportActivity::onEnter() {
 
 void LearningReportActivity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     if (touchEvent.isTap() || TouchHitTest::isForwardSwipe(touchEvent) || TouchHitTest::isBackwardSwipe(touchEvent)) {
       mappedInput.suppressTouchButtonFallback();
       finish();
@@ -102,8 +102,8 @@ void LearningReportActivity::render(RenderLock&&) {
 
     // Day label below bar
     const int lw = renderer.getTextWidth(SMALL_FONT_ID, kDayLabels[i]);
-    renderer.drawText(SMALL_FONT_ID, bx + (barW - lw) / 2, chartBottom + 4, kDayLabels[i],
-                      true, isToday ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+    renderer.drawText(SMALL_FONT_ID, bx + (barW - lw) / 2, chartBottom + 4, kDayLabels[i], true,
+                      isToday ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
   }
 
   // "Weekly accuracy" label

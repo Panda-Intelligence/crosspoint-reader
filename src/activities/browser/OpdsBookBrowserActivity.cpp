@@ -62,7 +62,7 @@ void OpdsBookBrowserActivity::loop() {
 
   if (state == BrowserState::ERROR) {
     InputTouchEvent touchEvent;
-    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
       const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
       if (!buttonHintTap && touchEvent.isTap()) {
         mappedInput.suppressTouchButtonFallback();
@@ -109,7 +109,7 @@ void OpdsBookBrowserActivity::loop() {
 
   if (state == BrowserState::BROWSING) {
     InputTouchEvent touchEvent;
-    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
       const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
       if (!entries.empty() && !buttonHintTap && touchEvent.isTap()) {
         const Rect listRect{0, 60, renderer.getScreenWidth(), PAGE_ITEMS * 30};

@@ -146,7 +146,7 @@ void OtaUpdateActivity::loop() {
   }
 
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
     if (!buttonHintTap && state == WAITING_CONFIRMATION && TouchHitTest::isBackwardSwipe(touchEvent)) {
       mappedInput.suppressTouchButtonFallback();

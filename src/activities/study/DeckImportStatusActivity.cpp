@@ -39,7 +39,7 @@ void DeckImportStatusActivity::onEnter() {
 void DeckImportStatusActivity::loop() {
   const auto& deckEntries = STUDY_DECKS.getDeckSummaries();
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     if (deckEntries.empty()) {
       if (touchEvent.isTap()) {
         mappedInput.suppressTouchButtonFallback();
@@ -50,8 +50,8 @@ void DeckImportStatusActivity::loop() {
     } else if (touchEvent.isTap()) {
       const auto& metrics = UITheme::getInstance().getMetrics();
       const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-      const int listH = renderer.getScreenHeight() - (contentTop + metrics.buttonHintsHeight +
-                                                       metrics.verticalSpacing + 24);
+      const int listH =
+          renderer.getScreenHeight() - (contentTop + metrics.buttonHintsHeight + metrics.verticalSpacing + 24);
       const Rect listRect{0, contentTop, renderer.getScreenWidth(), listH};
       const int clickedIndex =
           TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex,
@@ -139,15 +139,13 @@ void DeckImportStatusActivity::render(RenderLock&&) {
     renderer.fillRoundedRect(bx, cardY + 58, bulletR * 2, bulletR * 2, bulletR, Color::Black);
     renderer.drawText(SMALL_FONT_ID, tx, cardY + 54, "Copy .json decks to /.mofei/study");
     renderer.fillRoundedRect(bx, cardY + 82, bulletR * 2, bulletR * 2, bulletR, Color::Black);
-    renderer.drawText(SMALL_FONT_ID, tx, cardY + 78,
-                      hasStudyStateFile ? "Study state: ready" : "state.json not found");
+    renderer.drawText(SMALL_FONT_ID, tx, cardY + 78, hasStudyStateFile ? "Study state: ready" : "state.json not found");
     renderer.fillRoundedRect(bx, cardY + 106, bulletR * 2, bulletR * 2, bulletR, Color::Black);
     renderer.drawText(SMALL_FONT_ID, tx, cardY + 102, "Press Refresh after copying");
   } else {
     const int listH = pageHeight - (contentTop + metrics.buttonHintsHeight + metrics.verticalSpacing + 24);
     GUI.drawList(
-        renderer, Rect{0, contentTop, pageWidth, listH},
-        static_cast<int>(deckEntries.size()), selectedIndex,
+        renderer, Rect{0, contentTop, pageWidth, listH}, static_cast<int>(deckEntries.size()), selectedIndex,
         [](int index) {
           const auto& entry = STUDY_DECKS.getDeckSummaries()[index];
           return entry.valid ? entry.title : (entry.filename + "  ! error");
@@ -163,10 +161,8 @@ void DeckImportStatusActivity::render(RenderLock&&) {
     // Summary below list
     const int badgeY = pageHeight - metrics.buttonHintsHeight - 22;
     char countStr[48];
-    snprintf(countStr, sizeof(countStr), "%d deck%s  %s",
-             STUDY_DECKS.getDeckCount(),
-             deckEntries.size() == 1 ? "" : "s",
-             hasStudyStateFile ? "| state ready" : "| no state file");
+    snprintf(countStr, sizeof(countStr), "%d deck%s  %s", STUDY_DECKS.getDeckCount(),
+             deckEntries.size() == 1 ? "" : "s", hasStudyStateFile ? "| state ready" : "| no state file");
     renderer.drawCenteredText(SMALL_FONT_ID, badgeY, countStr);
   }
 

@@ -80,7 +80,7 @@ void SavedCardsActivity::onEnter() {
 
 void SavedCardsActivity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     const int totalDecks = deckCount();
     const int totalItems = itemCount();
     if (touchEvent.isTap()) {
@@ -246,8 +246,7 @@ void SavedCardsActivity::render(RenderLock&&) {
     }
   }
 
-  const auto labels =
-      mappedInput.mapLabels(tr(STR_BACK), showingBack ? "Remove" : "Flip", "Deck -", "Deck +");
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), showingBack ? "Remove" : "Flip", "Deck -", "Deck +");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

@@ -1,6 +1,7 @@
 #include "MappedInputManager.h"
 
 #include "CrossPointSettings.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 using ButtonIndex = uint8_t;
@@ -68,10 +69,21 @@ unsigned long MappedInputManager::getHeldTime() const { return gpio.getHeldTime(
 
 bool MappedInputManager::consumeTouchEvent(InputTouchEvent* outEvent) const { return gpio.consumeTouchEvent(outEvent); }
 
+bool MappedInputManager::consumeTouchEvent(InputTouchEvent* outEvent, const GfxRenderer& renderer) const {
+  InputTouchEvent event;
+  if (!consumeTouchEvent(&event)) {
+    return false;
+  }
+  if (outEvent != nullptr) {
+    *outEvent = TouchHitTest::eventForRendererOrientation(event, renderer);
+  }
+  return true;
+}
+
 void MappedInputManager::suppressTouchButtonFallback() const { gpio.suppressTouchButtonFallback(); }
 
 bool MappedInputManager::isTouchButtonHintTap(const InputTouchEvent& event) const {
-  return event.isTap() && gpio.isTouchButtonHintTap(event.x, event.y);
+  return event.isTap() && gpio.isTouchButtonHintTap(event.sourceX(), event.sourceY());
 }
 
 MappedInputManager::Labels MappedInputManager::mapLabels(const char* back, const char* confirm, const char* previous,

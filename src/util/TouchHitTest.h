@@ -128,6 +128,11 @@ inline uint16_t clampTouchCoord(int value, int maxExclusive) {
 
 inline InputTouchEvent eventForRendererOrientation(const InputTouchEvent& event, const GfxRenderer& renderer) {
   InputTouchEvent oriented = event;
+  if (!oriented.hasRaw) {
+    oriented.rawX = event.x;
+    oriented.rawY = event.y;
+    oriented.hasRaw = true;
+  }
   const auto orientation = renderer.getOrientation();
   const int width = renderer.getScreenWidth();
   const int height = renderer.getScreenHeight();

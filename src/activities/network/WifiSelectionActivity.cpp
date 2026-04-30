@@ -314,7 +314,7 @@ void WifiSelectionActivity::loop() {
   // Handle save prompt state
   if (state == WifiSelectionState::SAVE_PROMPT) {
     InputTouchEvent touchEvent;
-    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
       if (touchEvent.isTap()) {
         const auto pageWidth = renderer.getScreenWidth();
         const auto pageHeight = renderer.getScreenHeight();
@@ -375,7 +375,7 @@ void WifiSelectionActivity::loop() {
   // Handle forget prompt state (connection failed with saved credentials)
   if (state == WifiSelectionState::FORGET_PROMPT) {
     InputTouchEvent touchEvent;
-    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
       if (touchEvent.isTap()) {
         const auto pageWidth = renderer.getScreenWidth();
         const auto pageHeight = renderer.getScreenHeight();
@@ -455,7 +455,7 @@ void WifiSelectionActivity::loop() {
   // Handle connection failed state
   if (state == WifiSelectionState::CONNECTION_FAILED) {
     InputTouchEvent touchEvent;
-    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
       if (touchEvent.isTap() || TouchHitTest::isForwardSwipe(touchEvent) || TouchHitTest::isBackwardSwipe(touchEvent)) {
         mappedInput.suppressTouchButtonFallback();
         if (autoConnecting || usedSavedPassword) {
@@ -490,7 +490,7 @@ void WifiSelectionActivity::loop() {
   // Handle network list state
   if (state == WifiSelectionState::NETWORK_LIST) {
     InputTouchEvent touchEvent;
-    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
       const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
       if (!buttonHintTap && touchEvent.isTap()) {
         mappedInput.suppressTouchButtonFallback();
@@ -499,7 +499,8 @@ void WifiSelectionActivity::loop() {
           return;
         }
         const auto& metrics = UITheme::getInstance().getMetrics();
-        const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing;
+        const int contentTop =
+            metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing;
         const int contentHeight =
             renderer.getScreenHeight() - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
         const Rect listRect{0, contentTop, renderer.getScreenWidth(), contentHeight};

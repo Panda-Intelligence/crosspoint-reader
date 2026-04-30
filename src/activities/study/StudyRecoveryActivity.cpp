@@ -121,7 +121,7 @@ void StudyRecoveryActivity::onEnter() {
 
 void StudyRecoveryActivity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
     const auto& cards = STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Again);
     if (!buttonHintTap && touchEvent.isTap()) {

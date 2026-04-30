@@ -50,17 +50,15 @@ void RecentBooksActivity::loop() {
   const auto& metrics = UITheme::getInstance().getMetrics();
 
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     if (touchEvent.isTap()) {
-      const Rect listRect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing,
-                          renderer.getScreenWidth(),
-                          renderer.getScreenHeight() -
-                              (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
-                               metrics.verticalSpacing * 2)};
-      const int clickedIndex = TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight,
-                                                        static_cast<int>(selectorIndex),
-                                                        static_cast<int>(recentBooks.size()), touchEvent.x,
-                                                        touchEvent.y);
+      const Rect listRect{
+          0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, renderer.getScreenWidth(),
+          renderer.getScreenHeight() -
+              (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)};
+      const int clickedIndex =
+          TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, static_cast<int>(selectorIndex),
+                                   static_cast<int>(recentBooks.size()), touchEvent.x, touchEvent.y);
       if (clickedIndex >= 0) {
         mappedInput.suppressTouchButtonFallback();
         selectorIndex = clickedIndex;
@@ -72,17 +70,15 @@ void RecentBooksActivity::loop() {
       const auto gestureAction = TouchHitTest::listGestureActionForTouch(touchEvent);
       if (gestureAction == TouchHitTest::ListGestureAction::NextItem) {
         mappedInput.suppressTouchButtonFallback();
-        selectorIndex =
-            ButtonNavigator::nextPageIndex(static_cast<int>(selectorIndex), static_cast<int>(recentBooks.size()),
-                                           pageItems);
+        selectorIndex = ButtonNavigator::nextPageIndex(static_cast<int>(selectorIndex),
+                                                       static_cast<int>(recentBooks.size()), pageItems);
         requestUpdate();
         return;
       }
       if (gestureAction == TouchHitTest::ListGestureAction::PreviousItem) {
         mappedInput.suppressTouchButtonFallback();
-        selectorIndex =
-            ButtonNavigator::previousPageIndex(static_cast<int>(selectorIndex), static_cast<int>(recentBooks.size()),
-                                               pageItems);
+        selectorIndex = ButtonNavigator::previousPageIndex(static_cast<int>(selectorIndex),
+                                                           static_cast<int>(recentBooks.size()), pageItems);
         requestUpdate();
         return;
       }

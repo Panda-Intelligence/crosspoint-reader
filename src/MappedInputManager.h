@@ -4,6 +4,8 @@
 
 #include "InputTouchEvent.h"
 
+class GfxRenderer;
+
 class MappedInputManager {
  public:
   enum class Button { Back, Confirm, Left, Right, Up, Down, Power, PageBack, PageForward };
@@ -25,6 +27,7 @@ class MappedInputManager {
   bool wasAnyReleased() const;
   unsigned long getHeldTime() const;
   bool consumeTouchEvent(InputTouchEvent* outEvent) const;
+  bool consumeTouchEvent(InputTouchEvent* outEvent, const GfxRenderer& renderer) const;
   void suppressTouchButtonFallback() const;
   bool isTouchButtonHintTap(const InputTouchEvent& event) const;
   Labels mapLabels(const char* back, const char* confirm, const char* previous, const char* next) const;

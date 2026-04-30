@@ -273,7 +273,7 @@ void CrossPointWebServerActivity::loop() {
   // Handle different states
   if (state == WebServerActivityState::SERVER_RUNNING) {
     InputTouchEvent touchEvent;
-    if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
       const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
       if (!buttonHintTap && TouchHitTest::isBackwardSwipe(touchEvent)) {
         mappedInput.suppressTouchButtonFallback();

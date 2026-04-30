@@ -67,7 +67,7 @@ void ArcadeHubActivity::openCurrentSelection() {
 
 void ArcadeHubActivity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     if (showingDetail) {
       if (touchEvent.isTap()) {
         mappedInput.suppressTouchButtonFallback();

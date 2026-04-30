@@ -362,7 +362,7 @@ void KOReaderSyncActivity::render(RenderLock&&) {
 
 void KOReaderSyncActivity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
 
     if (state == NO_CREDENTIALS || state == SYNC_FAILED || state == UPLOAD_COMPLETE) {
@@ -390,11 +390,10 @@ void KOReaderSyncActivity::loop() {
           }
           return;
         }
-      } else if (!buttonHintTap &&
-                 (touchEvent.type == InputTouchEvent::Type::SwipeUp ||
-                  touchEvent.type == InputTouchEvent::Type::SwipeDown ||
-                  touchEvent.type == InputTouchEvent::Type::SwipeLeft ||
-                  touchEvent.type == InputTouchEvent::Type::SwipeRight)) {
+      } else if (!buttonHintTap && (touchEvent.type == InputTouchEvent::Type::SwipeUp ||
+                                    touchEvent.type == InputTouchEvent::Type::SwipeDown ||
+                                    touchEvent.type == InputTouchEvent::Type::SwipeLeft ||
+                                    touchEvent.type == InputTouchEvent::Type::SwipeRight)) {
         mappedInput.suppressTouchButtonFallback();
         selectedOption = (selectedOption + 1) % 2;
         requestUpdate();

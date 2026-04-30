@@ -15,8 +15,8 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
-#include "RecentBooksStore.h"
 #include "ReaderUtils.h"
+#include "RecentBooksStore.h"
 #include "XtcReaderChapterSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -95,11 +95,10 @@ void XtcReaderActivity::onExit() {
 
 void XtcReaderActivity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     mappedInput.suppressTouchButtonFallback();
-    const InputTouchEvent orientedTouch = TouchHitTest::eventForRendererOrientation(touchEvent, renderer);
     const auto action = TouchHitTest::readerActionForTouch(
-        orientedTouch, Rect{0, 0, renderer.getScreenWidth(), renderer.getScreenHeight()});
+        touchEvent, Rect{0, 0, renderer.getScreenWidth(), renderer.getScreenHeight()});
     if (action == TouchHitTest::ReaderAction::Menu) {
       if (xtc && xtc->hasChapters() && !xtc->getChapters().empty()) {
         startActivityForResult(

@@ -53,7 +53,7 @@ void ReadingHubActivity::openCurrentSelection() {
 
 void ReadingHubActivity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     if (touchEvent.isTap()) {
       const auto& metrics = UITheme::getInstance().getMetrics();
       const Rect listRect{

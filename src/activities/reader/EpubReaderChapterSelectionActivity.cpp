@@ -77,13 +77,13 @@ void EpubReaderChapterSelectionActivity::loop() {
   };
 
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     if (totalItems > 0 && touchEvent.isTap()) {
       const Rect contentRect = chapterContentRect(renderer);
       const Rect listRect{contentRect.x, contentRect.y + kChapterStartY, contentRect.width,
                           contentRect.height - kChapterStartY};
-      const int clickedIndex = TouchHitTest::listItemAt(listRect, kChapterLineHeight, selectorIndex, totalItems,
-                                                        touchEvent.x, touchEvent.y);
+      const int clickedIndex =
+          TouchHitTest::listItemAt(listRect, kChapterLineHeight, selectorIndex, totalItems, touchEvent.x, touchEvent.y);
       if (clickedIndex >= 0) {
         mappedInput.suppressTouchButtonFallback();
         selectorIndex = clickedIndex;

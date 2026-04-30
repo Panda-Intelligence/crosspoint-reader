@@ -22,7 +22,7 @@ void CrashActivity::onEnter() {
 
 void CrashActivity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
     if (!buttonHintTap && (touchEvent.isTap() || TouchHitTest::isBackwardSwipe(touchEvent))) {
       mappedInput.suppressTouchButtonFallback();

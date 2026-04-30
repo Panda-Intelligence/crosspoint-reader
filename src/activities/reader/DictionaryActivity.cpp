@@ -25,9 +25,8 @@ constexpr std::array<DictionaryEntry, 5> kEntries = {{
 Rect dictionaryListRect(const GfxRenderer& renderer) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   return Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, renderer.getScreenWidth(),
-              renderer.getScreenHeight() -
-                  (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
-                   metrics.verticalSpacing * 2)};
+              renderer.getScreenHeight() - (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
+                                            metrics.verticalSpacing * 2)};
 }
 
 void toggleDictionaryDetail(bool& showingDetail, Activity& activity) {
@@ -45,7 +44,7 @@ void DictionaryActivity::onEnter() {
 
 void DictionaryActivity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
     if (!buttonHintTap && !showingDetail && touchEvent.isTap()) {
       const auto& metrics = UITheme::getInstance().getMetrics();
@@ -69,10 +68,10 @@ void DictionaryActivity::loop() {
       requestUpdate();
       return;
     } else if (!buttonHintTap && showingDetail && touchEvent.isTap() &&
-               TouchHitTest::pointInRect(touchEvent.x, touchEvent.y,
-                                         Rect{0, 0, renderer.getScreenWidth(),
-                                              renderer.getScreenHeight() -
-                                                  UITheme::getInstance().getMetrics().buttonHintsHeight})) {
+               TouchHitTest::pointInRect(
+                   touchEvent.x, touchEvent.y,
+                   Rect{0, 0, renderer.getScreenWidth(),
+                        renderer.getScreenHeight() - UITheme::getInstance().getMetrics().buttonHintsHeight})) {
       mappedInput.suppressTouchButtonFallback();
       toggleDictionaryDetail(showingDetail, *this);
       return;
@@ -117,8 +116,8 @@ void DictionaryActivity::render(RenderLock&&) {
 
   if (!showingDetail) {
     GUI.drawList(
-        renderer, dictionaryListRect(renderer),
-        static_cast<int>(kEntries.size()), selectedIndex, [](int index) { return std::string(kEntries[index].word); },
+        renderer, dictionaryListRect(renderer), static_cast<int>(kEntries.size()), selectedIndex,
+        [](int index) { return std::string(kEntries[index].word); },
         [](int index) { return std::string(kEntries[index].meaning); });
   } else {
     renderer.drawCenteredText(UI_12_FONT_ID, pageHeight / 2 - 40, kEntries[selectedIndex].word, true,
@@ -127,8 +126,8 @@ void DictionaryActivity::render(RenderLock&&) {
     renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 50, "Confirm toggles detail");
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), showingDetail ? "Toggle" : "Open", tr(STR_DIR_UP),
-                                            tr(STR_DIR_DOWN));
+  const auto labels =
+      mappedInput.mapLabels(tr(STR_BACK), showingDetail ? "Toggle" : "Open", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

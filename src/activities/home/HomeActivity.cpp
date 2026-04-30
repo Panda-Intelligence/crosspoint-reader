@@ -176,7 +176,7 @@ void HomeActivity::loop() {
   const int menuCount = getMenuItemCount();
 
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     mappedInput.suppressTouchButtonFallback();
     const auto& metrics = UITheme::getInstance().getMetrics();
     const int recentCount = static_cast<int>(recentBooks.size());
@@ -197,8 +197,8 @@ void HomeActivity::loop() {
       const int menuTop = metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.verticalSpacing;
       for (int i = 0; i < menuItemCount; ++i) {
         const int tileY = menuTop + i * (metrics.menuRowHeight + metrics.menuSpacing);
-        const Rect tileRect{metrics.contentSidePadding, tileY, renderer.getScreenWidth() - metrics.contentSidePadding * 2,
-                            metrics.menuRowHeight};
+        const Rect tileRect{metrics.contentSidePadding, tileY,
+                            renderer.getScreenWidth() - metrics.contentSidePadding * 2, metrics.menuRowHeight};
         if (TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, tileRect)) {
           selectorIndex = recentCount + i;
           openCurrentSelection();

@@ -149,6 +149,9 @@ InputTouchEvent toInputTouchEvent(const MofeiTouchDriver::Event& event) {
   InputTouchEvent inputEvent;
   inputEvent.x = event.x;
   inputEvent.y = event.y;
+  inputEvent.rawX = event.x;
+  inputEvent.rawY = event.y;
+  inputEvent.hasRaw = true;
 
   switch (event.type) {
     case MofeiTouchDriver::EventType::Tap:
@@ -383,8 +386,8 @@ void HalGPIO::updateMofeiTouch() {
   uint8_t button = BTN_CONFIRM;
   if (mapMofeiTouchToButton(touchEvent, &button)) {
     injectMofeiButtonEvent(button);
-    LOG_DBG("TOUCH", "event=%u x=%u y=%u button=%u", static_cast<unsigned>(touchEvent.type), touchEvent.x,
-            touchEvent.y, button);
+    LOG_DBG("TOUCH", "event=%u x=%u y=%u button=%u", static_cast<unsigned>(touchEvent.type), touchEvent.x, touchEvent.y,
+            button);
   } else {
     LOG_DBG("TOUCH", "event=%u x=%u y=%u button=none", static_cast<unsigned>(touchEvent.type), touchEvent.x,
             touchEvent.y);

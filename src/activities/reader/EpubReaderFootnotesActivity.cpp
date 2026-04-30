@@ -44,17 +44,16 @@ void EpubReaderFootnotesActivity::openSelectedFootnote() {
 
 void EpubReaderFootnotesActivity::loop() {
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
     if (!buttonHintTap && !footnotes.empty() && touchEvent.isTap()) {
       const Rect contentRect = footnoteContentRect(renderer);
       const int visibleCount = std::max(1, contentRect.height / kFootnoteLineHeight);
       const Rect listRect{contentRect.x, contentRect.y + kFootnoteStartY, contentRect.width,
                           contentRect.height - kFootnoteStartY};
-      const int clickedRow =
-          TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, listRect)
-              ? (touchEvent.y - listRect.y) / kFootnoteLineHeight
-              : -1;
+      const int clickedRow = TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, listRect)
+                                 ? (touchEvent.y - listRect.y) / kFootnoteLineHeight
+                                 : -1;
       const int clickedIndex = clickedRow >= 0 && clickedRow < visibleCount ? scrollOffset + clickedRow : -1;
       if (clickedIndex >= 0 && clickedIndex < static_cast<int>(footnotes.size())) {
         mappedInput.suppressTouchButtonFallback();

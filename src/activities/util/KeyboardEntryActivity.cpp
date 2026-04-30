@@ -363,7 +363,7 @@ void KeyboardEntryActivity::loop() {
   const int totalRows = getTotalRowCount();
 
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     if (touchEvent.isTap()) {
       if (handleTouchTap(touchEvent.x, touchEvent.y)) {
         mappedInput.suppressTouchButtonFallback();

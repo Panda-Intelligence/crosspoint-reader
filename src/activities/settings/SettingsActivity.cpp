@@ -12,8 +12,8 @@
 #include "OpdsServerListActivity.h"
 #include "OtaUpdateActivity.h"
 #include "SettingsList.h"
-#include "StorageFontRegistry.h"
 #include "StatusBarSettingsActivity.h"
+#include "StorageFontRegistry.h"
 #include "TraditionalChineseFontsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
@@ -37,8 +37,7 @@ std::string traditionalChineseFontStatus() {
 std::string readerFontValueText(const SettingInfo& setting) {
   const uint8_t value = SETTINGS.*(setting.valuePtr);
   std::string valueText = I18N.get(setting.enumValues[value]);
-  if (setting.valuePtr == &CrossPointSettings::fontFamily &&
-      value == CrossPointSettings::FONT_FAMILY::NOTOSANS_TC) {
+  if (setting.valuePtr == &CrossPointSettings::fontFamily && value == CrossPointSettings::FONT_FAMILY::NOTOSANS_TC) {
     valueText += " [";
     valueText += traditionalChineseFontStatus();
     valueText += "]";
@@ -131,14 +130,14 @@ void SettingsActivity::loop() {
   bool hasChangedCategory = false;
 
   InputTouchEvent touchEvent;
-  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
     const auto& metrics = UITheme::getInstance().getMetrics();
     if (touchEvent.isTap()) {
       const int pageWidth = renderer.getScreenWidth();
       const int pageHeight = renderer.getScreenHeight();
       const Rect tabRect{0, metrics.topPadding + metrics.headerHeight, pageWidth, metrics.tabBarHeight};
-      const int tappedCategory = categoryIndexAt(renderer, tabRect, touchEvent.x, touchEvent.y, categoryNames,
-                                                categoryCount);
+      const int tappedCategory =
+          categoryIndexAt(renderer, tabRect, touchEvent.x, touchEvent.y, categoryNames, categoryCount);
       if (tappedCategory >= 0) {
         mappedInput.suppressTouchButtonFallback();
         enterCategory(tappedCategory);
@@ -151,9 +150,8 @@ void SettingsActivity::loop() {
                           pageWidth,
                           pageHeight - (metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight +
                                         metrics.buttonHintsHeight + metrics.verticalSpacing * 2)};
-      const int clickedIndex =
-          TouchHitTest::listItemAt(listRect, metrics.listRowHeight, selectedSettingIndex - 1, settingsCount,
-                                   touchEvent.x, touchEvent.y);
+      const int clickedIndex = TouchHitTest::listItemAt(listRect, metrics.listRowHeight, selectedSettingIndex - 1,
+                                                        settingsCount, touchEvent.x, touchEvent.y);
       if (clickedIndex >= 0) {
         mappedInput.suppressTouchButtonFallback();
         selectedSettingIndex = clickedIndex + 1;
@@ -280,8 +278,7 @@ void SettingsActivity::toggleCurrentSetting() {
         startActivityForResult(std::make_unique<ButtonRemapActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::TraditionalChineseFonts:
-        startActivityForResult(std::make_unique<TraditionalChineseFontsActivity>(renderer, mappedInput),
-                               resultHandler);
+        startActivityForResult(std::make_unique<TraditionalChineseFontsActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::CustomiseStatusBar:
         startActivityForResult(std::make_unique<StatusBarSettingsActivity>(renderer, mappedInput), resultHandler);
@@ -353,8 +350,7 @@ void SettingsActivity::render(RenderLock&&) {
           valueText = readerFontValueText(setting);
         } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
           valueText = std::to_string(SETTINGS.*(setting.valuePtr));
-        } else if (setting.type == SettingType::ACTION &&
-                   setting.action == SettingAction::TraditionalChineseFonts) {
+        } else if (setting.type == SettingType::ACTION && setting.action == SettingAction::TraditionalChineseFonts) {
           valueText = tcFontPackSummary();
         }
         return valueText;
