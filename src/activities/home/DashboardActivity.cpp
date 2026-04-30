@@ -123,8 +123,10 @@ void DashboardActivity::openCurrentSelection() {
 void DashboardActivity::loop() {
   InputTouchEvent touchEvent;
   if (mappedInput.consumeTouchEvent(&touchEvent)) {
-    LOG_DBG("DASH", "touch type=%u x=%u y=%u", static_cast<unsigned>(touchEvent.type), touchEvent.x, touchEvent.y);
-    if (touchEvent.isTap()) {
+    const InputTouchEvent orientedTouch = TouchHitTest::eventForRendererOrientation(touchEvent, renderer);
+    LOG_DBG("DASH", "touch type=%u raw=%u,%u oriented=%u,%u", static_cast<unsigned>(orientedTouch.type),
+            touchEvent.x, touchEvent.y, orientedTouch.x, orientedTouch.y);
+    if (orientedTouch.isTap()) {
       const auto& metrics = UITheme::getInstance().getMetrics();
       const Rect listRect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing,
                           renderer.getScreenWidth(),
@@ -133,7 +135,7 @@ void DashboardActivity::loop() {
                                metrics.verticalSpacing * 2)};
       const int clickedIndex =
           TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex, kItemCount,
-                                   touchEvent.x, touchEvent.y);
+                                   orientedTouch.x, orientedTouch.y);
       if (clickedIndex >= 0) {
         mappedInput.suppressTouchButtonFallback();
         selectedIndex = clickedIndex;
@@ -141,7 +143,7 @@ void DashboardActivity::loop() {
         return;
       }
     } else {
-      const auto gestureAction = TouchHitTest::listGestureActionForTouch(touchEvent);
+      const auto gestureAction = TouchHitTest::listGestureActionForTouch(orientedTouch);
       if (gestureAction == TouchHitTest::ListGestureAction::NextItem) {
         mappedInput.suppressTouchButtonFallback();
         selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);
