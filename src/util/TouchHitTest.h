@@ -1,5 +1,7 @@
 #pragma once
 
+#include <GfxRenderer.h>
+
 #include "InputTouchEvent.h"
 #include "components/themes/BaseTheme.h"
 
@@ -68,6 +70,72 @@ inline bool isForwardSwipe(const InputTouchEvent& event) {
 
 inline bool isBackwardSwipe(const InputTouchEvent& event) {
   return event.type == InputTouchEvent::Type::SwipeDown || event.type == InputTouchEvent::Type::SwipeRight;
+}
+
+inline InputTouchEvent::Type transformSwipeForOrientation(InputTouchEvent::Type type,
+                                                          GfxRenderer::Orientation orientation) {
+  if (type == InputTouchEvent::Type::Tap || type == InputTouchEvent::Type::None) {
+    return type;
+  }
+
+  switch (orientation) {
+    case GfxRenderer::Orientation::Portrait:
+      return type;
+    case GfxRenderer::Orientation::PortraitInverted:
+      if (type == InputTouchEvent::Type::SwipeLeft) return InputTouchEvent::Type::SwipeRight;
+      if (type == InputTouchEvent::Type::SwipeRight) return InputTouchEvent::Type::SwipeLeft;
+      if (type == InputTouchEvent::Type::SwipeUp) return InputTouchEvent::Type::SwipeDown;
+      return InputTouchEvent::Type::SwipeUp;
+    case GfxRenderer::Orientation::LandscapeClockwise:
+      if (type == InputTouchEvent::Type::SwipeLeft) return InputTouchEvent::Type::SwipeUp;
+      if (type == InputTouchEvent::Type::SwipeRight) return InputTouchEvent::Type::SwipeDown;
+      if (type == InputTouchEvent::Type::SwipeUp) return InputTouchEvent::Type::SwipeRight;
+      return InputTouchEvent::Type::SwipeLeft;
+    case GfxRenderer::Orientation::LandscapeCounterClockwise:
+      if (type == InputTouchEvent::Type::SwipeLeft) return InputTouchEvent::Type::SwipeDown;
+      if (type == InputTouchEvent::Type::SwipeRight) return InputTouchEvent::Type::SwipeUp;
+      if (type == InputTouchEvent::Type::SwipeUp) return InputTouchEvent::Type::SwipeLeft;
+      return InputTouchEvent::Type::SwipeRight;
+  }
+
+  return type;
+}
+
+inline uint16_t clampTouchCoord(int value, int maxExclusive) {
+  if (value < 0 || maxExclusive <= 0) {
+    return 0;
+  }
+  if (value >= maxExclusive) {
+    return static_cast<uint16_t>(maxExclusive - 1);
+  }
+  return static_cast<uint16_t>(value);
+}
+
+inline InputTouchEvent eventForRendererOrientation(const InputTouchEvent& event, const GfxRenderer& renderer) {
+  InputTouchEvent oriented = event;
+  const auto orientation = renderer.getOrientation();
+  const int width = renderer.getScreenWidth();
+  const int height = renderer.getScreenHeight();
+
+  switch (orientation) {
+    case GfxRenderer::Orientation::Portrait:
+      break;
+    case GfxRenderer::Orientation::PortraitInverted:
+      oriented.x = clampTouchCoord(width - 1 - static_cast<int>(event.x), width);
+      oriented.y = clampTouchCoord(height - 1 - static_cast<int>(event.y), height);
+      break;
+    case GfxRenderer::Orientation::LandscapeClockwise:
+      oriented.x = clampTouchCoord(width - 1 - static_cast<int>(event.y), width);
+      oriented.y = clampTouchCoord(event.x, height);
+      break;
+    case GfxRenderer::Orientation::LandscapeCounterClockwise:
+      oriented.x = clampTouchCoord(event.y, width);
+      oriented.y = clampTouchCoord(height - 1 - static_cast<int>(event.x), height);
+      break;
+  }
+
+  oriented.type = transformSwipeForOrientation(event.type, orientation);
+  return oriented;
 }
 
 inline ReaderAction readerActionForTouch(const InputTouchEvent& event, const Rect& screenRect) {

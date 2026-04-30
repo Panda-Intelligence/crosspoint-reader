@@ -94,8 +94,9 @@ void XtcReaderActivity::loop() {
   InputTouchEvent touchEvent;
   if (mappedInput.consumeTouchEvent(&touchEvent)) {
     mappedInput.suppressTouchButtonFallback();
+    const InputTouchEvent orientedTouch = TouchHitTest::eventForRendererOrientation(touchEvent, renderer);
     const auto action = TouchHitTest::readerActionForTouch(
-        touchEvent, Rect{0, 0, renderer.getScreenWidth(), renderer.getScreenHeight()});
+        orientedTouch, Rect{0, 0, renderer.getScreenWidth(), renderer.getScreenHeight()});
     if (action == TouchHitTest::ReaderAction::Menu) {
       if (xtc && xtc->hasChapters() && !xtc->getChapters().empty()) {
         startActivityForResult(

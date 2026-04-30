@@ -26,6 +26,7 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/ScreenshotUtil.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 // pagesPerRefresh now comes from SETTINGS.getRefreshFrequency()
@@ -117,6 +118,58 @@ void EpubReaderActivity::loop() {
     return;
   }
 
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    mappedInput.suppressTouchButtonFallback();
+    const InputTouchEvent orientedTouch = TouchHitTest::eventForRendererOrientation(touchEvent, renderer);
+
+    if (automaticPageTurnActive) {
+      automaticPageTurnActive = false;
+      requestUpdate();
+      return;
+    }
+
+    const auto action = TouchHitTest::readerActionForTouch(
+        orientedTouch, Rect{0, 0, renderer.getScreenWidth(), renderer.getScreenHeight()});
+    if (action == TouchHitTest::ReaderAction::Menu) {
+      openReaderMenu();
+      return;
+    }
+
+    if (footnoteDepth > 0 && orientedTouch.isTap() && orientedTouch.x < renderer.getScreenWidth() / 6) {
+      restoreSavedPosition();
+      return;
+    }
+
+    if (currentSpineIndex > 0 && currentSpineIndex >= epub->getSpineItemsCount()) {
+      if (action == TouchHitTest::ReaderAction::NextPage) {
+        onGoHome();
+      } else if (action == TouchHitTest::ReaderAction::PreviousPage) {
+        currentSpineIndex = epub->getSpineItemsCount() - 1;
+        nextPageNumber = 0;
+        pendingPageJump = std::numeric_limits<uint16_t>::max();
+        requestUpdate();
+      }
+      return;
+    }
+
+    if (!section) {
+      requestUpdate();
+      return;
+    }
+
+    if (action == TouchHitTest::ReaderAction::NextPage) {
+      pageTurn(true);
+      return;
+    }
+    if (action == TouchHitTest::ReaderAction::PreviousPage) {
+      pageTurn(false);
+      return;
+    }
+
+    return;
+  }
+
   if (automaticPageTurnActive) {
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) ||
         mappedInput.wasReleased(MappedInputManager::Button::Back)) {
@@ -145,26 +198,7 @@ void EpubReaderActivity::loop() {
 
   // Enter reader menu activity.
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    const int currentPage = section ? section->currentPage + 1 : 0;
-    const int totalPages = section ? section->pageCount : 0;
-    float bookProgress = 0.0f;
-    if (epub->getBookSize() > 0 && section && section->pageCount > 0) {
-      const float chapterProgress = static_cast<float>(section->currentPage) / static_cast<float>(section->pageCount);
-      bookProgress = epub->calculateProgress(currentSpineIndex, chapterProgress) * 100.0f;
-    }
-    const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
-    startActivityForResult(std::make_unique<EpubReaderMenuActivity>(
-                               renderer, mappedInput, epub->getTitle(), currentPage, totalPages, bookProgressPercent,
-                               SETTINGS.orientation, !currentPageFootnotes.empty()),
-                           [this](const ActivityResult& result) {
-                             // Always apply orientation change even if the menu was cancelled
-                             const auto& menu = std::get<MenuResult>(result.data);
-                             applyOrientation(menu.orientation);
-                             toggleAutoPageTurn(menu.pageTurnOption);
-                             if (!result.isCancelled) {
-                               onReaderMenuConfirm(static_cast<EpubReaderMenuActivity::MenuAction>(menu.action));
-                             }
-                           });
+    openReaderMenu();
   }
 
   // Long press BACK (1s+) goes to file selection
@@ -483,6 +517,30 @@ void EpubReaderActivity::toggleAutoPageTurn(const uint8_t selectedPageTurnOption
     }
     section.reset();
   }
+}
+
+void EpubReaderActivity::openReaderMenu() {
+  const int currentPage = section ? section->currentPage + 1 : 0;
+  const int totalPages = section ? section->pageCount : 0;
+  float bookProgress = 0.0f;
+  if (epub->getBookSize() > 0 && section && section->pageCount > 0) {
+    const float chapterProgress = static_cast<float>(section->currentPage) / static_cast<float>(section->pageCount);
+    bookProgress = epub->calculateProgress(currentSpineIndex, chapterProgress) * 100.0f;
+  }
+  const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
+  startActivityForResult(
+      std::make_unique<EpubReaderMenuActivity>(renderer, mappedInput, epub->getTitle(), currentPage, totalPages,
+                                               bookProgressPercent, SETTINGS.orientation,
+                                               !currentPageFootnotes.empty()),
+      [this](const ActivityResult& result) {
+        // Always apply orientation change even if the menu was cancelled.
+        const auto& menu = std::get<MenuResult>(result.data);
+        applyOrientation(menu.orientation);
+        toggleAutoPageTurn(menu.pageTurnOption);
+        if (!result.isCancelled) {
+          onReaderMenuConfirm(static_cast<EpubReaderMenuActivity::MenuAction>(menu.action));
+        }
+      });
 }
 
 void EpubReaderActivity::pageTurn(bool isForwardTurn) {

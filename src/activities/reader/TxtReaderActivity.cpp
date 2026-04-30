@@ -14,6 +14,7 @@
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr size_t CHUNK_SIZE = 8 * 1024;  // 8KB chunk for reading
@@ -58,6 +59,34 @@ void TxtReaderActivity::onExit() {
 }
 
 void TxtReaderActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    mappedInput.suppressTouchButtonFallback();
+    const InputTouchEvent orientedTouch = TouchHitTest::eventForRendererOrientation(touchEvent, renderer);
+    const auto action = TouchHitTest::readerActionForTouch(
+        orientedTouch, Rect{0, 0, renderer.getScreenWidth(), renderer.getScreenHeight()});
+
+    if (action == TouchHitTest::ReaderAction::PreviousPage) {
+      if (currentPage > 0) {
+        currentPage--;
+        requestUpdate();
+      }
+      return;
+    }
+
+    if (action == TouchHitTest::ReaderAction::NextPage) {
+      if (currentPage < totalPages - 1) {
+        currentPage++;
+        requestUpdate();
+      } else {
+        onGoHome();
+      }
+      return;
+    }
+
+    return;
+  }
+
   // Long press BACK (1s+) goes to file selection
   if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
     activityManager.goToFileBrowser(txt ? txt->getPath() : "");
