@@ -7,6 +7,7 @@
 #include "StudyReviewQueueStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr int kQueueCount = 3;
@@ -82,6 +83,79 @@ void ReviewQueueActivity::onEnter() {
 }
 
 void ReviewQueueActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (confirmingClear) {
+      if (!buttonHintTap && touchEvent.isTap()) {
+        mappedInput.suppressTouchButtonFallback();
+        if (touchEvent.x >= renderer.getScreenWidth() / 2) {
+          STUDY_REVIEW_QUEUE.clearQueue(queueKind(queueIndex));
+          cardIndex = 0;
+        }
+        confirmingClear = false;
+        requestUpdate();
+        return;
+      }
+      if (!buttonHintTap && touchEvent.type == InputTouchEvent::Type::SwipeLeft) {
+        mappedInput.suppressTouchButtonFallback();
+        STUDY_REVIEW_QUEUE.clearQueue(queueKind(queueIndex));
+        cardIndex = 0;
+        confirmingClear = false;
+        requestUpdate();
+        return;
+      }
+      if (!buttonHintTap && touchEvent.type == InputTouchEvent::Type::SwipeRight) {
+        mappedInput.suppressTouchButtonFallback();
+        confirmingClear = false;
+        requestUpdate();
+        return;
+      }
+    } else if (!buttonHintTap && touchEvent.isTap()) {
+      mappedInput.suppressTouchButtonFallback();
+      if (!showingBack && currentQueueSize() > 0) {
+        const auto& metrics = UITheme::getInstance().getMetrics();
+        const int contentBottom = renderer.getScreenHeight() - metrics.buttonHintsHeight - 8;
+        if (touchEvent.y >= contentBottom - 56) {
+          confirmingClear = true;
+        } else {
+          showingBack = true;
+        }
+        requestUpdate();
+        return;
+      }
+      if (showingBack) {
+        const StudyQueueKind kind = queueKind(queueIndex);
+        if (kind == StudyQueueKind::Saved) {
+          showingBack = false;
+          requestUpdate();
+          return;
+        }
+        if (STUDY_REVIEW_QUEUE.removeAt(kind, cardIndex)) {
+          const int size = currentQueueSize();
+          cardIndex = size <= 0 ? 0 : std::min(cardIndex, size - 1);
+          showingBack = false;
+          requestUpdate();
+          return;
+        }
+      }
+    } else if (!buttonHintTap &&
+               (touchEvent.type == InputTouchEvent::Type::SwipeLeft ||
+                touchEvent.type == InputTouchEvent::Type::SwipeRight)) {
+      mappedInput.suppressTouchButtonFallback();
+      switchQueue(touchEvent.type == InputTouchEvent::Type::SwipeLeft ? 1 : -1);
+      return;
+    } else if (!buttonHintTap && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      moveCard(1);
+      return;
+    } else if (!buttonHintTap && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      moveCard(-1);
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     if (confirmingClear) {
       confirmingClear = false;

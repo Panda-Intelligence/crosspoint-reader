@@ -8,6 +8,7 @@
 #include "StudyDeckStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 namespace {
 constexpr char kStudyStateFile[] = "/.mofei/study/state.json";
@@ -36,12 +37,53 @@ void DeckImportStatusActivity::onEnter() {
 }
 
 void DeckImportStatusActivity::loop() {
+  const auto& deckEntries = STUDY_DECKS.getDeckSummaries();
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    if (deckEntries.empty()) {
+      if (touchEvent.isTap()) {
+        mappedInput.suppressTouchButtonFallback();
+        refreshDeckEntries();
+        requestUpdate();
+        return;
+      }
+    } else if (touchEvent.isTap()) {
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+      const int listH = renderer.getScreenHeight() - (contentTop + metrics.buttonHintsHeight +
+                                                       metrics.verticalSpacing + 24);
+      const Rect listRect{0, contentTop, renderer.getScreenWidth(), listH};
+      const int clickedIndex =
+          TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex,
+                                   static_cast<int>(deckEntries.size()), touchEvent.x, touchEvent.y);
+      if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
+        selectedIndex = clickedIndex;
+        refreshDeckEntries();
+        const auto& refreshedDeckEntries = STUDY_DECKS.getDeckSummaries();
+        selectedIndex = refreshedDeckEntries.empty()
+                            ? 0
+                            : std::min(selectedIndex, static_cast<int>(refreshedDeckEntries.size()) - 1);
+        requestUpdate();
+        return;
+      }
+    } else if (!deckEntries.empty() && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, static_cast<int>(deckEntries.size()));
+      requestUpdate();
+      return;
+    } else if (!deckEntries.empty() && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, static_cast<int>(deckEntries.size()));
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finish();
     return;
   }
-
-  const auto& deckEntries = STUDY_DECKS.getDeckSummaries();
 
   if (!deckEntries.empty()) {
     buttonNavigator.onNextRelease([this] {

@@ -8,6 +8,7 @@
 #include "StudyReviewQueueStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TouchHitTest.h"
 
 int SavedCardsActivity::itemCount() const {
   const auto& cards = STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Saved);
@@ -83,6 +84,49 @@ void SavedCardsActivity::onEnter() {
 }
 
 void SavedCardsActivity::loop() {
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent)) {
+    const int totalDecks = deckCount();
+    const int totalItems = itemCount();
+    if (touchEvent.isTap()) {
+      const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+      if (!buttonHintTap && totalItems > 0) {
+        mappedInput.suppressTouchButtonFallback();
+        if (!showingBack) {
+          showingBack = true;
+          requestUpdate();
+          return;
+        }
+        if (STUDY_REVIEW_QUEUE.removeAt(StudyQueueKind::Saved, selectedQueueIndex())) {
+          const int count = itemCount();
+          selectedIndex = count <= 0 ? 0 : std::min(selectedIndex, count - 1);
+          showingBack = false;
+          requestUpdate();
+          return;
+        }
+      }
+    } else if (!showingBack && totalDecks > 0 &&
+               (touchEvent.type == InputTouchEvent::Type::SwipeLeft ||
+                touchEvent.type == InputTouchEvent::Type::SwipeRight)) {
+      mappedInput.suppressTouchButtonFallback();
+      deckIndex = touchEvent.type == InputTouchEvent::Type::SwipeLeft ? (deckIndex + 1) % totalDecks
+                                                                      : (deckIndex - 1 + totalDecks) % totalDecks;
+      selectedIndex = 0;
+      requestUpdate();
+      return;
+    } else if (!showingBack && totalItems > 0 && TouchHitTest::isForwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, totalItems);
+      requestUpdate();
+      return;
+    } else if (!showingBack && totalItems > 0 && TouchHitTest::isBackwardSwipe(touchEvent)) {
+      mappedInput.suppressTouchButtonFallback();
+      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, totalItems);
+      requestUpdate();
+      return;
+    }
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     if (showingBack) {
       showingBack = false;
