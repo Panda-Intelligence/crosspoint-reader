@@ -120,6 +120,44 @@ void DashboardActivity::openCurrentSelection() {
 }
 
 void DashboardActivity::loop() {
+#if MOFEI_DEVICE
+  MofeiTouchDriver::Event touchEvent;
+  if (gpio.consumeMofeiTouchEvent(&touchEvent)) {
+    if (touchEvent.type == MofeiTouchDriver::EventType::Tap) {
+      const auto& metrics = UITheme::getInstance().getMetrics();
+      const int listY = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+      const int listHeight = renderer.getScreenHeight() - (metrics.topPadding + metrics.headerHeight +
+                                                           metrics.buttonHintsHeight + metrics.verticalSpacing * 2);
+
+      if (touchEvent.y >= listY && touchEvent.y < listY + listHeight) {
+        const int rowHeight = metrics.listWithSubtitleRowHeight;
+        const int pageItems = listHeight / rowHeight;
+        const int currentPage = selectedIndex / pageItems;
+        const int topIndex = currentPage * pageItems;
+
+        const int clickedRow = (touchEvent.y - listY) / rowHeight;
+        const int clickedIndex = topIndex + clickedRow;
+
+        if (clickedIndex < kItemCount) {
+          selectedIndex = clickedIndex;
+          openCurrentSelection();
+          return;
+        }
+      }
+    } else if (touchEvent.type == MofeiTouchDriver::EventType::SwipeUp ||
+               touchEvent.type == MofeiTouchDriver::EventType::SwipeLeft) {
+      selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);
+      requestUpdate();
+      return;
+    } else if (touchEvent.type == MofeiTouchDriver::EventType::SwipeDown ||
+               touchEvent.type == MofeiTouchDriver::EventType::SwipeRight) {
+      selectedIndex = ButtonNavigator::previousIndex(selectedIndex, kItemCount);
+      requestUpdate();
+      return;
+    }
+  }
+#endif
+
   buttonNavigator.onNextRelease([this] {
     selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);
     requestUpdate();
