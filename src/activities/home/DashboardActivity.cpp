@@ -123,8 +123,8 @@ void DashboardActivity::openCurrentSelection() {
 void DashboardActivity::loop() {
   InputTouchEvent touchEvent;
   if (mappedInput.consumeTouchEvent(&touchEvent)) {
-    mappedInput.suppressTouchButtonFallback();
-    if (touchEvent.isTap()) {
+    const InputTouchEvent dashboardTouch = TouchHitTest::eventForRendererOrientation(touchEvent, renderer);
+    if (dashboardTouch.isTap()) {
       const auto& metrics = UITheme::getInstance().getMetrics();
       const Rect listRect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing,
                           renderer.getScreenWidth(),
@@ -132,18 +132,21 @@ void DashboardActivity::loop() {
                               (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight +
                                metrics.verticalSpacing * 2)};
       const int clickedIndex =
-          TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex, kItemCount, touchEvent.x,
-                                   touchEvent.y);
+          TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex, kItemCount,
+                                   dashboardTouch.x, dashboardTouch.y);
       if (clickedIndex >= 0) {
+        mappedInput.suppressTouchButtonFallback();
         selectedIndex = clickedIndex;
         openCurrentSelection();
         return;
       }
-    } else if (TouchHitTest::isForwardSwipe(touchEvent)) {
+    } else if (TouchHitTest::isForwardSwipe(dashboardTouch)) {
+      mappedInput.suppressTouchButtonFallback();
       selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);
       requestUpdate();
       return;
-    } else if (TouchHitTest::isBackwardSwipe(touchEvent)) {
+    } else if (TouchHitTest::isBackwardSwipe(dashboardTouch)) {
+      mappedInput.suppressTouchButtonFallback();
       selectedIndex = ButtonNavigator::previousIndex(selectedIndex, kItemCount);
       requestUpdate();
       return;
