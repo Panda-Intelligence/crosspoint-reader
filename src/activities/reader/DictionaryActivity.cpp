@@ -136,7 +136,7 @@ void DictionaryActivity::render(RenderLock&&) {
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Dictionary");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_DICTIONARY));
 
   if (!showingDetail) {
     GUI.drawList(
@@ -147,11 +147,11 @@ void DictionaryActivity::render(RenderLock&&) {
     renderer.drawCenteredText(UI_12_FONT_ID, pageHeight / 2 - 40, kEntries[selectedIndex].word, true,
                               EpdFontFamily::BOLD);
     renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, kEntries[selectedIndex].meaning);
-    renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 50, "Confirm toggles detail");
+    renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 50, tr(STR_DICTIONARY_DETAIL_HINT));
   }
 
-  const auto labels =
-      mappedInput.mapLabels(tr(STR_BACK), showingDetail ? "Toggle" : "Open", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), showingDetail ? tr(STR_TOGGLE) : tr(STR_OPEN), tr(STR_DIR_UP),
+                                            tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

@@ -108,14 +108,14 @@ void ReadLaterActivity::render(RenderLock&&) {
   const auto pageHeight = renderer.getScreenHeight();
   const auto& items = READ_LATER_STORE.getItems();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Read Later");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_READ_LATER));
 
   if (items.empty()) {
     const int centerY = pageHeight / 2;
-    renderer.drawCenteredText(UI_10_FONT_ID, centerY - 42, "No local articles yet");
-    renderer.drawCenteredText(UI_10_FONT_ID, centerY - 8, "Send articles from companion/web");
-    renderer.drawCenteredText(UI_10_FONT_ID, centerY + 26, "Target path: /.mofei/reading/read_later");
-    renderer.drawCenteredText(SMALL_FONT_ID, centerY + 58, "Press Open to refresh");
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY - 42, tr(STR_READ_LATER_EMPTY_TITLE));
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY - 8, tr(STR_READ_LATER_EMPTY_HINT));
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + 26, tr(STR_READ_LATER_TARGET_PATH));
+    renderer.drawCenteredText(SMALL_FONT_ID, centerY + 58, tr(STR_READ_LATER_REFRESH_HINT));
   } else {
     GUI.drawList(
         renderer,
@@ -123,11 +123,11 @@ void ReadLaterActivity::render(RenderLock&&) {
              pageHeight -
                  (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)},
         static_cast<int>(items.size()), selectedIndex, [&items](int index) { return items[index].filename; },
-        [this, &items](int index) { return "Size: " + sizeLabel(items[index].bytes); });
+        [this, &items](int index) { return std::string(tr(STR_SIZE_LABEL)) + ": " + sizeLabel(items[index].bytes); });
   }
 
-  const auto labels =
-      mappedInput.mapLabels(tr(STR_BACK), items.empty() ? "Refresh" : "Open", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), items.empty() ? tr(STR_REFRESH) : tr(STR_OPEN),
+                                            tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

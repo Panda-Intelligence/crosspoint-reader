@@ -10,17 +10,31 @@
 namespace {
 constexpr int kItemCount = 4;
 
-const char* itemLabel(int index) {
+const char* itemLabel(const int index) {
   switch (index) {
     case 0:
-      return "Continue Reading";
+      return tr(STR_CONTINUE_READING);
     case 1:
-      return "Reader Library";
+      return tr(STR_READER_LIBRARY);
     case 2:
-      return "Dictionary";
+      return tr(STR_DICTIONARY);
     case 3:
     default:
-      return "Read Later";
+      return tr(STR_READ_LATER);
+  }
+}
+
+const char* itemSubtitle(const int index) {
+  switch (index) {
+    case 0:
+      return tr(STR_READING_SUBTITLE_CONTINUE);
+    case 1:
+      return tr(STR_READING_SUBTITLE_LIBRARY);
+    case 2:
+      return tr(STR_READING_SUBTITLE_DICTIONARY);
+    case 3:
+    default:
+      return tr(STR_READING_SUBTITLE_READ_LATER);
   }
 }
 }  // namespace
@@ -112,28 +126,16 @@ void ReadingHubActivity::render(RenderLock&&) {
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Reading");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_READING));
   GUI.drawList(
       renderer,
       Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, pageWidth,
            pageHeight -
                (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)},
       kItemCount, selectedIndex, [](int index) { return std::string(itemLabel(index)); },
-      [](int index) {
-        switch (index) {
-          case 0:
-            return std::string("Resume the latest book");
-          case 1:
-            return std::string("Library and reader settings");
-          case 2:
-            return std::string("Offline lookup");
-          case 3:
-          default:
-            return std::string("Imported articles");
-        }
-      });
+      [](int index) { return std::string(itemSubtitle(index)); });
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Open", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }
