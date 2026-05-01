@@ -22,6 +22,8 @@ struct MenuResult {
   uint8_t orientation = 0;
   uint8_t pageTurnOption = 0;
   bool pageTurnOptionChanged = false;
+  uint8_t fontSize = 0;
+  bool touchLockEnabled = false;
 };
 
 struct ChapterResult {

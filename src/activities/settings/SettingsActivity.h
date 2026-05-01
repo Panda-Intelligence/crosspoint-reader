@@ -23,6 +23,7 @@ enum class SettingAction {
   CheckForUpdates,
   Language,
   PreviewSleepScreen,
+  SleepWallpaper,
 };
 
 struct SettingInfo {

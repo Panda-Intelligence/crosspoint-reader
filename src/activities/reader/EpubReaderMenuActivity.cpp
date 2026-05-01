@@ -96,8 +96,30 @@ void EpubReaderMenuActivity::selectCurrentItem() {
     return;
   }
 
-  setResult(
-      MenuResult{static_cast<int>(selectedAction), pendingOrientation, selectedPageTurnOption, pageTurnOptionChanged});
+  if (selectedAction == MenuAction::FONT_SIZE_DOWN) {
+    if (currentFontSize > 0) {
+      currentFontSize--;
+      requestUpdate();
+    }
+    return;
+  }
+
+  if (selectedAction == MenuAction::FONT_SIZE_UP) {
+    if (currentFontSize < fontSizeLabels.size() - 1) {
+      currentFontSize++;
+      requestUpdate();
+    }
+    return;
+  }
+
+  if (selectedAction == MenuAction::TOUCH_LOCK) {
+    touchLockEnabled = !touchLockEnabled;
+    requestUpdate();
+    return;
+  }
+
+  setResult(MenuResult{static_cast<int>(selectedAction), pendingOrientation, selectedPageTurnOption,
+                       pageTurnOptionChanged, currentFontSize, touchLockEnabled});
   finish();
 }
 

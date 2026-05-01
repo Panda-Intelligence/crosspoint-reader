@@ -318,13 +318,14 @@ bool loadTraditionalChineseFonts(GfxRenderer& renderer) {
 
   bool anyLoaded = false;
   
-  // We cannot load all 4 font sizes into 8MB PSRAM simultaneously (~9.2MB total).
-  // The user requested to ONLY load the 12pt font for now.
-  const uint8_t requiredUiSize = CrossPointSettings::SMALL; // tc_12
+  // Load 12pt (Small) and 14pt (Medium) for UI use.
+  // This fits in 8MB PSRAM (approx 4.5MB for both) and provides better UI legibility.
+  const uint8_t uiSize12 = CrossPointSettings::SMALL;
+  const uint8_t uiSize14 = CrossPointSettings::MEDIUM;
   
   for (const auto& runtime : kPackRuntimes) {
-    if (runtime.info->size != requiredUiSize) {
-      // Unload if previously loaded to free memory
+    if (runtime.info->size != uiSize12 && runtime.info->size != uiSize14) {
+      // Unload 16pt/18pt if previously loaded to free memory
       if (runtime.family->loaded) {
         renderer.removeFont(runtime.info->fontId);
         runtime.family->reset();

@@ -11,6 +11,7 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
+#include "SleepWallpaperStore.h"
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -80,6 +81,20 @@ void SleepActivity::loop() {
 }
 
 void SleepActivity::renderCustomSleepScreen() const {
+  SLEEP_WALLPAPER.loadFromFile();
+  if (SLEEP_WALLPAPER.selectedPathExists()) {
+    FsFile selectedFile;
+    const auto& selectedPath = SLEEP_WALLPAPER.getSelectedPath();
+    if (Storage.openFileForRead("SLP", selectedPath, selectedFile)) {
+      Bitmap bitmap(selectedFile, true);
+      if (bitmap.parseHeaders() == BmpReaderError::Ok) {
+        LOG_DBG("SLP", "Loading selected wallpaper: %s", selectedPath.c_str());
+        renderBitmapSleepScreen(bitmap);
+        return;
+      }
+    }
+  }
+
   // Check if we have a /.sleep (preferred) or /sleep directory
   const char* sleepDir = nullptr;
   auto dir = Storage.open("/.sleep");

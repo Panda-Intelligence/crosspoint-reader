@@ -12,6 +12,7 @@
 #include "OpdsServerListActivity.h"
 #include "OtaUpdateActivity.h"
 #include "SettingsList.h"
+#include "SleepWallpaperActivity.h"
 #include "StatusBarSettingsActivity.h"
 #include "StorageFontRegistry.h"
 #include "TraditionalChineseFontsActivity.h"
@@ -98,6 +99,7 @@ void SettingsActivity::onEnter() {
   }
 
   // Append device-only ACTION items
+  displaySettings.push_back(SettingInfo::Action(StrId::STR_SLEEP_WALLPAPER_PICKER, SettingAction::SleepWallpaper));
   displaySettings.push_back(SettingInfo::Action(StrId::STR_PREVIEW_SLEEP_SCREEN, SettingAction::PreviewSleepScreen));
   controlsSettings.insert(controlsSettings.begin(),
                           SettingInfo::Action(StrId::STR_REMAP_FRONT_BUTTONS, SettingAction::RemapFrontButtons));
@@ -311,6 +313,9 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
       case SettingAction::PreviewSleepScreen:
         startActivityForResult(std::make_unique<SleepActivity>(renderer, mappedInput, true), resultHandler);
+        break;
+      case SettingAction::SleepWallpaper:
+        startActivityForResult(std::make_unique<SleepWallpaperActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::None:
         // Do nothing

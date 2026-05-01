@@ -126,7 +126,25 @@ void DashboardActivity::loop() {
         selectedIndex = clickedIndex;
         openCurrentSelection();
         return;
-      } else if (!mappedInput.isTouchButtonHintTap(touchEvent)) {
+      }
+
+      // Check for bottom button hints
+      uint8_t buttonIndex = 0;
+      if (gpio.mapMofeiButtonHintTapToButton(touchEvent.sourceX(), touchEvent.sourceY(), &buttonIndex)) {
+        mappedInput.suppressTouchButtonFallback();
+        if (buttonIndex == HalGPIO::BTN_CONFIRM) {
+          openCurrentSelection();
+        } else if (buttonIndex == HalGPIO::BTN_LEFT) {
+          selectedIndex = ButtonNavigator::previousIndex(selectedIndex, itemCount());
+          requestUpdate();
+        } else if (buttonIndex == HalGPIO::BTN_RIGHT) {
+          selectedIndex = ButtonNavigator::nextIndex(selectedIndex, itemCount());
+          requestUpdate();
+        }
+        return;
+      }
+
+      if (!mappedInput.isTouchButtonHintTap(touchEvent)) {
         mappedInput.suppressTouchButtonFallback();
         return;
       }

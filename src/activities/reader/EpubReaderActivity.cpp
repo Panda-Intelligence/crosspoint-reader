@@ -758,12 +758,21 @@ void EpubReaderActivity::openReaderMenu() {
                                                bookProgressPercent, SETTINGS.orientation, !currentPageFootnotes.empty(),
                                                SETTINGS.fontSize, touchLockEnabled, currentPageBookmarked),
       [this](const ActivityResult& result) {
-        // Always apply orientation change even if the menu was cancelled.
+        // Always apply orientation, font size, and touch lock changes even if the menu was cancelled.
         const auto& menu = std::get<MenuResult>(result.data);
         applyOrientation(menu.orientation);
         if (menu.pageTurnOptionChanged) {
           toggleAutoPageTurn(menu.pageTurnOption);
         }
+
+        if (menu.fontSize != SETTINGS.fontSize) {
+          changeFontSize(static_cast<int>(menu.fontSize) - static_cast<int>(SETTINGS.fontSize));
+        }
+
+        if (menu.touchLockEnabled != touchLockEnabled) {
+          toggleTouchLock();
+        }
+
         if (!result.isCancelled) {
           onReaderMenuConfirm(static_cast<EpubReaderMenuActivity::MenuAction>(menu.action));
         }

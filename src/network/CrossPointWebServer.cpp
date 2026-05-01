@@ -488,8 +488,11 @@ void CrossPointWebServer::handleGetFontPacks() const {
   server->send(200, "application/json", json);
 }
 
+#include "../ui_font_manager.h"
+
 void CrossPointWebServer::handleReloadFontPacks() {
   const bool loaded = StorageFontRegistry::loadTraditionalChineseFonts(renderer);
+  updateUiFontMapping();
   if (!loaded) {
     server->send(400, "text/plain", "No multilingual font packs found under /.mofei/fonts/");
     return;
@@ -527,6 +530,7 @@ void CrossPointWebServer::handleDeleteFontPack() {
   }
 
   StorageFontRegistry::loadTraditionalChineseFonts(renderer);
+  updateUiFontMapping();
   server->send(200, "text/plain", "Font pack deleted");
 }
 

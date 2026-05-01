@@ -104,12 +104,15 @@ void TraditionalChineseFontsActivity::loop() {
   });
 }
 
+#include "../../ui_font_manager.h"
+
 void TraditionalChineseFontsActivity::handleSelection() {
   if (selectedIndex != reloadRowIndex()) {
     return;
   }
 
   StorageFontRegistry::loadTraditionalChineseFonts(renderer);
+  updateUiFontMapping();
   requestUpdate();
 }
 

@@ -203,27 +203,39 @@ void updateUiFontMapping() {
   LOG_INF("UIFONT", "updateUiFontMapping() called. Language: %d", static_cast<int>(lang));
 
   if (lang == Language::ZH_CN || lang == Language::ZH_TW) {
-    bool loaded = StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::SMALL);
-    LOG_INF("UIFONT", "Is TC SMALL loaded? %d", loaded);
+    bool loaded12 = StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::SMALL);
+    bool loaded14 = StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::MEDIUM);
+    LOG_INF("UIFONT", "TC fonts loaded: 12pt=%d, 14pt=%d", loaded12, loaded14);
 
-    if (loaded) {
+    if (loaded12 || loaded14) {
       const auto& fontMap = renderer.getFontMap();
-      auto it = fontMap.find(NOTOSANS_TC_12_FONT_ID);
-      if (it != fontMap.end()) {
-        LOG_INF("UIFONT", "Found NOTOSANS_TC_12_FONT_ID. Remapping UI fonts...");
-        renderer.insertFont(UI_10_FONT_ID, it->second);
-        renderer.insertFont(UI_12_FONT_ID, it->second);
-        UITheme::getInstance().reload();
-        return;
-      } else {
-        LOG_ERR("UIFONT", "Font loaded but ID not in map!");
+      auto it12 = fontMap.find(NOTOSANS_TC_12_FONT_ID);
+      auto it14 = fontMap.find(NOTOSANS_TC_14_FONT_ID);
+
+      if (it14 != fontMap.end()) {
+        renderer.insertFont(UI_12_FONT_ID, it14->second);
+      } else if (it12 != fontMap.end()) {
+        renderer.insertFont(UI_12_FONT_ID, it12->second);
       }
+
+      if (it12 != fontMap.end()) {
+        renderer.insertFont(UI_10_FONT_ID, it12->second);
+        renderer.insertFont(SMALL_FONT_ID, it12->second);
+      } else if (it14 != fontMap.end()) {
+        renderer.insertFont(UI_10_FONT_ID, it14->second);
+        renderer.insertFont(SMALL_FONT_ID, it14->second);
+      }
+
+      LOG_INF("UIFONT", "Remapped UI fonts to Chinese variants.");
+      UITheme::getInstance().reload();
+      return;
     }
   }
 
-  LOG_INF("UIFONT", "Falling back to default UI fonts.");
+  LOG_INF("UIFONT", "Falling back to default UI fonts (Ubuntu).");
   renderer.insertFont(UI_10_FONT_ID, ui10FontFamily);
   renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
+  renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
   UITheme::getInstance().reload();
 }
 
