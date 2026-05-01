@@ -18,12 +18,16 @@
 void SleepActivity::onEnter() {
   Activity::onEnter();
 
+  const auto sleepOrientation =
+      SETTINGS.sleepScreenRotate180 ? GfxRenderer::Orientation::PortraitInverted : GfxRenderer::Orientation::Portrait;
+
   // Show popup with reader orientation only when going to sleep from reader
   if (APP_STATE.lastSleepFromReader) {
     ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
     GUI.drawPopup(renderer, tr(STR_ENTERING_SLEEP));
-    renderer.setOrientation(GfxRenderer::Orientation::Portrait);
+    renderer.setOrientation(sleepOrientation);
   } else {
+    renderer.setOrientation(sleepOrientation);
     GUI.drawPopup(renderer, tr(STR_ENTERING_SLEEP));
   }
 

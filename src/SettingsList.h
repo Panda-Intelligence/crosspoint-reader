@@ -23,6 +23,8 @@ inline const std::vector<SettingInfo>& getSettingsList() {
       SettingInfo::Enum(StrId::STR_SLEEP_COVER_FILTER, &CrossPointSettings::sleepScreenCoverFilter,
                         {StrId::STR_NONE_OPT, StrId::STR_FILTER_CONTRAST, StrId::STR_INVERTED},
                         "sleepScreenCoverFilter", StrId::STR_CAT_DISPLAY),
+      SettingInfo::Toggle(StrId::STR_SLEEP_ROTATE_180, &CrossPointSettings::sleepScreenRotate180,
+                          "sleepScreenRotate180", StrId::STR_CAT_DISPLAY),
       SettingInfo::Enum(StrId::STR_HIDE_BATTERY, &CrossPointSettings::hideBatteryPercentage,
                         {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS}, "hideBatteryPercentage",
                         StrId::STR_CAT_DISPLAY),
@@ -37,11 +39,10 @@ inline const std::vector<SettingInfo>& getSettingsList() {
                           StrId::STR_CAT_DISPLAY),
 
       // --- Reader ---
-      SettingInfo::Enum(StrId::STR_FONT_FAMILY, &CrossPointSettings::fontFamily,
-                        {StrId::STR_NOTO_SERIF, StrId::STR_NOTO_SANS, StrId::STR_OPEN_DYSLEXIC,
-                         StrId::STR_NOTO_SANS_TC},
-                        "fontFamily",
-                        StrId::STR_CAT_READER),
+      SettingInfo::Enum(
+          StrId::STR_FONT_FAMILY, &CrossPointSettings::fontFamily,
+          {StrId::STR_NOTO_SERIF, StrId::STR_NOTO_SANS, StrId::STR_OPEN_DYSLEXIC, StrId::STR_NOTO_SANS_TC},
+          "fontFamily", StrId::STR_CAT_READER),
       SettingInfo::Enum(StrId::STR_FONT_SIZE, &CrossPointSettings::fontSize,
                         {StrId::STR_SMALL, StrId::STR_MEDIUM, StrId::STR_LARGE, StrId::STR_X_LARGE}, "fontSize",
                         StrId::STR_CAT_READER),
