@@ -30,6 +30,7 @@ class EpubReaderActivity final : public Activity {
   bool pendingScreenshot = false;
   bool skipNextButtonCheck = false;  // Skip button processing for one frame after subactivity exit
   bool automaticPageTurnActive = false;
+  bool touchLockEnabled = false;
 
   // Footnote support
   std::vector<FootnoteEntry> currentPageFootnotes;
@@ -51,6 +52,8 @@ class EpubReaderActivity final : public Activity {
   void onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction action);
   void applyOrientation(uint8_t orientation);
   void toggleAutoPageTurn(uint8_t selectedPageTurnOption);
+  void changeFontSize(int delta);
+  void toggleTouchLock();
   void openReaderMenu();
   void pageTurn(bool isForwardTurn);
 

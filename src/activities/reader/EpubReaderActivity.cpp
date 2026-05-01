@@ -135,6 +135,10 @@ void EpubReaderActivity::loop() {
       return;
     }
 
+    if (touchLockEnabled) {
+      return;
+    }
+
     if (footnoteDepth > 0 && touchEvent.isTap() && touchEvent.x < renderer.getScreenWidth() / 6) {
       restoreSavedPosition();
       return;
@@ -375,6 +379,18 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
           });
       break;
     }
+    case EpubReaderMenuActivity::MenuAction::FONT_SIZE_DOWN: {
+      changeFontSize(-1);
+      break;
+    }
+    case EpubReaderMenuActivity::MenuAction::FONT_SIZE_UP: {
+      changeFontSize(1);
+      break;
+    }
+    case EpubReaderMenuActivity::MenuAction::TOUCH_LOCK: {
+      toggleTouchLock();
+      break;
+    }
     case EpubReaderMenuActivity::MenuAction::DISPLAY_QR: {
       if (section && section->currentPage >= 0 && section->currentPage < section->pageCount) {
         auto p = section->loadPageFromSectionFile();
@@ -518,6 +534,37 @@ void EpubReaderActivity::toggleAutoPageTurn(const uint8_t selectedPageTurnOption
   }
 }
 
+void EpubReaderActivity::changeFontSize(const int delta) {
+  const int nextFontSize = static_cast<int>(SETTINGS.fontSize) + delta;
+  if (nextFontSize < CrossPointSettings::FONT_SIZE::SMALL ||
+      nextFontSize >= CrossPointSettings::FONT_SIZE::FONT_SIZE_COUNT ||
+      nextFontSize == static_cast<int>(SETTINGS.fontSize)) {
+    requestUpdate();
+    return;
+  }
+
+  {
+    RenderLock lock(*this);
+    if (section) {
+      cachedSpineIndex = currentSpineIndex;
+      cachedChapterTotalPageCount = section->pageCount;
+      nextPageNumber = section->currentPage;
+      saveProgress(currentSpineIndex, section->currentPage, section->pageCount);
+    }
+
+    SETTINGS.fontSize = static_cast<uint8_t>(nextFontSize);
+    SETTINGS.saveToFile();
+    section.reset();
+  }
+  requestUpdate();
+}
+
+void EpubReaderActivity::toggleTouchLock() {
+  touchLockEnabled = !touchLockEnabled;
+  automaticPageTurnActive = false;
+  requestUpdate();
+}
+
 void EpubReaderActivity::openReaderMenu() {
   const int currentPage = section ? section->currentPage + 1 : 0;
   const int totalPages = section ? section->pageCount : 0;
@@ -527,14 +574,16 @@ void EpubReaderActivity::openReaderMenu() {
     bookProgress = epub->calculateProgress(currentSpineIndex, chapterProgress) * 100.0f;
   }
   const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
-  startActivityForResult(std::make_unique<EpubReaderMenuActivity>(renderer, mappedInput, epub->getTitle(), currentPage,
-                                                                  totalPages, bookProgressPercent, SETTINGS.orientation,
-                                                                  !currentPageFootnotes.empty()),
+  startActivityForResult(std::make_unique<EpubReaderMenuActivity>(
+                             renderer, mappedInput, epub->getTitle(), currentPage, totalPages, bookProgressPercent,
+                             SETTINGS.orientation, !currentPageFootnotes.empty(), SETTINGS.fontSize, touchLockEnabled),
                          [this](const ActivityResult& result) {
                            // Always apply orientation change even if the menu was cancelled.
                            const auto& menu = std::get<MenuResult>(result.data);
                            applyOrientation(menu.orientation);
-                           toggleAutoPageTurn(menu.pageTurnOption);
+                           if (menu.pageTurnOptionChanged) {
+                             toggleAutoPageTurn(menu.pageTurnOption);
+                           }
                            if (!result.isCancelled) {
                              onReaderMenuConfirm(static_cast<EpubReaderMenuActivity::MenuAction>(menu.action));
                            }

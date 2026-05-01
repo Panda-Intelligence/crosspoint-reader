@@ -3,6 +3,8 @@
 #include <GfxRenderer.h>
 #include <I18n.h>
 
+#include <algorithm>
+
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -23,16 +25,25 @@ Rect menuContentRect(const GfxRenderer& renderer) {
   return Rect{contentX, hintGutterHeight, renderer.getScreenWidth() - hintGutterWidth,
               renderer.getScreenHeight() - hintGutterHeight};
 }
+
+int menuVisibleItemCount(const GfxRenderer& renderer) {
+  const Rect contentRect = menuContentRect(renderer);
+  const int availableHeight = contentRect.height - kMenuStartY - UITheme::getInstance().getMetrics().buttonHintsHeight;
+  return std::max(1, availableHeight / kMenuLineHeight);
+}
 }  // namespace
 
 EpubReaderMenuActivity::EpubReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
                                                const std::string& title, const int currentPage, const int totalPages,
                                                const int bookProgressPercent, const uint8_t currentOrientation,
-                                               const bool hasFootnotes)
+                                               const bool hasFootnotes, const uint8_t fontSize,
+                                               const bool touchLockEnabled)
     : Activity("EpubReaderMenu", renderer, mappedInput),
       menuItems(buildMenuItems(hasFootnotes)),
       title(title),
       pendingOrientation(currentOrientation),
+      currentFontSize(fontSize),
+      touchLockEnabled(touchLockEnabled),
       currentPage(currentPage),
       totalPages(totalPages),
       bookProgressPercent(bookProgressPercent) {}
@@ -44,6 +55,9 @@ std::vector<EpubReaderMenuActivity::MenuItem> EpubReaderMenuActivity::buildMenuI
   if (hasFootnotes) {
     items.push_back({MenuAction::FOOTNOTES, StrId::STR_FOOTNOTES});
   }
+  items.push_back({MenuAction::FONT_SIZE_DOWN, StrId::STR_READER_FONT_SIZE_DOWN});
+  items.push_back({MenuAction::FONT_SIZE_UP, StrId::STR_READER_FONT_SIZE_UP});
+  items.push_back({MenuAction::TOUCH_LOCK, StrId::STR_TOUCH_LOCK});
   items.push_back({MenuAction::ROTATE_SCREEN, StrId::STR_ORIENTATION});
   items.push_back({MenuAction::AUTO_PAGE_TURN, StrId::STR_AUTO_TURN_PAGES_PER_MIN});
   items.push_back({MenuAction::GO_TO_PERCENT, StrId::STR_GO_TO_PERCENT});
@@ -73,11 +87,13 @@ void EpubReaderMenuActivity::selectCurrentItem() {
 
   if (selectedAction == MenuAction::AUTO_PAGE_TURN) {
     selectedPageTurnOption = (selectedPageTurnOption + 1) % pageTurnLabels.size();
+    pageTurnOptionChanged = true;
     requestUpdate();
     return;
   }
 
-  setResult(MenuResult{static_cast<int>(selectedAction), pendingOrientation, selectedPageTurnOption});
+  setResult(
+      MenuResult{static_cast<int>(selectedAction), pendingOrientation, selectedPageTurnOption, pageTurnOptionChanged});
   finish();
 }
 
@@ -88,7 +104,7 @@ void EpubReaderMenuActivity::loop() {
     if (!buttonHintTap && touchEvent.isTap()) {
       const Rect contentRect = menuContentRect(renderer);
       const Rect listRect{contentRect.x, contentRect.y + kMenuStartY, contentRect.width,
-                          contentRect.height - kMenuStartY};
+                          menuVisibleItemCount(renderer) * kMenuLineHeight};
       const int clickedIndex = TouchHitTest::listItemAt(listRect, kMenuLineHeight, selectedIndex,
                                                         static_cast<int>(menuItems.size()), touchEvent.x, touchEvent.y);
       if (clickedIndex >= 0) {
@@ -97,6 +113,8 @@ void EpubReaderMenuActivity::loop() {
         selectCurrentItem();
         return;
       }
+      mappedInput.suppressTouchButtonFallback();
+      return;
     } else if (!buttonHintTap && TouchHitTest::isForwardSwipe(touchEvent)) {
       mappedInput.suppressTouchButtonFallback();
       selectedIndex = ButtonNavigator::nextIndex(selectedIndex, static_cast<int>(menuItems.size()));
@@ -106,6 +124,9 @@ void EpubReaderMenuActivity::loop() {
       mappedInput.suppressTouchButtonFallback();
       selectedIndex = ButtonNavigator::previousIndex(selectedIndex, static_cast<int>(menuItems.size()));
       requestUpdate();
+      return;
+    } else if (!buttonHintTap) {
+      mappedInput.suppressTouchButtonFallback();
       return;
     }
   }
@@ -127,7 +148,7 @@ void EpubReaderMenuActivity::loop() {
   } else if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
     ActivityResult result;
     result.isCancelled = true;
-    result.data = MenuResult{-1, pendingOrientation, selectedPageTurnOption};
+    result.data = MenuResult{-1, pendingOrientation, selectedPageTurnOption, pageTurnOptionChanged};
     setResult(std::move(result));
     finish();
     return;
@@ -171,10 +192,13 @@ void EpubReaderMenuActivity::render(RenderLock&&) {
 
   // Menu Items
   const int startY = kMenuStartY + contentY;
+  const int visibleItems = menuVisibleItemCount(renderer);
+  const int pageStartIndex = (selectedIndex / visibleItems) * visibleItems;
+  const int pageEndIndex = std::min(static_cast<int>(menuItems.size()), pageStartIndex + visibleItems);
 
-  for (size_t i = 0; i < menuItems.size(); ++i) {
-    const int displayY = startY + (i * kMenuLineHeight);
-    const bool isSelected = (static_cast<int>(i) == selectedIndex);
+  for (int i = pageStartIndex; i < pageEndIndex; ++i) {
+    const int displayY = startY + ((i - pageStartIndex) * kMenuLineHeight);
+    const bool isSelected = (i == selectedIndex);
 
     if (isSelected) {
       // Highlight only the content area so we don't paint over hint gutters.
@@ -193,6 +217,19 @@ void EpubReaderMenuActivity::render(RenderLock&&) {
     if (menuItems[i].action == MenuAction::AUTO_PAGE_TURN) {
       // Render current page turn value on the right edge of the content area.
       const auto value = pageTurnLabels[selectedPageTurnOption];
+      const auto width = renderer.getTextWidth(UI_10_FONT_ID, value);
+      renderer.drawText(UI_10_FONT_ID, contentX + contentWidth - 20 - width, displayY, value, !isSelected);
+    }
+
+    if (menuItems[i].action == MenuAction::FONT_SIZE_DOWN || menuItems[i].action == MenuAction::FONT_SIZE_UP) {
+      const char* value = currentFontSize < fontSizeLabels.size() ? I18N.get(fontSizeLabels[currentFontSize])
+                                                                  : I18N.get(StrId::STR_MEDIUM);
+      const auto width = renderer.getTextWidth(UI_10_FONT_ID, value);
+      renderer.drawText(UI_10_FONT_ID, contentX + contentWidth - 20 - width, displayY, value, !isSelected);
+    }
+
+    if (menuItems[i].action == MenuAction::TOUCH_LOCK) {
+      const char* value = touchLockEnabled ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
       const auto width = renderer.getTextWidth(UI_10_FONT_ID, value);
       renderer.drawText(UI_10_FONT_ID, contentX + contentWidth - 20 - width, displayY, value, !isSelected);
     }
