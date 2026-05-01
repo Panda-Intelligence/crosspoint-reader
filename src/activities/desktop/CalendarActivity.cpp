@@ -14,14 +14,27 @@
 namespace {
 constexpr int kPageCount = 3;
 
-const char* weekdayLabel(int weekday) {
-  static const char* kLabels[] = {"S", "M", "T", "W", "T", "F", "S"};
+StrId weekdayShortId(int weekday) {
+  static constexpr StrId kLabels[] = {StrId::STR_WEEKDAY_SHORT_SUN, StrId::STR_WEEKDAY_SHORT_MON,
+                                      StrId::STR_WEEKDAY_SHORT_TUE, StrId::STR_WEEKDAY_SHORT_WED,
+                                      StrId::STR_WEEKDAY_SHORT_THU, StrId::STR_WEEKDAY_SHORT_FRI,
+                                      StrId::STR_WEEKDAY_SHORT_SAT};
   return kLabels[std::clamp(weekday, 0, 6)];
 }
 
-const char* weekdayFull(int weekday) {
-  static const char* kFull[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+StrId weekdayFullId(int weekday) {
+  static constexpr StrId kFull[] = {StrId::STR_WEEKDAY_SUN, StrId::STR_WEEKDAY_MON, StrId::STR_WEEKDAY_TUE,
+                                    StrId::STR_WEEKDAY_WED, StrId::STR_WEEKDAY_THU, StrId::STR_WEEKDAY_FRI,
+                                    StrId::STR_WEEKDAY_SAT};
   return kFull[std::clamp(weekday, 0, 6)];
+}
+
+StrId monthId(int monthIndex) {
+  static constexpr StrId kMonths[] = {StrId::STR_MONTH_JAN, StrId::STR_MONTH_FEB, StrId::STR_MONTH_MAR,
+                                      StrId::STR_MONTH_APR, StrId::STR_MONTH_MAY, StrId::STR_MONTH_JUN,
+                                      StrId::STR_MONTH_JUL, StrId::STR_MONTH_AUG, StrId::STR_MONTH_SEP,
+                                      StrId::STR_MONTH_OCT, StrId::STR_MONTH_NOV, StrId::STR_MONTH_DEC};
+  return kMonths[std::clamp(monthIndex, 0, 11)];
 }
 
 void drawLine(const GfxRenderer& renderer, int x, int y, const char* text, bool bold = false) {
@@ -124,10 +137,8 @@ void CalendarActivity::render(RenderLock&&) {
   const int day = localTm.tm_mday;
   const int todayWday = localTm.tm_wday;
 
-  // Month name for header
-  static const char* kMonths[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
   char headerBuf[32];
-  snprintf(headerBuf, sizeof(headerBuf), "%s %04d", kMonths[localTm.tm_mon], year);
+  snprintf(headerBuf, sizeof(headerBuf), "%s %04d", I18n::getInstance().get(monthId(localTm.tm_mon)), year);
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, headerBuf);
 
   const int pad = metrics.contentSidePadding;
@@ -137,9 +148,9 @@ void CalendarActivity::render(RenderLock&&) {
   if (pageIndex == 0) {
     // ── Page 0: Mini calendar grid + today highlights ───────────────────
     // Top meta row: weekday name + "Today N"
-    renderer.drawText(SMALL_FONT_ID, pad, contentTop, weekdayFull(todayWday));
+    renderer.drawText(SMALL_FONT_ID, pad, contentTop, I18n::getInstance().get(weekdayFullId(todayWday)));
     char todayLabel[16];
-    snprintf(todayLabel, sizeof(todayLabel), "Today %d", day);
+    snprintf(todayLabel, sizeof(todayLabel), tr(STR_CALENDAR_TODAY_FORMAT), day);
     const int tlW = renderer.getTextWidth(SMALL_FONT_ID, todayLabel);
     renderer.drawText(SMALL_FONT_ID, pageWidth - pad - tlW, contentTop, todayLabel);
 
@@ -150,8 +161,9 @@ void CalendarActivity::render(RenderLock&&) {
 
     // Weekday column headers
     for (int c = 0; c < 7; c++) {
-      const int x = pad + c * colW + (colW - renderer.getTextWidth(SMALL_FONT_ID, weekdayLabel(c))) / 2;
-      renderer.drawText(SMALL_FONT_ID, x, gridTop, weekdayLabel(c));
+      const char* dayLabel = I18n::getInstance().get(weekdayShortId(c));
+      const int x = pad + c * colW + (colW - renderer.getTextWidth(SMALL_FONT_ID, dayLabel)) / 2;
+      renderer.drawText(SMALL_FONT_ID, x, gridTop, dayLabel);
     }
 
     // Divider under headers
@@ -209,28 +221,29 @@ void CalendarActivity::render(RenderLock&&) {
     const int lineH = 22;
     const int week = isoWeek(localTm);
 
-    static const char* kAgenda[] = {"Study session · due cards", "Focus timer · 25 min", "Daily maze challenge"};
+    static constexpr StrId kAgenda[] = {StrId::STR_CALENDAR_AGENDA_STUDY, StrId::STR_CALENDAR_AGENDA_FOCUS,
+                                        StrId::STR_CALENDAR_AGENDA_MAZE};
     for (int i = 0; i < 3; i++) {
       const int lineY = agendaTop + 10 + i * lineH;
       if (lineY + 16 > contentBottom) break;
       renderer.fillRoundedRect(bulletX - bulletR, lineY + 4, bulletR * 2, bulletR * 2, bulletR, Color::Black);
-      renderer.drawText(SMALL_FONT_ID, textX, lineY, kAgenda[i]);
+      renderer.drawText(SMALL_FONT_ID, textX, lineY, I18n::getInstance().get(kAgenda[i]));
     }
 
     // Bottom status row
     const int statusY = contentBottom - 14;
     char weekStr[16];
-    snprintf(weekStr, sizeof(weekStr), "Week %d", week);
+    snprintf(weekStr, sizeof(weekStr), tr(STR_CALENDAR_WEEK_FORMAT), week);
     renderer.drawText(SMALL_FONT_ID, pad, statusY, weekStr);
     char dimStr[24];
-    snprintf(dimStr, sizeof(dimStr), "%d days left", dim - day);
+    snprintf(dimStr, sizeof(dimStr), tr(STR_CALENDAR_DAYS_LEFT_FORMAT), dim - day);
     const int dsW = renderer.getTextWidth(SMALL_FONT_ID, dimStr);
     renderer.drawText(SMALL_FONT_ID, pageWidth - pad - dsW, statusY, dimStr);
 
   } else if (pageIndex == 1) {
     // ── Page 1: Week view ───────────────────────────────────────────────
     const int top = contentTop + 8;
-    drawLine(renderer, pad, top, "This week", true);
+    drawLine(renderer, pad, top, tr(STR_CALENDAR_THIS_WEEK), true);
 
     const int dim = daysInMonth(year, month);
     for (int i = 0; i < 7; i++) {
@@ -240,9 +253,11 @@ void CalendarActivity::render(RenderLock&&) {
 
       char line[48];
       if (futureDay <= dim) {
-        snprintf(line, sizeof(line), "%s %d  %s", weekdayFull(weekday), futureDay, isToday ? "Today" : "—");
+        snprintf(line, sizeof(line), "%s %d  %s", I18n::getInstance().get(weekdayFullId(weekday)), futureDay,
+                 isToday ? tr(STR_DASHBOARD_TODAY) : tr(STR_CALENDAR_NO_EVENT));
       } else {
-        snprintf(line, sizeof(line), "%s %d  Next month", weekdayFull(weekday), futureDay - dim);
+        snprintf(line, sizeof(line), "%s %d  %s", I18n::getInstance().get(weekdayFullId(weekday)), futureDay - dim,
+                 tr(STR_CALENDAR_NEXT_MONTH));
       }
       drawLine(renderer, pad, top + 32 + i * 26, line, isToday);
     }
@@ -250,7 +265,7 @@ void CalendarActivity::render(RenderLock&&) {
   } else {
     // ── Page 2: Month progress ──────────────────────────────────────────
     const int top = contentTop + 8;
-    drawLine(renderer, pad, top, "Month View", true);
+    drawLine(renderer, pad, top, tr(STR_CALENDAR_MONTH_VIEW), true);
 
     const int dim = daysInMonth(year, month);
     const int monthProgress = dim > 0 ? std::clamp((day * 100) / dim, 0, 100) : 0;
@@ -266,16 +281,16 @@ void CalendarActivity::render(RenderLock&&) {
     }
 
     char progressLine[48];
-    snprintf(progressLine, sizeof(progressLine), "Month progress: %d%%", monthProgress);
+    snprintf(progressLine, sizeof(progressLine), tr(STR_CALENDAR_MONTH_PROGRESS_FORMAT), monthProgress);
     drawLine(renderer, pad, barY + barH + 12, progressLine, true);
 
     char countLine[48];
-    snprintf(countLine, sizeof(countLine), "Day %d of %d · %s", day, dim,
-             day >= dim - 7 ? "near month end" : "in progress");
+    snprintf(countLine, sizeof(countLine), tr(STR_CALENDAR_DAY_OF_MONTH_FORMAT), day, dim,
+             day >= dim - 7 ? tr(STR_CALENDAR_NEAR_MONTH_END) : tr(STR_CALENDAR_IN_PROGRESS));
     drawLine(renderer, pad, barY + barH + 44, countLine);
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Refresh", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_REFRESH), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }
