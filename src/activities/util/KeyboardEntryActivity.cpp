@@ -14,6 +14,9 @@ const char* const KeyboardEntryActivity::shiftString[2] = {"shift", "SHIFT"};
 
 void KeyboardEntryActivity::onEnter() {
   Activity::onEnter();
+  if (title.empty()) {
+    title = tr(STR_ENTER_TEXT);
+  }
   cursorPos = text.length();
   symMode = false;
   urlMode = false;
@@ -300,7 +303,9 @@ bool KeyboardEntryActivity::handleTouchTap(uint16_t x, uint16_t y) {
         continue;
       }
       const int keyX = rowLeftMargin + col * (layout.keyWidth + layout.keySpacing);
-      if (TouchHitTest::pointInRect(x, y, Rect{keyX - hPad, rowY - vPad, layout.keyWidth + layout.keySpacing, layout.keyHeight + layout.keySpacing})) {
+      if (TouchHitTest::pointInRect(x, y,
+                                    Rect{keyX - hPad, rowY - vPad, layout.keyWidth + layout.keySpacing,
+                                         layout.keyHeight + layout.keySpacing})) {
         cursorMode = false;
         togglePos = false;
         selectedRow = row;
@@ -315,7 +320,10 @@ bool KeyboardEntryActivity::handleTouchTap(uint16_t x, uint16_t y) {
 
   for (int col = 0; col < BOTTOM_KEY_COUNT; col++) {
     const int keyX = layout.bottomLeftMargin + col * (layout.bottomKeyWidth + layout.bkSpacing);
-    if (TouchHitTest::pointInRect(x, y, Rect{keyX - hPad, layout.bottomRowY - layout.bottomRowGap / 2, layout.bottomKeyWidth + layout.bkSpacing, layout.bottomKeyHeight + layout.bottomRowGap})) {
+    if (TouchHitTest::pointInRect(
+            x, y,
+            Rect{keyX - hPad, layout.bottomRowY - layout.bottomRowGap / 2, layout.bottomKeyWidth + layout.bkSpacing,
+                 layout.bottomKeyHeight + layout.bottomRowGap})) {
       cursorMode = false;
       togglePos = false;
       selectedRow = getContentRowCount();

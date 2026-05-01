@@ -20,9 +20,9 @@ enum class InputType { Text, Password, Url };
 
 class KeyboardEntryActivity : public Activity {
  public:
-  explicit KeyboardEntryActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                 std::string title = "Enter Text", std::string initialText = "",
-                                 const size_t maxLength = 0, InputType inputType = InputType::Text)
+  explicit KeyboardEntryActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string title = "",
+                                 std::string initialText = "", const size_t maxLength = 0,
+                                 InputType inputType = InputType::Text)
       : Activity("KeyboardEntry", renderer, mappedInput),
         title(std::move(title)),
         text(std::move(initialText)),
