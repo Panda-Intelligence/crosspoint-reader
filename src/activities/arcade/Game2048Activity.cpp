@@ -222,7 +222,7 @@ void Game2048Activity::render(RenderLock&&) {
   const int pageWidth = renderer.getScreenWidth();
   const int pageHeight = renderer.getScreenHeight();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "2048");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_ARCADE_GAME_2048));
 
   const int gridTop = metrics.topPadding + metrics.headerHeight + 20;
   const int gridBottom = pageHeight - metrics.buttonHintsHeight - 24;
@@ -276,19 +276,20 @@ void Game2048Activity::render(RenderLock&&) {
 
   // Score below board
   char scoreBuffer[32];
-  snprintf(scoreBuffer, sizeof(scoreBuffer), "Score  %lu", static_cast<unsigned long>(score));
+  snprintf(scoreBuffer, sizeof(scoreBuffer), tr(STR_ARCADE_SCORE_FORMAT), static_cast<unsigned long>(score));
   renderer.drawCenteredText(UI_10_FONT_ID, startY + boardSize + 8, scoreBuffer, true, EpdFontFamily::BOLD);
 
   const int statusY = startY + boardSize + 34;
   if (gameOver) {
-    renderer.drawCenteredText(UI_10_FONT_ID, statusY, "Game over - Confirm to restart");
+    renderer.drawCenteredText(UI_10_FONT_ID, statusY, tr(STR_ARCADE_2048_GAME_OVER));
   } else if (reached2048) {
-    renderer.drawCenteredText(UI_10_FONT_ID, statusY, "2048 reached! Keep going");
+    renderer.drawCenteredText(UI_10_FONT_ID, statusY, tr(STR_ARCADE_2048_REACHED));
   } else {
-    renderer.drawCenteredText(SMALL_FONT_ID, statusY, "Arrows to slide - Confirm to restart");
+    renderer.drawCenteredText(SMALL_FONT_ID, statusY, tr(STR_ARCADE_2048_MOVE_HINT));
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Restart", "Left/Up", "Right/Down");
+  const auto labels =
+      mappedInput.mapLabels(tr(STR_BACK), tr(STR_ARCADE_RESTART), tr(STR_ARCADE_LEFT_UP), tr(STR_ARCADE_RIGHT_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

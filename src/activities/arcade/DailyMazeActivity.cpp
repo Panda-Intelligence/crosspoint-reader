@@ -155,7 +155,7 @@ void DailyMazeActivity::render(RenderLock&&) {
   const int pageWidth = renderer.getScreenWidth();
   const int pageHeight = renderer.getScreenHeight();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Daily Maze");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_ARCADE_GAME_MAZE));
 
   const int gridTop = metrics.topPadding + metrics.headerHeight + 16;
   const int gridBottom = pageHeight - metrics.buttonHintsHeight - 18;
@@ -196,16 +196,17 @@ void DailyMazeActivity::render(RenderLock&&) {
   }
 
   char status[48];
-  snprintf(status, sizeof(status), "Steps: %d", stepCount);
+  snprintf(status, sizeof(status), tr(STR_ARCADE_STEPS_FORMAT), stepCount);
   renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 2, status);
 
   if (completed) {
-    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 30, "Maze cleared! Press Confirm to restart");
+    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 30, tr(STR_ARCADE_MAZE_CLEARED));
   } else {
-    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 30, "Use arrows to move to the exit");
+    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 30, tr(STR_ARCADE_MAZE_MOVE_HINT));
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Restart", "Left/Up", "Right/Down");
+  const auto labels =
+      mappedInput.mapLabels(tr(STR_BACK), tr(STR_ARCADE_RESTART), tr(STR_ARCADE_LEFT_UP), tr(STR_ARCADE_RIGHT_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

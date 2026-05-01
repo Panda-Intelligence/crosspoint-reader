@@ -202,7 +202,7 @@ void MemoryGameActivity::render(RenderLock&&) {
   const int pageWidth = renderer.getScreenWidth();
   const int pageHeight = renderer.getScreenHeight();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Memory");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_ARCADE_GAME_MEMORY));
 
   const int gridTop = metrics.topPadding + metrics.headerHeight + 20;
   const int gridBottom = pageHeight - metrics.buttonHintsHeight - 20;
@@ -255,16 +255,17 @@ void MemoryGameActivity::render(RenderLock&&) {
   // Status line
   if (matchedPairs == kPairs) {
     char buf[48];
-    snprintf(buf, sizeof(buf), "All matched in %d moves! Confirm to restart", moveCount);
+    snprintf(buf, sizeof(buf), tr(STR_ARCADE_MEMORY_COMPLETE_FORMAT), moveCount);
     renderer.drawCenteredText(SMALL_FONT_ID, gridBottom + 4, buf);
   } else {
     char buf[48];
-    snprintf(buf, sizeof(buf), "Pairs: %d/%d  Moves: %d", matchedPairs, kPairs, moveCount);
+    snprintf(buf, sizeof(buf), tr(STR_ARCADE_MEMORY_STATUS_FORMAT), matchedPairs, kPairs, moveCount);
     renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 4, buf);
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), matchedPairs == kPairs ? "Restart" : "Flip", tr(STR_DIR_UP),
-                                            tr(STR_DIR_DOWN));
+  const auto labels =
+      mappedInput.mapLabels(tr(STR_BACK), matchedPairs == kPairs ? tr(STR_ARCADE_RESTART) : tr(STR_ARCADE_FLIP),
+                            tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

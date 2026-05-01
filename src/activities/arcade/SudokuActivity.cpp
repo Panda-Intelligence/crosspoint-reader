@@ -194,7 +194,7 @@ void SudokuActivity::render(RenderLock&&) {
   const int pageWidth = renderer.getScreenWidth();
   const int pageHeight = renderer.getScreenHeight();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Sudoku");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_ARCADE_GAME_SUDOKU));
 
   const int gridTop = metrics.topPadding + metrics.headerHeight + 12;
   const int gridBottom = pageHeight - metrics.buttonHintsHeight - 28;
@@ -258,14 +258,15 @@ void SudokuActivity::render(RenderLock&&) {
   }
 
   if (completed) {
-    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 4, "Solved! Press Confirm for new game");
+    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 4, tr(STR_ARCADE_SUDOKU_SOLVED));
   } else if (hasConflicts) {
-    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 4, "Conflict exists in highlighted cells");
+    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 4, tr(STR_ARCADE_SUDOKU_CONFLICT));
   } else {
-    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 4, "Move cursor and press Confirm to fill");
+    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 4, tr(STR_ARCADE_SUDOKU_MOVE_HINT));
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), completed ? "Restart" : "Set", "Left/Up", "Right/Down");
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), completed ? tr(STR_ARCADE_RESTART) : tr(STR_ARCADE_SET),
+                                            tr(STR_ARCADE_LEFT_UP), tr(STR_ARCADE_RIGHT_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

@@ -38,7 +38,7 @@ void WordPuzzleActivity::loadPuzzle(const int index) {
   completed = false;
   cursor = {0, 0};
   clearSelection();
-  statusMessage = "Select letters to find all words";
+  statusMessage = tr(STR_ARCADE_WORD_SELECT_HINT);
 }
 
 void WordPuzzleActivity::moveCursor(const int rowDelta, const int colDelta) {
@@ -102,14 +102,14 @@ void WordPuzzleActivity::selectCurrentCell() {
       if (!currentWord.empty()) {
         currentWord.pop_back();
       }
-      statusMessage = currentWord.empty() ? "Selection cleared" : currentWord;
+      statusMessage = currentWord.empty() ? tr(STR_ARCADE_WORD_SELECTION_CLEARED) : currentWord;
       requestUpdate();
     }
     return;
   }
 
   if (!isAdjacentToCurrentPath(cursor.row, cursor.col)) {
-    statusMessage = "Pick a neighboring letter";
+    statusMessage = tr(STR_ARCADE_WORD_NEIGHBOR_HINT);
     requestUpdate();
     return;
   }
@@ -117,7 +117,7 @@ void WordPuzzleActivity::selectCurrentCell() {
   const char nextChar = board[cursor.row][cursor.col];
   const std::string candidate = currentWord + nextChar;
   if (!isPrefixOfRemainingWord(candidate)) {
-    statusMessage = "No target word starts with that path";
+    statusMessage = tr(STR_ARCADE_WORD_NO_PREFIX);
     requestUpdate();
     return;
   }
@@ -129,12 +129,14 @@ void WordPuzzleActivity::selectCurrentCell() {
   if (matchedIndex >= 0) {
     foundWords[matchedIndex] = true;
     foundCount++;
-    statusMessage = targetWords[matchedIndex] + " found";
+    char foundMessage[32];
+    snprintf(foundMessage, sizeof(foundMessage), tr(STR_ARCADE_WORD_FOUND_FORMAT), targetWords[matchedIndex].c_str());
+    statusMessage = foundMessage;
     clearSelection();
     if (foundCount == kWordCount) {
       completed = true;
       ARCADE_PROGRESS.recordWin(ArcadeGameId::WordPuzzle);
-      statusMessage = "All words found - Confirm for next board";
+      statusMessage = tr(STR_ARCADE_WORD_ALL_FOUND);
     }
   } else {
     statusMessage = currentWord;
@@ -222,7 +224,7 @@ void WordPuzzleActivity::render(RenderLock&&) {
   const int pageWidth = renderer.getScreenWidth();
   const int pageHeight = renderer.getScreenHeight();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Word Puzzle");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_ARCADE_GAME_WORD));
 
   const int gridTop = metrics.topPadding + metrics.headerHeight + 20;
   const int gridBottom = pageHeight - metrics.buttonHintsHeight - 92;
@@ -276,10 +278,11 @@ void WordPuzzleActivity::render(RenderLock&&) {
                             completed ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
 
   char progress[24];
-  snprintf(progress, sizeof(progress), "Board %d  %d/%d", puzzleIndex + 1, foundCount, kWordCount);
+  snprintf(progress, sizeof(progress), tr(STR_ARCADE_WORD_BOARD_FORMAT), puzzleIndex + 1, foundCount, kWordCount);
   renderer.drawCenteredText(SMALL_FONT_ID, statusY + 24, progress);
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), completed ? "Next" : "Pick", "Left/Up", "Right/Down");
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), completed ? tr(STR_ARCADE_NEXT) : tr(STR_ARCADE_PICK),
+                                            tr(STR_ARCADE_LEFT_UP), tr(STR_ARCADE_RIGHT_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

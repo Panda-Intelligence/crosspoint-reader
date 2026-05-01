@@ -173,7 +173,7 @@ void SokobanActivity::render(RenderLock&&) {
   const int pageWidth = renderer.getScreenWidth();
   const int pageHeight = renderer.getScreenHeight();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Sokoban");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_ARCADE_GAME_SOKOBAN));
 
   const int gridTop = metrics.topPadding + metrics.headerHeight + 20;
   const int gridBottom = pageHeight - metrics.buttonHintsHeight - 20;
@@ -225,16 +225,17 @@ void SokobanActivity::render(RenderLock&&) {
   }
 
   char status[32];
-  snprintf(status, sizeof(status), "Moves: %d", moveCount);
+  snprintf(status, sizeof(status), tr(STR_ARCADE_MOVES_FORMAT), moveCount);
   renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 4, status, true, EpdFontFamily::BOLD);
 
   if (completed) {
-    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 30, "All placed! Confirm to restart");
+    renderer.drawCenteredText(UI_10_FONT_ID, gridBottom + 30, tr(STR_ARCADE_SOKOBAN_COMPLETE));
   } else {
-    renderer.drawCenteredText(SMALL_FONT_ID, gridBottom + 30, "Push boxes onto target dots");
+    renderer.drawCenteredText(SMALL_FONT_ID, gridBottom + 30, tr(STR_ARCADE_SOKOBAN_MOVE_HINT));
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Restart", "Left/Up", "Right/Down");
+  const auto labels =
+      mappedInput.mapLabels(tr(STR_BACK), tr(STR_ARCADE_RESTART), tr(STR_ARCADE_LEFT_UP), tr(STR_ARCADE_RIGHT_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }
