@@ -8,6 +8,8 @@
 namespace {
 constexpr char kStudyDir[] = "/.mofei/study";
 constexpr char kStudyStateFileName[] = "state.json";
+constexpr char kUserWordsFile[] = "/.mofei/study/user_words.json";
+constexpr char kUserWordsTitle[] = "User Words";
 
 bool hasJsonSuffix(const std::string& name) {
   constexpr const char* suffix = ".json";
@@ -34,6 +36,21 @@ std::string pickString(JsonObjectConst object, const char* first, const char* se
   }
 
   return "";
+}
+
+std::string normalizeCardField(const std::string& text) {
+  const auto first = text.find_first_not_of(" \t\r\n");
+  if (first == std::string::npos) {
+    return "";
+  }
+
+  const auto last = text.find_last_not_of(" \t\r\n");
+  std::string normalized = text.substr(first, last - first + 1);
+  constexpr size_t maxFieldLength = 160;
+  if (normalized.size() > maxFieldLength) {
+    normalized.resize(maxFieldLength);
+  }
+  return normalized;
 }
 }  // namespace
 
@@ -133,4 +150,50 @@ void StudyDeckStore::refresh() {
     }
     deckSummaries.push_back(summary);
   }
+}
+
+StudyUserWordSaveResult StudyDeckStore::addUserWord(const std::string& front, const std::string& back,
+                                                    const std::string& example) {
+  const std::string normalizedFront = normalizeCardField(front);
+  const std::string normalizedBack = normalizeCardField(back);
+  const std::string normalizedExample = normalizeCardField(example);
+  if (normalizedFront.empty() || normalizedBack.empty()) {
+    return StudyUserWordSaveResult::Failed;
+  }
+
+  Storage.mkdir("/.mofei");
+  Storage.mkdir(kStudyDir);
+
+  JsonDocument doc;
+  if (Storage.exists(kUserWordsFile)) {
+    const String json = Storage.readFile(kUserWordsFile);
+    if (!json.isEmpty() && deserializeJson(doc, json)) {
+      doc.clear();
+    }
+  }
+
+  doc["title"] = kUserWordsTitle;
+  JsonArray cardsArray = doc["cards"].is<JsonArray>() ? doc["cards"].as<JsonArray>() : doc["cards"].to<JsonArray>();
+  for (JsonObjectConst item : cardsArray) {
+    const std::string existingFront = normalizeCardField(item["front"] | item["term"] | item["question"] | "");
+    if (existingFront == normalizedFront) {
+      return StudyUserWordSaveResult::AlreadyExists;
+    }
+  }
+
+  JsonObject card = cardsArray.add<JsonObject>();
+  card["front"] = normalizedFront;
+  card["back"] = normalizedBack;
+  if (!normalizedExample.empty()) {
+    card["example"] = normalizedExample;
+  }
+
+  String output;
+  serializeJson(doc, output);
+  if (!Storage.writeFile(kUserWordsFile, output)) {
+    return StudyUserWordSaveResult::Failed;
+  }
+
+  refresh();
+  return StudyUserWordSaveResult::Added;
 }

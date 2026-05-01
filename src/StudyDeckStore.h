@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -18,6 +19,8 @@ struct StudyDeckSummary {
   int cardCount = 0;
   bool valid = false;
 };
+
+enum class StudyUserWordSaveResult : uint8_t { Added, AlreadyExists, Failed };
 
 class StudyDeckStore {
   static StudyDeckStore instance;
@@ -39,6 +42,8 @@ class StudyDeckStore {
   int getErrorCount() const { return errorCount; }
   bool hasCards() const { return !cards.empty(); }
   void refresh();
+  StudyUserWordSaveResult addUserWord(const std::string& front, const std::string& back,
+                                      const std::string& example = "");
 };
 
 #define STUDY_DECKS StudyDeckStore::getInstance()
