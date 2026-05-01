@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/open-x4-sdk/backend/index.md", "reason": "Firmware activity conventions and quality expectations"}
+{"file": ".trellis/spec/open-x4-sdk/frontend/index.md", "reason": "Touch-first UI activity conventions"}
+{"file": ".trellis/spec/open-x4-sdk/backend/quality-guidelines.md", "reason": "Mofei build and flash verification rule"}
+{"file": ".trellis/spec/guides/index.md", "reason": "Shared code reuse and cross-layer thinking guides"}
+{"file": ".trellis/tasks/04-29-mofei-touch-support/research/touch-event-architecture.md", "reason": "Generic touch event ownership and fallback suppression architecture"}
