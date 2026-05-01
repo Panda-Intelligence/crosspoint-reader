@@ -1,7 +1,5 @@
 #include <Arduino.h>
 #include <Epub.h>
-#include "ExternalFontIds.h"
-#include "FontCacheManager.h"
 #include <FontDecompressor.h>
 #include <GfxRenderer.h>
 #include <HalDisplay.h>
@@ -18,6 +16,8 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "ExternalFontIds.h"
+#include "FontCacheManager.h"
 #include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
@@ -203,32 +203,26 @@ void updateUiFontMapping() {
   LOG_INF("UIFONT", "updateUiFontMapping() called. Language: %d", static_cast<int>(lang));
 
   if (lang == Language::ZH_CN || lang == Language::ZH_TW) {
-    bool loaded12 = StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::SMALL);
-    bool loaded14 = StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::MEDIUM);
-    LOG_INF("UIFONT", "TC fonts loaded: 12pt=%d, 14pt=%d", loaded12, loaded14);
+    const bool tc12Loaded = StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::SMALL);
+    LOG_INF("UIFONT", "TC fonts loaded: 12pt=%d", tc12Loaded);
 
-    if (loaded12 || loaded14) {
+    if (tc12Loaded) {
       const auto& fontMap = renderer.getFontMap();
       auto it12 = fontMap.find(NOTOSANS_TC_12_FONT_ID);
-      auto it14 = fontMap.find(NOTOSANS_TC_14_FONT_ID);
-
-      if (it14 != fontMap.end()) {
-        renderer.insertFont(UI_12_FONT_ID, it14->second);
-      } else if (it12 != fontMap.end()) {
-        renderer.insertFont(UI_12_FONT_ID, it12->second);
-      }
-
       if (it12 != fontMap.end()) {
+        // Always use TC_12 for the entire UI strip. Falling back to TC_14 produces
+        // oversized glyphs that break list/header layout, so do NOT remap to a larger
+        // size — let the Latin fallback render instead if TC_12 is missing.
         renderer.insertFont(UI_10_FONT_ID, it12->second);
+        renderer.insertFont(UI_12_FONT_ID, it12->second);
         renderer.insertFont(SMALL_FONT_ID, it12->second);
-      } else if (it14 != fontMap.end()) {
-        renderer.insertFont(UI_10_FONT_ID, it14->second);
-        renderer.insertFont(SMALL_FONT_ID, it14->second);
+        LOG_INF("UIFONT", "UI strip remapped to NOTOSANS_TC_12.");
+        UITheme::getInstance().reload();
+        return;
       }
-
-      LOG_INF("UIFONT", "Remapped UI fonts to Chinese variants.");
-      UITheme::getInstance().reload();
-      return;
+      LOG_ERR("UIFONT", "TC_12 reported loaded but missing from font map");
+    } else {
+      LOG_ERR("UIFONT", "TC_12 not loaded; UI strip stays Latin (CJK glyphs will render via reader-size pack only).");
     }
   }
 
@@ -270,9 +264,9 @@ void setupDisplayAndFonts() {
   renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
   renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
   StorageFontRegistry::loadTraditionalChineseFonts(renderer);
-  
+
   updateUiFontMapping();
-  
+
   LOG_DBG("MAIN", "Fonts setup");
 }
 
@@ -385,9 +379,8 @@ void loop() {
   renderer.setFadingFix(SETTINGS.fadingFix);
 
   if (logSerial && millis() - lastMemPrint >= 10000) {
-    LOG_INF("MEM", "SRAM Free: %d, MaxAlloc: %d | PSRAM Free: %d, MaxAlloc: %d", 
-            ESP.getFreeHeap(), ESP.getMaxAllocHeap(),
-            ESP.getFreePsram(), ESP.getMaxAllocPsram());
+    LOG_INF("MEM", "SRAM Free: %d, MaxAlloc: %d | PSRAM Free: %d, MaxAlloc: %d", ESP.getFreeHeap(),
+            ESP.getMaxAllocHeap(), ESP.getFreePsram(), ESP.getMaxAllocPsram());
     lastMemPrint = millis();
   }
 

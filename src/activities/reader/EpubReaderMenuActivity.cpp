@@ -151,6 +151,29 @@ void EpubReaderMenuActivity::loop() {
       selectedIndex = ButtonNavigator::previousIndex(selectedIndex, static_cast<int>(menuItems.size()));
       requestUpdate();
       return;
+    } else if (buttonHintTap) {
+      uint8_t buttonIndex = 0;
+#if MOFEI_DEVICE
+      if (gpio.mapMofeiButtonHintTapToButton(touchEvent.sourceX(), touchEvent.sourceY(), &buttonIndex)) {
+        if (buttonIndex == HalGPIO::BTN_BACK) {
+          ActivityResult result;
+          result.isCancelled = true;
+          result.data = MenuResult{-1, pendingOrientation, selectedPageTurnOption, pageTurnOptionChanged, currentFontSize, touchLockEnabled};
+          setResult(std::move(result));
+          finish();
+        } else if (buttonIndex == HalGPIO::BTN_CONFIRM) {
+          selectCurrentItem();
+        } else if (buttonIndex == HalGPIO::BTN_LEFT) {
+          selectedIndex = ButtonNavigator::previousIndex(selectedIndex, static_cast<int>(menuItems.size()));
+          requestUpdate();
+        } else if (buttonIndex == HalGPIO::BTN_RIGHT) {
+          selectedIndex = ButtonNavigator::nextIndex(selectedIndex, static_cast<int>(menuItems.size()));
+          requestUpdate();
+        }
+      }
+#endif
+      mappedInput.suppressTouchButtonFallback();
+      return;
     } else if (!buttonHintTap) {
       mappedInput.suppressTouchButtonFallback();
       return;
