@@ -11,6 +11,18 @@
 
 struct Rect;
 
+struct RecentBookProgress {
+  bool available = false;
+  uint8_t percent = 0;
+  uint32_t currentPage = 0;
+  uint32_t totalPages = 0;
+};
+
+struct RecentBookListItem {
+  RecentBook book;
+  RecentBookProgress progress;
+};
+
 class RecentBooksActivity final : public Activity {
  private:
   ButtonNavigator buttonNavigator;
@@ -18,11 +30,12 @@ class RecentBooksActivity final : public Activity {
   size_t selectorIndex = 0;
 
   // Recent tab state
-  std::vector<RecentBook> recentBooks;
+  std::vector<RecentBookListItem> recentBooks;
 
   // Data loading
   void loadRecentBooks();
-  void drawRecentBookRow(const RecentBook& book, int index, Rect rowRect, bool selected);
+  RecentBookProgress loadProgressForBook(const RecentBook& book) const;
+  void drawRecentBookRow(const RecentBookListItem& item, int index, Rect rowRect, bool selected);
   bool drawBookCover(const RecentBook& book, int x, int y, int width, int height);
   std::string subtitleForBook(const RecentBook& book) const;
 

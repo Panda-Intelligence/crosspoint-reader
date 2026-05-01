@@ -1,9 +1,14 @@
 #include "RecentBooksActivity.h"
 
 #include <Bitmap.h>
+#include <Epub.h>
+#include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <Serialization.h>
+#include <Txt.h>
+#include <Xtc.h>
 
 #include <algorithm>
 
@@ -19,6 +24,9 @@ constexpr int kCoverWidth = 34;
 constexpr int kCoverHeight = 52;
 constexpr int kCoverRadius = 3;
 constexpr int kHomeCoverFallbackHeight = 400;
+constexpr int kProgressBarHeight = 5;
+constexpr uint32_t TXT_INDEX_CACHE_MAGIC = 0x54585449;  // "TXTI"
+constexpr uint8_t TXT_INDEX_CACHE_VERSION = 2;
 
 std::string fileNameForPath(const std::string& path) {
   const size_t slash = path.find_last_of('/');
@@ -26,6 +34,16 @@ std::string fileNameForPath(const std::string& path) {
     return path;
   }
   return path.substr(slash + 1);
+}
+
+uint8_t clampProgressPercent(int percent) {
+  if (percent < 0) {
+    return 0;
+  }
+  if (percent > 100) {
+    return 100;
+  }
+  return static_cast<uint8_t>(percent);
 }
 }  // namespace
 
@@ -39,8 +57,140 @@ void RecentBooksActivity::loadRecentBooks() {
     if (!Storage.exists(book.path.c_str())) {
       continue;
     }
-    recentBooks.push_back(book);
+    recentBooks.push_back({book, loadProgressForBook(book)});
   }
+}
+
+RecentBookProgress RecentBooksActivity::loadProgressForBook(const RecentBook& book) const {
+  RecentBookProgress progress;
+  const std::string filename = fileNameForPath(book.path);
+
+  if (FsHelpers::hasEpubExtension(filename)) {
+    Epub epub(book.path, "/.crosspoint");
+    if (!epub.load(false, true)) {
+      return progress;
+    }
+
+    FsFile f;
+    if (!Storage.openFileForRead("RBA", epub.getCachePath() + "/progress.bin", f)) {
+      return progress;
+    }
+
+    uint8_t data[6] = {};
+    const int dataSize = f.read(data, sizeof(data));
+    if (dataSize != 4 && dataSize != 6) {
+      return progress;
+    }
+
+    const int spineIndex = data[0] + (data[1] << 8);
+    const uint32_t page = static_cast<uint32_t>(data[2] + (data[3] << 8));
+    const uint32_t pageCount = dataSize == 6 ? static_cast<uint32_t>(data[4] + (data[5] << 8)) : 0;
+    if (spineIndex < 0 || spineIndex >= epub.getSpineItemsCount()) {
+      return progress;
+    }
+
+    const float chapterProgress =
+        pageCount > 0 ? std::min(1.0f, static_cast<float>(page + 1) / static_cast<float>(pageCount)) : 0.0f;
+    progress.percent = clampProgressPercent(static_cast<int>(epub.calculateProgress(spineIndex, chapterProgress) *
+                                                             100.0f +
+                                                             0.5f));
+    progress.currentPage = page + 1;
+    progress.totalPages = pageCount;
+    progress.available = true;
+    return progress;
+  }
+
+  if (FsHelpers::hasXtcExtension(filename)) {
+    Xtc xtc(book.path, "/.crosspoint");
+    if (!xtc.load()) {
+      return progress;
+    }
+
+    FsFile f;
+    if (!Storage.openFileForRead("RBA", xtc.getCachePath() + "/progress.bin", f)) {
+      return progress;
+    }
+
+    uint8_t data[4] = {};
+    if (f.read(data, sizeof(data)) != static_cast<int>(sizeof(data))) {
+      return progress;
+    }
+
+    uint32_t page = data[0] | (static_cast<uint32_t>(data[1]) << 8) | (static_cast<uint32_t>(data[2]) << 16) |
+                    (static_cast<uint32_t>(data[3]) << 24);
+    const uint32_t pageCount = xtc.getPageCount();
+    if (pageCount == 0) {
+      return progress;
+    }
+    if (page >= pageCount) {
+      page = pageCount - 1;
+    }
+
+    progress.percent = xtc.calculateProgress(page);
+    progress.currentPage = page + 1;
+    progress.totalPages = pageCount;
+    progress.available = true;
+    return progress;
+  }
+
+  if (FsHelpers::hasTxtExtension(filename) || FsHelpers::hasMarkdownExtension(filename)) {
+    Txt txt(book.path, "/.crosspoint");
+    if (!txt.load()) {
+      return progress;
+    }
+
+    FsFile progressFile;
+    if (!Storage.openFileForRead("RBA", txt.getCachePath() + "/progress.bin", progressFile)) {
+      return progress;
+    }
+
+    uint8_t data[4] = {};
+    if (progressFile.read(data, sizeof(data)) != static_cast<int>(sizeof(data))) {
+      return progress;
+    }
+    uint32_t page = data[0] + (data[1] << 8);
+
+    FsFile indexFile;
+    if (!Storage.openFileForRead("RBA", txt.getCachePath() + "/index.bin", indexFile)) {
+      return progress;
+    }
+
+    uint32_t magic = 0;
+    uint8_t version = 0;
+    uint32_t fileSize = 0;
+    int32_t cachedWidth = 0;
+    int32_t cachedLines = 0;
+    int32_t fontId = 0;
+    int32_t margin = 0;
+    uint8_t alignment = 0;
+    uint32_t pageCount = 0;
+    serialization::readPod(indexFile, magic);
+    serialization::readPod(indexFile, version);
+    serialization::readPod(indexFile, fileSize);
+    serialization::readPod(indexFile, cachedWidth);
+    serialization::readPod(indexFile, cachedLines);
+    serialization::readPod(indexFile, fontId);
+    serialization::readPod(indexFile, margin);
+    serialization::readPod(indexFile, alignment);
+    serialization::readPod(indexFile, pageCount);
+
+    if (magic != TXT_INDEX_CACHE_MAGIC || version != TXT_INDEX_CACHE_VERSION || fileSize != txt.getFileSize() ||
+        pageCount == 0) {
+      return progress;
+    }
+    if (page >= pageCount) {
+      page = pageCount - 1;
+    }
+
+    progress.percent =
+        clampProgressPercent(static_cast<int>((static_cast<uint64_t>(page + 1) * 100 + pageCount / 2) / pageCount));
+    progress.currentPage = page + 1;
+    progress.totalPages = pageCount;
+    progress.available = true;
+    return progress;
+  }
+
+  return progress;
 }
 
 void RecentBooksActivity::onEnter() {
@@ -78,8 +228,8 @@ void RecentBooksActivity::loop() {
       if (clickedIndex >= 0) {
         mappedInput.suppressTouchButtonFallback();
         selectorIndex = clickedIndex;
-        LOG_DBG("RBA", "Selected recent book by touch: %s", recentBooks[selectorIndex].path.c_str());
-        onSelectBook(recentBooks[selectorIndex].path);
+        LOG_DBG("RBA", "Selected recent book by touch: %s", recentBooks[selectorIndex].book.path.c_str());
+        onSelectBook(recentBooks[selectorIndex].book.path);
         return;
       }
     } else {
@@ -103,8 +253,8 @@ void RecentBooksActivity::loop() {
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     if (!recentBooks.empty() && selectorIndex < static_cast<int>(recentBooks.size())) {
-      LOG_DBG("RBA", "Selected recent book: %s", recentBooks[selectorIndex].path.c_str());
-      onSelectBook(recentBooks[selectorIndex].path);
+      LOG_DBG("RBA", "Selected recent book: %s", recentBooks[selectorIndex].book.path.c_str());
+      onSelectBook(recentBooks[selectorIndex].book.path);
       return;
     }
   }
@@ -174,8 +324,9 @@ bool RecentBooksActivity::drawBookCover(const RecentBook& book, const int x, con
   return renderedCover;
 }
 
-void RecentBooksActivity::drawRecentBookRow(const RecentBook& book, const int index, const Rect rowRect,
+void RecentBooksActivity::drawRecentBookRow(const RecentBookListItem& item, const int index, const Rect rowRect,
                                             const bool selected) {
+  const RecentBook& book = item.book;
   if (selected) {
     renderer.fillRect(rowRect.x, rowRect.y - 2, rowRect.width, rowRect.height, true);
   }
@@ -191,8 +342,22 @@ void RecentBooksActivity::drawRecentBookRow(const RecentBook& book, const int in
   const std::string truncatedTitle = renderer.truncatedText(UI_12_FONT_ID, title.c_str(), textWidth);
   renderer.drawText(UI_12_FONT_ID, textX, rowRect.y + 5, truncatedTitle.c_str(), !selected);
 
-  const std::string subtitle = renderer.truncatedText(UI_10_FONT_ID, subtitleForBook(book).c_str(), textWidth);
-  renderer.drawText(UI_10_FONT_ID, textX, rowRect.y + 34, subtitle.c_str(), !selected);
+  std::string subtitle = subtitleForBook(book);
+  if (item.progress.available) {
+    subtitle += "  ";
+    subtitle += std::to_string(item.progress.percent);
+    subtitle += "%";
+  }
+  const std::string subtitleText = renderer.truncatedText(UI_10_FONT_ID, subtitle.c_str(), textWidth);
+  renderer.drawText(UI_10_FONT_ID, textX, rowRect.y + 32, subtitleText.c_str(), !selected);
+
+  if (item.progress.available) {
+    const int barY = rowRect.y + rowRect.height - kProgressBarHeight - 6;
+    const int barWidth = std::max(20, textWidth);
+    renderer.drawRect(textX, barY, barWidth, kProgressBarHeight, !selected);
+    const int fillWidth = std::max(1, (barWidth - 2) * item.progress.percent / 100);
+    renderer.fillRect(textX + 1, barY + 1, fillWidth, kProgressBarHeight - 2, !selected);
+  }
 
   if (selected) {
     char slot[8];
