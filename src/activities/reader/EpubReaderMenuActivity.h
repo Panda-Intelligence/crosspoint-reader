@@ -56,7 +56,7 @@ class EpubReaderMenuActivity final : public Activity {
   int selectedIndex = 0;
 
   ButtonNavigator buttonNavigator;
-  std::string title = "Reader Menu";
+  std::string title;
   uint8_t pendingOrientation = 0;
   uint8_t selectedPageTurnOption = 0;
   bool pageTurnOptionChanged = false;

@@ -40,7 +40,7 @@ EpubReaderMenuActivity::EpubReaderMenuActivity(GfxRenderer& renderer, MappedInpu
                                                const bool touchLockEnabled, const bool currentPageBookmarked)
     : Activity("EpubReaderMenu", renderer, mappedInput),
       menuItems(buildMenuItems(hasFootnotes)),
-      title(title),
+      title(title.empty() ? tr(STR_READING) : title),
       pendingOrientation(currentOrientation),
       currentFontSize(fontSize),
       touchLockEnabled(touchLockEnabled),
