@@ -193,8 +193,17 @@ For Mofei firmware driver changes, run the narrow build gate:
 scripts/mofei_flash_validate.sh --build-only
 ```
 
-When a device is attached, follow with a flash and serial-log check on the
-actual USB port.
+When a Mofei device is attached, build-only is not enough. Always follow with
+a flash test on the actual USB port before calling the slice verified:
+
+```bash
+scripts/mofei_flash_validate.sh --port /dev/cu.usbmodemXXXX
+```
+
+For touch, display, input, boot, power, font, i18n, or UI rendering changes,
+also inspect serial logs or perform the relevant manual screen interaction
+after flashing. If flashing is impossible, record the exact upload/esptool
+error and the physical recovery step needed before claiming verification.
 
 ---
 
