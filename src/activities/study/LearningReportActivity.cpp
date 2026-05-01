@@ -3,12 +3,23 @@
 #include <I18n.h>
 
 #include <algorithm>
+#include <ctime>
 
 #include "StudyReviewQueueStore.h"
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/TouchHitTest.h"
+
+namespace {
+StrId weekdayShortId(int weekday) {
+  static constexpr StrId kLabels[] = {StrId::STR_WEEKDAY_SHORT_SUN, StrId::STR_WEEKDAY_SHORT_MON,
+                                      StrId::STR_WEEKDAY_SHORT_TUE, StrId::STR_WEEKDAY_SHORT_WED,
+                                      StrId::STR_WEEKDAY_SHORT_THU, StrId::STR_WEEKDAY_SHORT_FRI,
+                                      StrId::STR_WEEKDAY_SHORT_SAT};
+  return kLabels[std::clamp(weekday, 0, 6)];
+}
+}  // namespace
 
 void LearningReportActivity::onEnter() {
   Activity::onEnter();
@@ -78,7 +89,10 @@ void LearningReportActivity::render(RenderLock&&) {
   // Mock accuracy history ending with today's real accuracy
   const int kBars = 7;
   const int barValues[kBars] = {44, 56, 72, 68, 82, 78, accuracy};
-  static const char* kDayLabels[kBars] = {"M", "T", "W", "T", "F", "S", "T"};
+
+  time_t now = time(nullptr);
+  struct tm localTm = {};
+  localtime_r(&now, &localTm);
 
   const int chartTop = contentTop + 28;
   const int chartH = 80;
@@ -101,8 +115,10 @@ void LearningReportActivity::render(RenderLock&&) {
     }
 
     // Day label below bar
-    const int lw = renderer.getTextWidth(SMALL_FONT_ID, kDayLabels[i]);
-    renderer.drawText(SMALL_FONT_ID, bx + (barW - lw) / 2, chartBottom + 4, kDayLabels[i], true,
+    const int weekday = (localTm.tm_wday + i - (kBars - 1) + 7) % 7;
+    const char* dayLabel = I18N.get(weekdayShortId(weekday));
+    const int lw = renderer.getTextWidth(SMALL_FONT_ID, dayLabel);
+    renderer.drawText(SMALL_FONT_ID, bx + (barW - lw) / 2, chartBottom + 4, dayLabel, true,
                       isToday ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
   }
 
