@@ -9,15 +9,15 @@
 
 namespace {
 struct FocusPreset {
-  const char* name;
+  StrId name;
   uint32_t durationMs;
 };
 
 constexpr FocusPreset kPresets[] = {
-    {"Focus 25m", 25UL * 60UL * 1000UL},
-    {"Short Break 5m", 5UL * 60UL * 1000UL},
-    {"Long Break 15m", 15UL * 60UL * 1000UL},
-    {"Countdown 45m", 45UL * 60UL * 1000UL},
+    {StrId::STR_FOCUS_PRESET_FOCUS_25M, 25UL * 60UL * 1000UL},
+    {StrId::STR_FOCUS_PRESET_SHORT_BREAK_5M, 5UL * 60UL * 1000UL},
+    {StrId::STR_FOCUS_PRESET_LONG_BREAK_15M, 15UL * 60UL * 1000UL},
+    {StrId::STR_FOCUS_PRESET_COUNTDOWN_45M, 45UL * 60UL * 1000UL},
 };
 constexpr int kPresetCount = static_cast<int>(sizeof(kPresets) / sizeof(kPresets[0]));
 }  // namespace
@@ -134,7 +134,7 @@ void ClockFocusActivity::render(RenderLock&&) {
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Clock Focus");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_DESKTOP_CLOCK_FOCUS));
 
   const uint32_t totalSeconds = (remainingMs + 500) / 1000;
   const uint32_t minutes = totalSeconds / 60;
@@ -144,23 +144,24 @@ void ClockFocusActivity::render(RenderLock&&) {
   snprintf(timeBuffer, sizeof(timeBuffer), "%02lu:%02lu", static_cast<unsigned long>(minutes),
            static_cast<unsigned long>(seconds));
 
-  renderer.drawCenteredText(UI_10_FONT_ID, metrics.topPadding + metrics.headerHeight + 12, kPresets[presetIndex].name,
-                            true, EpdFontFamily::BOLD);
+  renderer.drawCenteredText(UI_10_FONT_ID, metrics.topPadding + metrics.headerHeight + 12,
+                            I18n::getInstance().get(kPresets[presetIndex].name), true, EpdFontFamily::BOLD);
   renderer.drawCenteredText(UI_12_FONT_ID, pageHeight / 2 - 40, timeBuffer, true, EpdFontFamily::BOLD);
 
   if (hasFinished) {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, "Focus complete");
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 45, "Press Confirm to reset");
+    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, tr(STR_FOCUS_COMPLETE));
+    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 45, tr(STR_FOCUS_RESET_HINT));
   } else if (isRunning) {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, "Running");
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 45, "Press Confirm to pause");
+    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, tr(STR_FOCUS_RUNNING));
+    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 45, tr(STR_FOCUS_PAUSE_HINT));
   } else {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, "Ready");
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 45, "Use Up/Down to change preset");
+    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, tr(STR_FOCUS_READY));
+    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 45, tr(STR_FOCUS_PRESET_HINT));
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), hasFinished ? "Reset" : (isRunning ? "Pause" : "Start"),
-                                            tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels =
+      mappedInput.mapLabels(tr(STR_BACK), hasFinished ? tr(STR_RESET) : (isRunning ? tr(STR_PAUSE) : tr(STR_START)),
+                            tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }
