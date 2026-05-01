@@ -65,10 +65,10 @@ const char* itemSubtitle(int index) {
     case 8:
       return "Upload books, cards and articles";
     case 9:
-      return "System and package settings";
+      return "Connection and account state";
     case 10:
     default:
-      return "Connection and account state";
+      return "System and package settings";
   }
 }
 }  // namespace
@@ -105,6 +105,9 @@ void DashboardActivity::openCurrentSelection() {
       activityManager.goToFileTransfer();
       break;
     case 9:
+      activityManager.goToFileBrowser();
+      break;
+    case 10:
       activityManager.goToSettings();
       break;
     case 3:

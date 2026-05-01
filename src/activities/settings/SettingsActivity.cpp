@@ -36,6 +36,9 @@ std::string traditionalChineseFontStatus() {
 
 std::string readerFontValueText(const SettingInfo& setting) {
   const uint8_t value = SETTINGS.*(setting.valuePtr);
+  if (value >= setting.enumValues.size()) {
+    return tr(STR_NONE_OPT);
+  }
   std::string valueText = I18N.get(setting.enumValues[value]);
   if (setting.valuePtr == &CrossPointSettings::fontFamily && value == CrossPointSettings::FONT_FAMILY::NOTOSANS_TC) {
     valueText += " [";
