@@ -88,7 +88,7 @@ void WeatherClockActivity::render(RenderLock&&) {
   const auto pageHeight = renderer.getScreenHeight();
   const auto& summary = DESKTOP_SUMMARY.getState();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Weather & Clock");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_DASHBOARD_WEATHER));
 
   time_t now = time(nullptr);
   struct tm localTm = {};
@@ -134,36 +134,40 @@ void WeatherClockActivity::render(RenderLock&&) {
     char windStr[12];
     snprintf(windStr, sizeof(windStr), "%d km/h", summary.isOnline ? 8 : 0);
     char tempStr[8];
-    snprintf(tempStr, sizeof(tempStr), "%d deg", temp);
+    snprintf(tempStr, sizeof(tempStr), "%d %s", temp, tr(STR_TEMP_UNIT_C));
 
-    drawMetricCard(renderer, pad, metricTop, metricW, metricH, "Rain", rainStr);
-    drawMetricCard(renderer, pad + metricW + gap, metricTop, metricW, metricH, "Wind", windStr);
-    drawMetricCard(renderer, pad + (metricW + gap) * 2, metricTop, metricW, metricH, "Temp", tempStr);
+    drawMetricCard(renderer, pad, metricTop, metricW, metricH, tr(STR_WEATHER_METRIC_RAIN), rainStr);
+    drawMetricCard(renderer, pad + metricW + gap, metricTop, metricW, metricH, tr(STR_WEATHER_METRIC_WIND), windStr);
+    drawMetricCard(renderer, pad + (metricW + gap) * 2, metricTop, metricW, metricH, tr(STR_WEATHER_METRIC_TEMP),
+                   tempStr);
 
     // Bullet commute hints
     const int bulletTop = metricTop + metricH + 12;
     const int bulletR = 3;
     drawBulletLine(renderer, pad, bulletTop, bulletR,
-                   summary.isOnline ? "Umbrella recommended" : "Offline - no forecast");
+                   summary.isOnline ? tr(STR_WEATHER_UMBRELLA_RECOMMENDED) : tr(STR_WEATHER_OFFLINE_NO_FORECAST));
     drawBulletLine(renderer, pad, bulletTop + 22, bulletR,
-                   summary.isOnline ? "Light traffic window" : "Cached data only");
+                   summary.isOnline ? tr(STR_WEATHER_LIGHT_TRAFFIC_WINDOW) : tr(STR_WEATHER_CACHED_DATA_ONLY));
 
   } else if (pageIndex == 1) {
     // ── Page 1: 3-day forecast ─────────────────────────────────────────
-    renderer.drawText(UI_10_FONT_ID, pad, contentTop + 4, "Forecast", true, EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, pad, contentTop + 4, tr(STR_WEATHER_FORECAST), true, EpdFontFamily::BOLD);
 
     const int temp = summary.isOnline ? 24 : 22;
     const int spread = summary.isOnline ? 6 : 5;
     struct DayForecast {
-      const char* day;
+      StrId day;
       int low;
       int high;
-      const char* cond;
+      StrId cond;
     };
     const DayForecast forecasts[3] = {
-        {"Today", temp - spread, temp + spread, summary.isOnline ? "Cloudy" : "Cached"},
-        {"Tomorrow", temp - spread - 1, temp + spread + 1, summary.isOnline ? "Sunny" : "Offline"},
-        {"+2 days", temp - spread + 1, temp + spread - 1, summary.isOnline ? "Rain chance" : "Cached"},
+        {StrId::STR_DASHBOARD_TODAY, temp - spread, temp + spread,
+         summary.isOnline ? StrId::STR_WEATHER_CLOUDY : StrId::STR_WEATHER_CACHED},
+        {StrId::STR_WEATHER_TOMORROW, temp - spread - 1, temp + spread + 1,
+         summary.isOnline ? StrId::STR_WEATHER_SUNNY : StrId::STR_WEATHER_OFFLINE},
+        {StrId::STR_WEATHER_PLUS_2_DAYS, temp - spread + 1, temp + spread - 1,
+         summary.isOnline ? StrId::STR_WEATHER_RAIN_CHANCE : StrId::STR_WEATHER_CACHED},
     };
 
     const int rowH = 56;
@@ -171,52 +175,52 @@ void WeatherClockActivity::render(RenderLock&&) {
       const int rowY = contentTop + 28 + i * rowH;
       renderer.drawRoundedRect(pad, rowY, pageWidth - pad * 2, rowH - 6, 1, 8, true);
 
-      renderer.drawText(UI_10_FONT_ID, pad + 12, rowY + 8, forecasts[i].day, true,
+      const char* dayLabel = I18n::getInstance().get(forecasts[i].day);
+      const char* conditionLabel = I18n::getInstance().get(forecasts[i].cond);
+      renderer.drawText(UI_10_FONT_ID, pad + 12, rowY + 8, dayLabel, true,
                         i == 0 ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
       char tempRange[20];
-      snprintf(tempRange, sizeof(tempRange), "%d - %d deg", forecasts[i].low, forecasts[i].high);
+      snprintf(tempRange, sizeof(tempRange), "%d - %d %s", forecasts[i].low, forecasts[i].high, tr(STR_TEMP_UNIT_C));
       renderer.drawText(SMALL_FONT_ID, pad + 12, rowY + 30, tempRange);
 
-      const int condW = renderer.getTextWidth(SMALL_FONT_ID, forecasts[i].cond);
-      renderer.drawText(SMALL_FONT_ID, pageWidth - pad - condW - 12, rowY + 19, forecasts[i].cond);
+      const int condW = renderer.getTextWidth(SMALL_FONT_ID, conditionLabel);
+      renderer.drawText(SMALL_FONT_ID, pageWidth - pad - condW - 12, rowY + 19, conditionLabel);
     }
 
     // Source note
     renderer.drawCenteredText(SMALL_FONT_ID, contentBottom - 14,
-                              summary.isOnline ? "Source: companion sync" : "Offline - cached forecast");
+                              summary.isOnline ? tr(STR_WEATHER_SOURCE_COMPANION) : tr(STR_WEATHER_SOURCE_CACHED));
 
   } else {
     // ── Page 2: Commute scenes ─────────────────────────────────────────
-    renderer.drawText(UI_10_FONT_ID, pad, contentTop + 4, "Scenes", true, EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, pad, contentTop + 4, tr(STR_WEATHER_SCENES), true, EpdFontFamily::BOLD);
 
     const int temp = summary.isOnline ? 24 : 22;
     const bool carryUmbrella = summary.isOnline;
 
     struct Scene {
-      const char* title;
-      char detail[64];
+      StrId title;
+      const char* detail;
     };
 
     Scene scenes[3];
-    scenes[0].title = "Commute";
-    snprintf(scenes[0].detail, sizeof(scenes[0].detail), "%s",
-             carryUmbrella ? "Leave 10 min earlier" : "Normal traffic window");
-    scenes[1].title = "Clothing";
-    snprintf(scenes[1].detail, sizeof(scenes[1].detail), "%s",
-             temp <= 20 ? "Light jacket suggested" : "Shirt + thin layer");
-    scenes[2].title = "Umbrella";
-    snprintf(scenes[2].detail, sizeof(scenes[2].detail), "%s", carryUmbrella ? "Recommended today" : "Optional");
+    scenes[0].title = StrId::STR_WEATHER_SCENE_COMMUTE;
+    scenes[0].detail = carryUmbrella ? tr(STR_WEATHER_LEAVE_10_MIN_EARLY) : tr(STR_WEATHER_NORMAL_TRAFFIC);
+    scenes[1].title = StrId::STR_WEATHER_SCENE_CLOTHING;
+    scenes[1].detail = temp <= 20 ? tr(STR_WEATHER_LIGHT_JACKET) : tr(STR_WEATHER_SHIRT_LAYER);
+    scenes[2].title = StrId::STR_WEATHER_SCENE_UMBRELLA;
+    scenes[2].detail = carryUmbrella ? tr(STR_WEATHER_RECOMMENDED_TODAY) : tr(STR_WEATHER_OPTIONAL);
 
     const int rowH = 52;
     for (int i = 0; i < 3; i++) {
       const int rowY = contentTop + 28 + i * rowH;
       renderer.drawRoundedRect(pad, rowY, pageWidth - pad * 2, rowH - 6, 1, 8, true);
-      renderer.drawText(SMALL_FONT_ID, pad + 12, rowY + 6, scenes[i].title);
+      renderer.drawText(SMALL_FONT_ID, pad + 12, rowY + 6, I18n::getInstance().get(scenes[i].title));
       renderer.drawText(UI_10_FONT_ID, pad + 12, rowY + 24, scenes[i].detail, true, EpdFontFamily::BOLD);
     }
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Refresh", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_REFRESH), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }
