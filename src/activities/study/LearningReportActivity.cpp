@@ -41,7 +41,7 @@ void LearningReportActivity::render(RenderLock&&) {
   const auto pageHeight = renderer.getScreenHeight();
   const auto& state = STUDY_STATE.getState();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Learning Report");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_STUDY_LEARNING_REPORT));
 
   const int pad = metrics.contentSidePadding;
   const int contentTop = metrics.topPadding + metrics.headerHeight + 10;
@@ -58,21 +58,21 @@ void LearningReportActivity::render(RenderLock&&) {
   const int laterCount = STUDY_REVIEW_QUEUE.getLaterCount();
   const int savedCount = STUDY_REVIEW_QUEUE.getSavedCount();
 
-  const char* weakArea = "Balanced progress";
-  const char* nextFocus = "Keep daily review steady";
+  const char* weakArea = tr(STR_STUDY_BALANCED_PROGRESS);
+  const char* nextFocus = tr(STR_STUDY_KEEP_DAILY_REVIEW_STEADY);
   if (againCount >= laterCount && againCount >= savedCount && againCount > 0) {
-    weakArea = "Recovery backlog high";
-    nextFocus = "Prioritise wrong cards first";
+    weakArea = tr(STR_STUDY_RECOVERY_BACKLOG_HIGH);
+    nextFocus = tr(STR_STUDY_PRIORITISE_WRONG_CARDS_FIRST);
   } else if (laterCount >= againCount && laterCount >= savedCount && laterCount > 0) {
-    weakArea = "Later queue growing";
-    nextFocus = "Turn postponed cards into wins";
+    weakArea = tr(STR_STUDY_LATER_QUEUE_GROWING);
+    nextFocus = tr(STR_STUDY_TURN_POSTPONED_INTO_WINS);
   } else if (savedCount > 0) {
-    weakArea = "Saved set expanding";
-    nextFocus = "Revisit saved cards this week";
+    weakArea = tr(STR_STUDY_SAVED_SET_EXPANDING);
+    nextFocus = tr(STR_STUDY_REVISIT_SAVED_THIS_WEEK);
   }
 
   // ── Today label ──────────────────────────────────────────────────────
-  renderer.drawText(UI_10_FONT_ID, pad, contentTop, "Today", true, EpdFontFamily::BOLD);
+  renderer.drawText(UI_10_FONT_ID, pad, contentTop, tr(STR_STUDY_TODAY), true, EpdFontFamily::BOLD);
 
   // ── Vertical bar chart (7 mock days, today is the last bar) ──────────
   // Mock accuracy history ending with today's real accuracy
@@ -106,8 +106,7 @@ void LearningReportActivity::render(RenderLock&&) {
                       isToday ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
   }
 
-  // "Weekly accuracy" label
-  renderer.drawText(SMALL_FONT_ID, pad, chartBottom + 20, "Weekly accuracy");
+  renderer.drawText(SMALL_FONT_ID, pad, chartBottom + 20, tr(STR_STUDY_WEEKLY_ACCURACY));
   char accPct[16];
   snprintf(accPct, sizeof(accPct), "%d%%", accuracy);
   const int apW = renderer.getTextWidth(SMALL_FONT_ID, accPct);
@@ -120,16 +119,17 @@ void LearningReportActivity::render(RenderLock&&) {
   // ── Stat rows ─────────────────────────────────────────────────────────
   struct StatRow {
     const char* label;
-    char value[32];
+    char value[48];
   };
 
   StatRow rows[3];
-  rows[0].label = "Cards done";
+  rows[0].label = tr(STR_STUDY_CARDS_DONE);
   snprintf(rows[0].value, sizeof(rows[0].value), "%u / %u  (%d%%)", state.completedToday, state.dueToday, completion);
-  rows[1].label = "Accuracy";
+  rows[1].label = tr(STR_STUDY_ACCURACY);
   snprintf(rows[1].value, sizeof(rows[1].value), "%d%%  (%u wrong)", accuracy, state.wrongToday);
-  rows[2].label = "Review queue";
-  snprintf(rows[2].value, sizeof(rows[2].value), "A%d L%d S%d", againCount, laterCount, savedCount);
+  rows[2].label = tr(STR_STUDY_REVIEW_QUEUE);
+  snprintf(rows[2].value, sizeof(rows[2].value), tr(STR_STUDY_QUEUE_COUNTS_SHORT_FORMAT), againCount, laterCount,
+           savedCount);
 
   const int rowH = 28;
   for (int i = 0; i < 3; i++) {
@@ -141,11 +141,11 @@ void LearningReportActivity::render(RenderLock&&) {
 
   // ── Bottom status row ─────────────────────────────────────────────────
   const int statusY = contentBottom - 14;
-  char streakStr[24];
-  snprintf(streakStr, sizeof(streakStr), "Streak %u days", state.streakDays);
+  char streakStr[40];
+  snprintf(streakStr, sizeof(streakStr), tr(STR_STUDY_STREAK_DAYS_FORMAT), state.streakDays);
   renderer.drawText(SMALL_FONT_ID, pad, statusY, streakStr);
-  char masteryStr[28];
-  snprintf(masteryStr, sizeof(masteryStr), "Mastery %d/100", masteryScore);
+  char masteryStr[40];
+  snprintf(masteryStr, sizeof(masteryStr), tr(STR_STUDY_MASTERY_FORMAT), masteryScore);
   renderer.drawText(SMALL_FONT_ID, pageWidth - pad - renderer.getTextWidth(SMALL_FONT_ID, masteryStr), statusY,
                     masteryStr);
 
@@ -153,7 +153,7 @@ void LearningReportActivity::render(RenderLock&&) {
   renderer.drawText(SMALL_FONT_ID, pageWidth - pad - renderer.getTextWidth(SMALL_FONT_ID, nextFocus), statusY - 24,
                     nextFocus);
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Done", "", "");
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_DONE), "", "");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

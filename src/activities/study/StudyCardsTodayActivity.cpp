@@ -17,7 +17,8 @@
 
 namespace {
 constexpr int kActionCount = 4;
-constexpr const char* kActions[kActionCount] = {"Know", "Again", "Later", "Save"};
+constexpr StrId kActionIds[kActionCount] = {StrId::STR_STUDY_ACTION_KNOW, StrId::STR_STUDY_ACTION_AGAIN,
+                                            StrId::STR_STUDY_ACTION_LATER, StrId::STR_STUDY_ACTION_SAVE};
 
 void drawProgressBar(const GfxRenderer& renderer, int x, int y, int width, int height, int percent) {
   const int r = height / 2;
@@ -72,31 +73,31 @@ StudyCardsTodayActivity::NextStep StudyCardsTodayActivity::recommendedNextStep()
   return NextStep::Report;
 }
 
-const char* StudyCardsTodayActivity::nextStepLabel() const {
+StrId StudyCardsTodayActivity::nextStepLabelId() const {
   switch (recommendedNextStep()) {
     case NextStep::Recovery:
-      return "Next: Recovery";
+      return StrId::STR_STUDY_NEXT_RECOVERY;
     case NextStep::Later:
-      return "Next: Later Cards";
+      return StrId::STR_STUDY_NEXT_LATER_CARDS;
     case NextStep::Saved:
-      return "Next: Saved Cards";
+      return StrId::STR_STUDY_NEXT_SAVED_CARDS;
     case NextStep::Report:
     default:
-      return "Next: Learning Report";
+      return StrId::STR_STUDY_NEXT_LEARNING_REPORT;
   }
 }
 
-const char* StudyCardsTodayActivity::nextStepHint() const {
+StrId StudyCardsTodayActivity::nextStepHintId() const {
   switch (recommendedNextStep()) {
     case NextStep::Recovery:
-      return "Fix missed cards first";
+      return StrId::STR_STUDY_HINT_FIX_MISSED_FIRST;
     case NextStep::Later:
-      return "Clear postponed cards next";
+      return StrId::STR_STUDY_HINT_CLEAR_POSTPONED_NEXT;
     case NextStep::Saved:
-      return "Review cards worth keeping";
+      return StrId::STR_STUDY_HINT_REVIEW_SAVED_CARDS;
     case NextStep::Report:
     default:
-      return "Check mastery and weak areas";
+      return StrId::STR_STUDY_HINT_CHECK_MASTERY;
   }
 }
 
@@ -304,7 +305,7 @@ void StudyCardsTodayActivity::render(RenderLock&&) {
   const auto& state = STUDY_STATE.getState();
   const auto& cards = STUDY_DECKS.getCards();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Study Cards");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_STUDY_CARDS));
 
   const int pad = metrics.contentSidePadding;
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
@@ -316,32 +317,34 @@ void StudyCardsTodayActivity::render(RenderLock&&) {
     const int cardH = 144;
     const int cardY = (pageHeight - cardH) / 2 - 20;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 16, "No study cards found", true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 16, tr(STR_STUDY_NO_STUDY_CARDS_FOUND), true, EpdFontFamily::BOLD);
     renderer.drawLine(pad + 16, cardY + 48, pageWidth - pad - 16, cardY + 48, true);
-    renderer.drawText(SMALL_FONT_ID, pad + 18, cardY + 62, "Copy deck JSON files to:");
+    renderer.drawText(SMALL_FONT_ID, pad + 18, cardY + 62, tr(STR_STUDY_COPY_DECK_JSON_TO));
     renderer.drawText(UI_10_FONT_ID, pad + 18, cardY + 84, "/.mofei/study", true, EpdFontFamily::BOLD);
-    renderer.drawText(SMALL_FONT_ID, pad + 18, cardY + 112, "Accepted: cards[], front/back/example");
+    renderer.drawText(SMALL_FONT_ID, pad + 18, cardY + 112, tr(STR_STUDY_ACCEPTED_DECK_SCHEMA));
 
-    char status[48];
-    snprintf(status, sizeof(status), "Decks %d  Errors %d", STUDY_DECKS.getDeckCount(), STUDY_DECKS.getErrorCount());
+    char status[64];
+    snprintf(status, sizeof(status), tr(STR_STUDY_DECKS_ERRORS_COMPACT_FORMAT), STUDY_DECKS.getDeckCount(),
+             STUDY_DECKS.getErrorCount());
     renderer.drawCenteredText(SMALL_FONT_ID, contentBottom - 16, status);
   } else if (!inSession && sessionComplete) {
     const int cardH = 178;
     const int cardY = contentTop + (contentBottom - contentTop - cardH) / 2 - 22;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 16, "Study complete", true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 16, tr(STR_STUDY_COMPLETE), true, EpdFontFamily::BOLD);
     renderer.drawLine(pad + 24, cardY + 46, pageWidth - pad - 24, cardY + 46, true);
 
-    char reviewed[48];
-    snprintf(reviewed, sizeof(reviewed), "Reviewed %d  Saved %d", reviewedInSession, savedCount);
+    char reviewed[64];
+    snprintf(reviewed, sizeof(reviewed), tr(STR_STUDY_REVIEWED_SAVED_FORMAT), reviewedInSession, savedCount);
     renderer.drawCenteredText(SMALL_FONT_ID, cardY + 62, reviewed);
 
-    char queues[48];
-    snprintf(queues, sizeof(queues), "Again %d  Later %d", sessionAgainCount, sessionLaterCount);
+    char queues[64];
+    snprintf(queues, sizeof(queues), tr(STR_STUDY_AGAIN_LATER_FORMAT), sessionAgainCount, sessionLaterCount);
     renderer.drawCenteredText(SMALL_FONT_ID, cardY + 86, queues);
 
-    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 116, nextStepLabel(), true, EpdFontFamily::BOLD);
-    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 144, nextStepHint());
+    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 116, I18n::getInstance().get(nextStepLabelId()), true,
+                              EpdFontFamily::BOLD);
+    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 144, I18n::getInstance().get(nextStepHintId()));
   } else if (!inSession) {
     const int due = std::max(0, static_cast<int>(state.dueToday) - static_cast<int>(state.completedToday));
     const int cardH = 178;
@@ -351,16 +354,15 @@ void StudyCardsTodayActivity::render(RenderLock&&) {
     char countStr[32];
     snprintf(countStr, sizeof(countStr), "%d", static_cast<int>(cards.size()));
     renderer.drawCenteredText(UI_12_FONT_ID, cardY + 18, countStr, true, EpdFontFamily::BOLD);
-    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 66, "loaded cards");
+    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 66, tr(STR_STUDY_LOADED_CARDS));
     renderer.drawLine(pad + 24, cardY + 94, pageWidth - pad - 24, cardY + 94, true);
 
-    char deckStr[48];
-    snprintf(deckStr, sizeof(deckStr), "%d deck%s imported", STUDY_DECKS.getDeckCount(),
-             STUDY_DECKS.getDeckCount() == 1 ? "" : "s");
+    char deckStr[64];
+    snprintf(deckStr, sizeof(deckStr), tr(STR_STUDY_DECKS_IMPORTED_FORMAT), STUDY_DECKS.getDeckCount());
     renderer.drawCenteredText(SMALL_FONT_ID, cardY + 108, deckStr);
 
-    char dueStr[48];
-    snprintf(dueStr, sizeof(dueStr), "%d due today  Accuracy %d%%", due, accuracy);
+    char dueStr[80];
+    snprintf(dueStr, sizeof(dueStr), tr(STR_STUDY_DUE_ACCURACY_FORMAT), due, accuracy);
     renderer.drawCenteredText(SMALL_FONT_ID, cardY + 132, dueStr);
     drawProgressBar(renderer, pad + 22, cardY + 154, pageWidth - (pad + 22) * 2, 8,
                     state.dueToday > 0 ? static_cast<int>(state.completedToday) * 100 / state.dueToday : 0);
@@ -369,8 +371,8 @@ void StudyCardsTodayActivity::render(RenderLock&&) {
     const int total = static_cast<int>(cards.size());
     const int pct = total > 0 ? std::clamp(reviewedInSession * 100 / total, 0, 100) : 0;
 
-    char meta[48];
-    snprintf(meta, sizeof(meta), "Card %d/%d  Saved %d", reviewedInSession + 1, total, savedCount);
+    char meta[80];
+    snprintf(meta, sizeof(meta), tr(STR_STUDY_CARD_SAVED_FORMAT), reviewedInSession + 1, total, savedCount);
     renderer.drawText(SMALL_FONT_ID, pad, contentTop, meta);
     const std::string deckName = truncatedLine(renderer, SMALL_FONT_ID, card.deckName, pageWidth / 2);
     renderer.drawText(SMALL_FONT_ID, pageWidth - pad - renderer.getTextWidth(SMALL_FONT_ID, deckName.c_str()),
@@ -380,7 +382,8 @@ void StudyCardsTodayActivity::render(RenderLock&&) {
     const int actionArea = showingBack ? 92 : 38;
     const int cardH = contentBottom - cardY - actionArea;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-    renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14, showingBack ? "Back" : "Front");
+    renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14,
+                      showingBack ? tr(STR_STUDY_CARD_BACK) : tr(STR_STUDY_CARD_FRONT));
 
     const std::string primary = showingBack ? card.back : card.front;
     const std::string secondary = showingBack ? card.example : "";
@@ -410,16 +413,16 @@ void StudyCardsTodayActivity::render(RenderLock&&) {
       for (int i = 0; i < kActionCount; i++) {
         const int x = pad + (i % 2) * (btnW + 18);
         const int y = btnTop + (i / 2) * (btnH + 8);
-        drawActionButton(renderer, x, y, btnW, btnH, kActions[i], i == actionIndex);
+        drawActionButton(renderer, x, y, btnW, btnH, I18n::getInstance().get(kActionIds[i]), i == actionIndex);
       }
     } else {
-      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 32, "Press Confirm to reveal answer");
+      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 32, tr(STR_STUDY_PRESS_CONFIRM_REVEAL_ANSWER));
     }
   }
 
-  const auto labels = mappedInput.mapLabels(
-      tr(STR_BACK), inSession ? (showingBack ? "Apply" : "Flip") : (sessionComplete ? "Open" : "Start"), tr(STR_DIR_UP),
-      tr(STR_DIR_DOWN));
+  const char* confirmLabel = inSession ? (showingBack ? tr(STR_STUDY_APPLY) : tr(STR_STUDY_FLIP))
+                                       : (sessionComplete ? tr(STR_OPEN) : tr(STR_START));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), confirmLabel, tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

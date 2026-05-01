@@ -3,6 +3,8 @@
 #include <HalStorage.h>
 #include <I18n.h>
 
+#include <cstdio>
+
 #include "DeckImportStatusActivity.h"
 #include "LearningReportActivity.h"
 #include "ReviewQueueActivity.h"
@@ -22,26 +24,38 @@ constexpr int kItemCount = 8;
 constexpr char kStudyDir[] = "/.mofei/study";
 constexpr char kStudyStateFile[] = "/.mofei/study/state.json";
 
-const char* itemLabel(int index) {
+StrId itemLabelId(int index) {
   switch (index) {
     case 0:
-      return "Study Cards";
+      return StrId::STR_STUDY_CARDS;
     case 1:
-      return "Recovery";
+      return StrId::STR_STUDY_RECOVERY;
     case 2:
-      return "Quiz Practice";
+      return StrId::STR_STUDY_QUIZ_PRACTICE;
     case 3:
-      return "Later Cards";
+      return StrId::STR_STUDY_LATER_CARDS;
     case 4:
-      return "Saved Cards";
+      return StrId::STR_STUDY_SAVED_CARDS;
     case 5:
-      return "Learning Report";
+      return StrId::STR_STUDY_LEARNING_REPORT;
     case 6:
-      return "Review Queue";
+      return StrId::STR_STUDY_REVIEW_QUEUE;
     case 7:
     default:
-      return "Deck Import Status";
+      return StrId::STR_STUDY_DECK_IMPORT_STATUS;
   }
+}
+
+std::string formatString(StrId id, int value) {
+  char buffer[96];
+  snprintf(buffer, sizeof(buffer), I18n::getInstance().get(id), value);
+  return std::string(buffer);
+}
+
+std::string formatString(StrId id, int first, int second) {
+  char buffer[112];
+  snprintf(buffer, sizeof(buffer), I18n::getInstance().get(id), first, second);
+  return std::string(buffer);
 }
 }  // namespace
 
@@ -157,48 +171,49 @@ void StudyHubActivity::render(RenderLock&&) {
   const auto pageHeight = renderer.getScreenHeight();
   const auto& state = STUDY_STATE.getState();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Study");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_STUDY));
   GUI.drawList(
       renderer,
       Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, pageWidth,
            pageHeight -
                (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)},
-      kItemCount, selectedIndex, [](int index) { return std::string(itemLabel(index)); },
+      kItemCount, selectedIndex, [](int index) { return std::string(I18n::getInstance().get(itemLabelId(index))); },
       [this, &state](int index) {
         switch (index) {
           case 0:
             if (importedCardCount <= 0) {
-              return std::string("Import deck files to start");
+              return std::string(tr(STR_STUDY_IMPORT_DECKS_TO_START));
             }
-            return "Due today: " +
-                   std::to_string(state.dueToday > state.completedToday ? state.dueToday - state.completedToday : 0);
+            return formatString(StrId::STR_STUDY_DUE_TODAY_FORMAT,
+                                state.dueToday > state.completedToday ? state.dueToday - state.completedToday : 0);
           case 1:
-            return againQueueCount > 0 ? ("Wrong cards: " + std::to_string(againQueueCount))
-                                       : std::string("No recovery backlog");
+            return againQueueCount > 0 ? formatString(StrId::STR_STUDY_WRONG_CARDS_FORMAT, againQueueCount)
+                                       : std::string(tr(STR_STUDY_NO_RECOVERY_BACKLOG));
           case 2:
-            return importedCardCount > 1 ? std::string("Three drill modes ready")
-                                         : std::string("Need at least 2 cards");
+            return importedCardCount > 1 ? std::string(tr(STR_STUDY_THREE_DRILL_MODES_READY))
+                                         : std::string(tr(STR_STUDY_NEED_AT_LEAST_2_CARDS));
           case 3:
-            return laterQueueCount > 0 ? ("Later: " + std::to_string(laterQueueCount) + "  Parked for later")
-                                       : std::string("No postponed cards");
+            return laterQueueCount > 0 ? formatString(StrId::STR_STUDY_LATER_PARKED_FORMAT, laterQueueCount)
+                                       : std::string(tr(STR_STUDY_NO_POSTPONED_CARDS));
           case 4:
-            return savedQueueCount > 0 ? ("Saved: " + std::to_string(savedQueueCount) + "  Keep key cards")
-                                       : std::string("Save cards you want to keep");
+            return savedQueueCount > 0 ? formatString(StrId::STR_STUDY_SAVED_KEEP_FORMAT, savedQueueCount)
+                                       : std::string(tr(STR_STUDY_SAVE_CARDS_TO_KEEP));
           case 5:
-            return std::string("Weak area and mastery");
+            return std::string(tr(STR_STUDY_WEAK_AREA_AND_MASTERY));
           case 6:
-            return "Again: " + std::to_string(againQueueCount) +
-                   "  Total: " + std::to_string(againQueueCount + laterQueueCount + savedQueueCount);
+            return formatString(StrId::STR_STUDY_AGAIN_TOTAL_FORMAT, againQueueCount,
+                                againQueueCount + laterQueueCount + savedQueueCount);
           case 7:
           default:
             if (importedDeckCount > 0) {
-              return "Decks: " + std::to_string(importedDeckCount) + "  Errors: " + std::to_string(deckErrorCount);
+              return formatString(StrId::STR_STUDY_DECKS_ERRORS_FORMAT, importedDeckCount, deckErrorCount);
             }
-            return hasStudyStateFile ? std::string("Study state ready") : std::string("No deck imported yet");
+            return hasStudyStateFile ? std::string(tr(STR_STUDY_STATE_READY))
+                                     : std::string(tr(STR_STUDY_NO_DECK_IMPORTED_YET));
         }
       });
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Open", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

@@ -15,7 +15,7 @@
 
 namespace {
 constexpr int kActionCount = 2;
-constexpr const char* kActions[kActionCount] = {"Know", "Again"};
+constexpr StrId kActionIds[kActionCount] = {StrId::STR_STUDY_ACTION_KNOW, StrId::STR_STUDY_ACTION_AGAIN};
 
 void drawActionButton(const GfxRenderer& renderer, int x, int y, int w, int h, const char* label, bool selected) {
   if (selected) {
@@ -41,27 +41,27 @@ StudyRecoveryActivity::NextStep StudyRecoveryActivity::recommendedNextStep() con
   return NextStep::Report;
 }
 
-const char* StudyRecoveryActivity::nextStepLabel() const {
+StrId StudyRecoveryActivity::nextStepLabelId() const {
   switch (recommendedNextStep()) {
     case NextStep::Later:
-      return "Next: Later Cards";
+      return StrId::STR_STUDY_NEXT_LATER_CARDS;
     case NextStep::Saved:
-      return "Next: Saved Cards";
+      return StrId::STR_STUDY_NEXT_SAVED_CARDS;
     case NextStep::Report:
     default:
-      return "Next: Learning Report";
+      return StrId::STR_STUDY_NEXT_LEARNING_REPORT;
   }
 }
 
-const char* StudyRecoveryActivity::nextStepHint() const {
+StrId StudyRecoveryActivity::nextStepHintId() const {
   switch (recommendedNextStep()) {
     case NextStep::Later:
-      return "Convert postponed cards next";
+      return StrId::STR_STUDY_HINT_CONVERT_POSTPONED_NEXT;
     case NextStep::Saved:
-      return "Review cards worth keeping";
+      return StrId::STR_STUDY_HINT_REVIEW_SAVED_CARDS;
     case NextStep::Report:
     default:
-      return "Check mastery and weak areas";
+      return StrId::STR_STUDY_HINT_CHECK_MASTERY;
   }
 }
 
@@ -246,30 +246,33 @@ void StudyRecoveryActivity::render(RenderLock&&) {
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   const int contentBottom = pageHeight - metrics.buttonHintsHeight - 8;
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Recovery");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_STUDY_RECOVERY));
 
   const auto& cards = STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Again);
   if (cards.empty()) {
     const int cardH = sessionComplete ? 156 : 132;
     const int cardY = (pageHeight - cardH) / 2 - 18;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 18, sessionComplete ? "Recovery complete" : "No recovery cards",
-                              true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 18,
+                              sessionComplete ? tr(STR_STUDY_RECOVERY_COMPLETE) : tr(STR_STUDY_NO_RECOVERY_CARDS), true,
+                              EpdFontFamily::BOLD);
     renderer.drawLine(pad + 18, cardY + 48, pageWidth - pad - 18, cardY + 48, true);
     if (sessionComplete) {
-      char done[40];
-      snprintf(done, sizeof(done), "Cleared %d recovery card%s", completedCount, completedCount == 1 ? "" : "s");
+      char done[64];
+      snprintf(done, sizeof(done), tr(STR_STUDY_CLEARED_RECOVERY_FORMAT), completedCount);
       renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, done);
-      renderer.drawCenteredText(UI_10_FONT_ID, cardY + 94, nextStepLabel(), true, EpdFontFamily::BOLD);
-      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 122, nextStepHint());
+      renderer.drawCenteredText(UI_10_FONT_ID, cardY + 94, I18n::getInstance().get(nextStepLabelId()), true,
+                                EpdFontFamily::BOLD);
+      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 122, I18n::getInstance().get(nextStepHintId()));
     } else {
-      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, "Wrong cards will appear here");
-      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, "Miss a card in Study Cards");
+      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, tr(STR_STUDY_WRONG_CARDS_APPEAR_HERE));
+      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, tr(STR_STUDY_MISS_CARD_HINT));
     }
   } else {
     const auto& card = cards[std::clamp(selectedIndex, 0, static_cast<int>(cards.size()) - 1)];
-    char meta[48];
-    snprintf(meta, sizeof(meta), "%d/%d  Count %u", selectedIndex + 1, static_cast<int>(cards.size()), card.count);
+    char meta[64];
+    snprintf(meta, sizeof(meta), tr(STR_STUDY_INDEX_COUNT_FORMAT), selectedIndex + 1, static_cast<int>(cards.size()),
+             card.count);
     renderer.drawText(SMALL_FONT_ID, pad, contentTop, meta);
     const std::string deckLabel = renderer.truncatedText(SMALL_FONT_ID, card.deckName.c_str(), pageWidth / 2);
     renderer.drawText(SMALL_FONT_ID, pageWidth - pad - renderer.getTextWidth(SMALL_FONT_ID, deckLabel.c_str()),
@@ -279,7 +282,8 @@ void StudyRecoveryActivity::render(RenderLock&&) {
     const int actionArea = showingBack ? 72 : 38;
     const int cardH = contentBottom - cardY - actionArea;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-    renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14, showingBack ? "Back" : "Front");
+    renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14,
+                      showingBack ? tr(STR_STUDY_CARD_BACK) : tr(STR_STUDY_CARD_FRONT));
 
     const std::string text = showingBack ? card.back : card.front;
     const auto lines =
@@ -296,15 +300,16 @@ void StudyRecoveryActivity::render(RenderLock&&) {
       const int btnTop = contentBottom - 54;
       for (int i = 0; i < kActionCount; i++) {
         const int x = pad + i * (btnW + 18);
-        drawActionButton(renderer, x, btnTop, btnW, btnH, kActions[i], i == actionIndex);
+        drawActionButton(renderer, x, btnTop, btnW, btnH, I18n::getInstance().get(kActionIds[i]), i == actionIndex);
       }
     } else {
-      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Confirm to reveal");
+      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, tr(STR_STUDY_CONFIRM_TO_REVEAL));
     }
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), sessionComplete ? "Open" : (showingBack ? "Apply" : "Flip"),
-                                            tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(
+      tr(STR_BACK), sessionComplete ? tr(STR_OPEN) : (showingBack ? tr(STR_STUDY_APPLY) : tr(STR_STUDY_FLIP)),
+      tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

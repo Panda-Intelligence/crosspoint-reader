@@ -24,27 +24,27 @@ StudyQueueKind queueKind(const int index) {
   }
 }
 
-const char* queueTitle(const int index) {
+StrId queueTitleId(const int index) {
   switch (index) {
     case 1:
-      return "Later";
+      return StrId::STR_STUDY_QUEUE_LATER;
     case 2:
-      return "Saved";
+      return StrId::STR_STUDY_QUEUE_SAVED;
     case 0:
     default:
-      return "Again";
+      return StrId::STR_STUDY_QUEUE_AGAIN;
   }
 }
 
-const char* queueHint(const int index) {
+StrId queueHintId(const int index) {
   switch (index) {
     case 1:
-      return "Cards parked for later review";
+      return StrId::STR_STUDY_CARDS_PARKED_FOR_LATER;
     case 2:
-      return "Saved cards are read-only";
+      return StrId::STR_STUDY_SAVED_CARDS_READ_ONLY;
     case 0:
     default:
-      return "Cards marked wrong";
+      return StrId::STR_STUDY_CARDS_MARKED_WRONG;
   }
 }
 }  // namespace
@@ -244,8 +244,9 @@ void ReviewQueueActivity::render(RenderLock&&) {
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   const int contentBottom = pageHeight - metrics.buttonHintsHeight - 8;
 
-  char header[32];
-  snprintf(header, sizeof(header), "Review Queue: %s", queueTitle(queueIndex));
+  char header[64];
+  snprintf(header, sizeof(header), tr(STR_STUDY_REVIEW_QUEUE_HEADER_FORMAT),
+           I18n::getInstance().get(queueTitleId(queueIndex)));
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, header);
 
   const auto& cards = STUDY_REVIEW_QUEUE.getCards(queueKind(queueIndex));
@@ -253,28 +254,30 @@ void ReviewQueueActivity::render(RenderLock&&) {
     const int cardH = 132;
     const int cardY = (pageHeight - cardH) / 2 - 18;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 18, "Queue is empty", true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 18, tr(STR_STUDY_QUEUE_EMPTY), true, EpdFontFamily::BOLD);
     renderer.drawLine(pad + 18, cardY + 48, pageWidth - pad - 18, cardY + 48, true);
-    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, queueHint(queueIndex));
-    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, "Use Left/Right to switch queues");
+    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, I18n::getInstance().get(queueHintId(queueIndex)));
+    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, tr(STR_STUDY_USE_LEFT_RIGHT_SWITCH_QUEUES));
   } else {
     if (confirmingClear) {
       const int cardH = 132;
       const int cardY = (pageHeight - cardH) / 2 - 18;
       renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-      renderer.drawCenteredText(UI_10_FONT_ID, cardY + 18, "Clear current queue?", true, EpdFontFamily::BOLD);
+      renderer.drawCenteredText(UI_10_FONT_ID, cardY + 18, tr(STR_STUDY_CLEAR_CURRENT_QUEUE), true,
+                                EpdFontFamily::BOLD);
       renderer.drawLine(pad + 18, cardY + 48, pageWidth - pad - 18, cardY + 48, true);
-      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, queueTitle(queueIndex));
-      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, "Right confirms, Left cancels");
-      const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "Cancel", "Clear");
+      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, I18n::getInstance().get(queueTitleId(queueIndex)));
+      renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, tr(STR_STUDY_RIGHT_CONFIRM_LEFT_CANCEL));
+      const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", tr(STR_CANCEL), tr(STR_CLEAR_BUTTON));
       GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
       renderer.displayBuffer();
       return;
     }
 
     const StudyQueuedCard& card = cards[std::clamp(cardIndex, 0, static_cast<int>(cards.size()) - 1)];
-    char meta[48];
-    snprintf(meta, sizeof(meta), "%d/%d  Count %u", cardIndex + 1, static_cast<int>(cards.size()), card.count);
+    char meta[64];
+    snprintf(meta, sizeof(meta), tr(STR_STUDY_INDEX_COUNT_FORMAT), cardIndex + 1, static_cast<int>(cards.size()),
+             card.count);
     renderer.drawText(SMALL_FONT_ID, pad, contentTop, meta);
     const std::string deckLabel = renderer.truncatedText(SMALL_FONT_ID, card.deckName.c_str(), pageWidth / 2);
     const int deckW = renderer.getTextWidth(SMALL_FONT_ID, deckLabel.c_str());
@@ -283,7 +286,8 @@ void ReviewQueueActivity::render(RenderLock&&) {
     const int cardY = contentTop + 24;
     const int cardH = contentBottom - cardY - 38;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-    renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14, showingBack ? "Back" : "Front");
+    renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14,
+                      showingBack ? tr(STR_STUDY_CARD_BACK) : tr(STR_STUDY_CARD_FRONT));
 
     const std::string text = showingBack ? card.back : card.front;
     const auto lines =
@@ -295,15 +299,16 @@ void ReviewQueueActivity::render(RenderLock&&) {
     }
 
     if (showingBack) {
-      const char* action =
-          queueKind(queueIndex) == StudyQueueKind::Saved ? "Saved card - Confirm closes" : "Confirm marks Done";
+      const char* action = queueKind(queueIndex) == StudyQueueKind::Saved ? tr(STR_STUDY_SAVED_CONFIRM_CLOSES)
+                                                                          : tr(STR_STUDY_CONFIRM_MARKS_DONE);
       renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, action);
     } else {
-      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Confirm reveal  Down clear queue");
+      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, tr(STR_STUDY_CONFIRM_REVEAL_DOWN_CLEAR));
     }
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), showingBack ? "Done" : "Flip", "Queue -", "Queue +");
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), showingBack ? tr(STR_DONE) : tr(STR_STUDY_FLIP),
+                                            tr(STR_STUDY_QUEUE_PREV), tr(STR_STUDY_QUEUE_NEXT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

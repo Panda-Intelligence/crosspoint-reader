@@ -185,17 +185,17 @@ void SavedCardsActivity::render(RenderLock&&) {
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   const int contentBottom = pageHeight - metrics.buttonHintsHeight - 8;
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Saved Cards");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_STUDY_SAVED_CARDS));
 
   const auto& cards = STUDY_REVIEW_QUEUE.getCards(StudyQueueKind::Saved);
   if (cards.empty()) {
     const int cardH = 132;
     const int cardY = (pageHeight - cardH) / 2 - 18;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 18, "No saved cards yet", true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 18, tr(STR_STUDY_NO_SAVED_CARDS_YET), true, EpdFontFamily::BOLD);
     renderer.drawLine(pad + 18, cardY + 48, pageWidth - pad - 18, cardY + 48, true);
-    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, "Use Save during Study Cards");
-    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, "Saved cards stay here");
+    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, tr(STR_STUDY_USE_SAVE_DURING_STUDY));
+    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, tr(STR_STUDY_SAVED_CARDS_STAY_HERE));
   } else {
     std::vector<std::string> decks;
     for (const auto& item : cards) {
@@ -213,8 +213,8 @@ void SavedCardsActivity::render(RenderLock&&) {
     }
 
     const auto& card = *filteredCards[std::clamp(selectedIndex, 0, static_cast<int>(filteredCards.size()) - 1)];
-    char meta[56];
-    snprintf(meta, sizeof(meta), "Deck %d/%d  Card %d/%d",
+    char meta[80];
+    snprintf(meta, sizeof(meta), tr(STR_STUDY_DECK_CARD_FORMAT),
              std::clamp(deckIndex, 0, static_cast<int>(decks.size()) - 1) + 1, static_cast<int>(decks.size()),
              selectedIndex + 1, static_cast<int>(filteredCards.size()));
     renderer.drawText(SMALL_FONT_ID, pad, contentTop, meta);
@@ -225,7 +225,8 @@ void SavedCardsActivity::render(RenderLock&&) {
     const int cardY = contentTop + 24;
     const int cardH = contentBottom - cardY - 38;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-    renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14, showingBack ? "Back" : "Front");
+    renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14,
+                      showingBack ? tr(STR_STUDY_CARD_BACK) : tr(STR_STUDY_CARD_FRONT));
 
     const std::string text = showingBack ? card.back : card.front;
     const auto lines =
@@ -237,16 +238,17 @@ void SavedCardsActivity::render(RenderLock&&) {
     }
 
     if (showingBack) {
-      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Confirm removes from saved");
+      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, tr(STR_STUDY_CONFIRM_REMOVES_SAVED));
     } else {
-      char progress[56];
-      snprintf(progress, sizeof(progress), "%d in deck, %d saved total", static_cast<int>(filteredCards.size()),
-               static_cast<int>(cards.size()));
+      char progress[80];
+      snprintf(progress, sizeof(progress), tr(STR_STUDY_IN_DECK_SAVED_TOTAL_FORMAT),
+               static_cast<int>(filteredCards.size()), static_cast<int>(cards.size()));
       renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, progress);
     }
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), showingBack ? "Remove" : "Flip", "Deck -", "Deck +");
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), showingBack ? tr(STR_STUDY_REMOVE) : tr(STR_STUDY_FLIP),
+                                            tr(STR_STUDY_DECK_PREV), tr(STR_STUDY_DECK_NEXT));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <I18nKeys.h>
+
 #include "../Activity.h"
 #include "util/ButtonNavigator.h"
 
@@ -21,8 +23,8 @@ class StudyCardsTodayActivity final : public Activity {
   void advanceCard(bool recordResult, bool correct, bool saved);
   void applySelectedAction();
   NextStep recommendedNextStep() const;
-  const char* nextStepLabel() const;
-  const char* nextStepHint() const;
+  StrId nextStepLabelId() const;
+  StrId nextStepHintId() const;
   void openRecommendedNextStep();
 
  public:

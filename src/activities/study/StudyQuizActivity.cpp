@@ -11,15 +11,15 @@
 #include "util/TouchHitTest.h"
 
 namespace {
-const char* modeLabel(const StudyQuizActivity::QuizMode mode) {
+StrId modeLabelId(const StudyQuizActivity::QuizMode mode) {
   switch (mode) {
     case StudyQuizActivity::QuizMode::TrueFalse:
-      return "True / False";
+      return StrId::STR_STUDY_MODE_TRUE_FALSE;
     case StudyQuizActivity::QuizMode::FirstLetter:
-      return "First Letter";
+      return StrId::STR_STUDY_MODE_FIRST_LETTER;
     case StudyQuizActivity::QuizMode::TwoChoice:
     default:
-      return "Two Choice";
+      return StrId::STR_STUDY_MODE_TWO_CHOICE;
   }
 }
 
@@ -218,17 +218,18 @@ void StudyQuizActivity::render(RenderLock&&) {
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   const int contentBottom = pageHeight - metrics.buttonHintsHeight - 8;
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Quiz Practice");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_STUDY_QUIZ_PRACTICE));
 
   const auto& cards = STUDY_DECKS.getCards();
   if (cards.size() < 2) {
     const int cardH = 132;
     const int cardY = (pageHeight - cardH) / 2 - 18;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
-    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 18, "Need at least 2 cards", true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 18, tr(STR_STUDY_NEED_AT_LEAST_2_CARDS), true,
+                              EpdFontFamily::BOLD);
     renderer.drawLine(pad + 18, cardY + 48, pageWidth - pad - 18, cardY + 48, true);
-    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, "Import more deck cards");
-    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, "Press Confirm to refresh");
+    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 66, tr(STR_STUDY_IMPORT_MORE_DECK_CARDS));
+    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 94, tr(STR_STUDY_PRESS_CONFIRM_REFRESH));
   } else {
     const StudyCard& question = cards[questionIndex];
     const StudyCard& distractor = cards[(questionIndex + 1) % static_cast<int>(cards.size())];
@@ -238,8 +239,8 @@ void StudyQuizActivity::render(RenderLock&&) {
       options[0] = correctOption == 0 ? question.back : distractor.back;
       options[1] = correctOption == 1 ? question.back : distractor.back;
     } else if (mode == QuizMode::TrueFalse) {
-      options[0] = "True";
-      options[1] = "False";
+      options[0] = tr(STR_STUDY_TRUE);
+      options[1] = tr(STR_STUDY_FALSE);
     } else {
       const char correctLetter = question.front.empty() ? '?' : static_cast<char>(toupper(question.front.front()));
       const char wrongLetter = distractor.front.empty() ? 'X' : static_cast<char>(toupper(distractor.front.front()));
@@ -247,21 +248,21 @@ void StudyQuizActivity::render(RenderLock&&) {
       options[1] = std::string(1, correctOption == 1 ? correctLetter : wrongLetter);
     }
 
-    char meta[32];
-    snprintf(meta, sizeof(meta), "Question %d/%d", questionIndex + 1, static_cast<int>(cards.size()));
+    char meta[48];
+    snprintf(meta, sizeof(meta), tr(STR_STUDY_QUESTION_FORMAT), questionIndex + 1, static_cast<int>(cards.size()));
     renderer.drawText(SMALL_FONT_ID, pad, contentTop, meta);
     const std::string deckName = renderer.truncatedText(SMALL_FONT_ID, question.deckName.c_str(), pageWidth / 2);
     renderer.drawText(SMALL_FONT_ID, pageWidth - pad - renderer.getTextWidth(SMALL_FONT_ID, deckName.c_str()),
                       contentTop, deckName.c_str());
-    renderer.drawCenteredText(SMALL_FONT_ID, contentTop, modeLabel(mode));
+    renderer.drawCenteredText(SMALL_FONT_ID, contentTop, I18n::getInstance().get(modeLabelId(mode)));
 
     const int cardY = contentTop + 24;
     const int cardH = 112;
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 12, true);
     renderer.drawText(SMALL_FONT_ID, pad + 14, cardY + 14,
-                      mode == QuizMode::TwoChoice
-                          ? "Pick the correct answer"
-                          : (mode == QuizMode::TrueFalse ? "Does this answer match?" : "Pick the first letter"));
+                      mode == QuizMode::TwoChoice ? tr(STR_STUDY_PICK_CORRECT_ANSWER)
+                                                  : (mode == QuizMode::TrueFalse ? tr(STR_STUDY_DOES_ANSWER_MATCH)
+                                                                                 : tr(STR_STUDY_PICK_FIRST_LETTER)));
 
     std::string prompt = question.front;
     if (mode == QuizMode::TrueFalse) {
@@ -288,13 +289,13 @@ void StudyQuizActivity::render(RenderLock&&) {
 
     if (showingResult) {
       renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30,
-                                answerCorrect ? "Correct - Confirm for next" : "Wrong - Confirm for next");
+                                answerCorrect ? tr(STR_STUDY_CORRECT_CONFIRM_NEXT) : tr(STR_STUDY_WRONG_CONFIRM_NEXT));
     } else {
-      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, "Up/Down answer  Left/Right mode");
+      renderer.drawCenteredText(UI_10_FONT_ID, contentBottom - 30, tr(STR_STUDY_QUIZ_CONTROL_HINT));
     }
   }
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Confirm", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_CONFIRM), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <I18nKeys.h>
+
 #include "../Activity.h"
 #include "util/ButtonNavigator.h"
 
@@ -14,8 +16,8 @@ class StudyRecoveryActivity final : public Activity {
   enum class NextStep { Later, Saved, Report };
 
   NextStep recommendedNextStep() const;
-  const char* nextStepLabel() const;
-  const char* nextStepHint() const;
+  StrId nextStepLabelId() const;
+  StrId nextStepHintId() const;
   void openRecommendedNextStep();
   void applySelectedAction();
 
