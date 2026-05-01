@@ -2,132 +2,117 @@
 
 #include <I18n.h>
 
+#include <cstdio>
+
+#include "DashboardShortcutStore.h"
 #include "DesktopSummaryStore.h"
 #include "StudyStateStore.h"
-#include "activities/arcade/ArcadeHubActivity.h"
-#include "activities/desktop/CalendarActivity.h"
-#include "activities/desktop/DesktopHubActivity.h"
-#include "activities/desktop/WeatherClockActivity.h"
-#include "activities/reader/ReadingHubActivity.h"
-#include "activities/study/StudyHubActivity.h"
 #include "components/UITheme.h"
 #include "util/TouchHitTest.h"
 
 namespace {
-constexpr int kItemCount = 11;
-const char* itemLabel(int index) {
-  switch (index) {
-    case 0:
-      return tr(STR_DASHBOARD_WEATHER);
-    case 1:
-      return tr(STR_DASHBOARD_TODAY);
-    case 2:
-      return tr(STR_DASHBOARD_STUDY_TODAY);
-    case 3:
-      return tr(STR_CONTINUE_READING);
-    case 4:
-      return tr(STR_DASHBOARD_DESKTOP);
-    case 5:
-      return tr(STR_DASHBOARD_STUDY);
-    case 6:
-      return tr(STR_DASHBOARD_READING);
-    case 7:
-      return tr(STR_DASHBOARD_ARCADE);
-    case 8:
-      return tr(STR_DASHBOARD_IMPORT);
-    case 9:
-      return tr(STR_DASHBOARD_FILES);
-    case 10:
-      return tr(STR_SETTINGS_TITLE);
-    default:
-      return "";
-  }
+constexpr int kCustomizeRowCount = 1;
+
+bool isShortcutRow(int index) { return index >= 0 && index < static_cast<int>(DashboardShortcutStore::SLOT_COUNT); }
+
+std::string formatDashboardValue(const StrId id, const int value) {
+  char buffer[64];
+  snprintf(buffer, sizeof(buffer), I18N.get(id), value);
+  return buffer;
 }
 
-const char* itemSubtitle(int index) {
-  switch (index) {
-    case 0:
-      return "Time, weather and AQI";
-    case 1:
-      return "Events and countdowns";
-    case 2:
-      return "Due cards and progress";
-    case 3:
-      return "Resume the latest title";
-    case 4:
-      return "Weather, calendar, focus";
-    case 5:
-      return "Cards, reports, deck sync";
-    case 6:
-      return "Reader, dictionary, read later";
-    case 7:
-      return "Games and daily challenge";
-    case 8:
-      return "Upload books, cards and articles";
-    case 9:
-      return "Connection and account state";
-    case 10:
-    default:
-      return "System and package settings";
-  }
+std::string formatDashboardValue(const StrId id, const int firstValue, const int secondValue) {
+  char buffer[80];
+  snprintf(buffer, sizeof(buffer), I18N.get(id), firstValue, secondValue);
+  return buffer;
 }
 }  // namespace
 
 void DashboardActivity::onEnter() {
   Activity::onEnter();
+  DASHBOARD_SHORTCUTS.loadFromFile();
   selectedIndex = 0;
-  DESKTOP_SUMMARY.refresh();
   STUDY_STATE.loadFromFile();
+  DESKTOP_SUMMARY.refresh();
   requestUpdate();
 }
 
+int DashboardActivity::itemCount() const {
+  return static_cast<int>(DashboardShortcutStore::SLOT_COUNT) + kCustomizeRowCount;
+}
+
+std::string DashboardActivity::subtitleForShortcut(const DashboardShortcutId id) const {
+  const auto& summary = DESKTOP_SUMMARY.getState();
+  switch (id) {
+    case DashboardShortcutId::WeatherClock:
+      return summary.weatherLine;
+    case DashboardShortcutId::Today:
+      return summary.todaySecondary;
+    case DashboardShortcutId::StudyToday:
+      if (summary.loadedCards <= 0) {
+        return tr(STR_DASHBOARD_STUDY_IMPORT_HINT);
+      }
+      if (summary.againCards > 0) {
+        return formatDashboardValue(StrId::STR_DASHBOARD_STUDY_AGAIN_FORMAT, summary.againCards);
+      }
+      return summary.dueCards > 0 ? formatDashboardValue(StrId::STR_DASHBOARD_STUDY_DUE_FORMAT, summary.dueCards)
+                                  : std::string(tr(STR_DASHBOARD_STUDY_CAUGHT_UP));
+    case DashboardShortcutId::StudyHub:
+      return formatDashboardValue(StrId::STR_DASHBOARD_STUDY_SUMMARY_FORMAT, summary.loadedCards, summary.laterCards);
+    default: {
+      const auto* definition = DashboardShortcutStore::definitionFor(id);
+      return definition != nullptr ? std::string(I18N.get(definition->subtitleId)) : std::string();
+    }
+  }
+}
+
 void DashboardActivity::openCurrentSelection() {
-  switch (selectedIndex) {
-    case 0:
-      activityManager.replaceActivity(std::make_unique<WeatherClockActivity>(renderer, mappedInput));
+  if (!isShortcutRow(selectedIndex)) {
+    activityManager.goToDashboardCustomize();
+    return;
+  }
+
+  switch (DASHBOARD_SHORTCUTS.getShortcut(static_cast<size_t>(selectedIndex))) {
+    case DashboardShortcutId::WeatherClock:
+      activityManager.goToWeatherClock();
       break;
-    case 1:
-      activityManager.replaceActivity(std::make_unique<CalendarActivity>(renderer, mappedInput));
+    case DashboardShortcutId::Today:
+      activityManager.goToCalendar();
       break;
-    case 4:
-      activityManager.replaceActivity(std::make_unique<DesktopHubActivity>(renderer, mappedInput));
+    case DashboardShortcutId::DesktopHub:
+      activityManager.goToDesktopHub();
       break;
-    case 5:
-      activityManager.replaceActivity(std::make_unique<StudyHubActivity>(renderer, mappedInput));
+    case DashboardShortcutId::StudyHub:
+    case DashboardShortcutId::StudyToday:
+      activityManager.goToStudyHub();
       break;
-    case 6:
-      activityManager.replaceActivity(std::make_unique<ReadingHubActivity>(renderer, mappedInput));
+    case DashboardShortcutId::ReadingHub:
+      activityManager.goToReadingHub();
       break;
-    case 7:
-      activityManager.replaceActivity(std::make_unique<ArcadeHubActivity>(renderer, mappedInput));
+    case DashboardShortcutId::ArcadeHub:
+      activityManager.goToArcadeHub();
       break;
-    case 8:
+    case DashboardShortcutId::ImportSync:
       activityManager.goToFileTransfer();
       break;
-    case 9:
+    case DashboardShortcutId::FileBrowser:
       activityManager.goToFileBrowser();
       break;
-    case 10:
+    case DashboardShortcutId::Settings:
       activityManager.goToSettings();
       break;
-    case 3:
+    case DashboardShortcutId::RecentReading:
       activityManager.goToRecentBooks();
       break;
-    default:
-      if (selectedIndex == 2) {
-        activityManager.goToStudyHub();
-        return;
-      }
+    case DashboardShortcutId::Count:
       requestUpdate();
-      break;
+      return;
   }
 }
 
 void DashboardActivity::loop() {
   InputTouchEvent touchEvent;
   if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
-    LOG_DBG("DASH", "touch type=%u raw=%u,%u screen=%u,%u", static_cast<unsigned>(touchEvent.type),
-            touchEvent.sourceX(), touchEvent.sourceY(), touchEvent.x, touchEvent.y);
     if (touchEvent.isTap()) {
       const auto& metrics = UITheme::getInstance().getMetrics();
       const Rect listRect{
@@ -135,7 +120,7 @@ void DashboardActivity::loop() {
           renderer.getScreenHeight() -
               (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)};
       const int clickedIndex = TouchHitTest::listItemAt(listRect, metrics.listWithSubtitleRowHeight, selectedIndex,
-                                                        kItemCount, touchEvent.x, touchEvent.y);
+                                                        itemCount(), touchEvent.x, touchEvent.y);
       if (clickedIndex >= 0) {
         mappedInput.suppressTouchButtonFallback();
         selectedIndex = clickedIndex;
@@ -149,26 +134,30 @@ void DashboardActivity::loop() {
       const auto gestureAction = TouchHitTest::listGestureActionForTouch(touchEvent);
       if (gestureAction == TouchHitTest::ListGestureAction::NextItem) {
         mappedInput.suppressTouchButtonFallback();
-        selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);
+        selectedIndex = ButtonNavigator::nextIndex(selectedIndex, itemCount());
         requestUpdate();
         return;
       }
       if (gestureAction == TouchHitTest::ListGestureAction::PreviousItem) {
         mappedInput.suppressTouchButtonFallback();
-        selectedIndex = ButtonNavigator::previousIndex(selectedIndex, kItemCount);
+        selectedIndex = ButtonNavigator::previousIndex(selectedIndex, itemCount());
         requestUpdate();
+        return;
+      }
+      if (!mappedInput.isTouchButtonHintTap(touchEvent)) {
+        mappedInput.suppressTouchButtonFallback();
         return;
       }
     }
   }
 
   buttonNavigator.onNextRelease([this] {
-    selectedIndex = ButtonNavigator::nextIndex(selectedIndex, kItemCount);
+    selectedIndex = ButtonNavigator::nextIndex(selectedIndex, itemCount());
     requestUpdate();
   });
 
   buttonNavigator.onPreviousRelease([this] {
-    selectedIndex = ButtonNavigator::previousIndex(selectedIndex, kItemCount);
+    selectedIndex = ButtonNavigator::previousIndex(selectedIndex, itemCount());
     requestUpdate();
   });
 
@@ -183,39 +172,30 @@ void DashboardActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
-  const auto& summary = DESKTOP_SUMMARY.getState();
-  const auto& study = STUDY_STATE.getState();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Mofei Dashboard");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_MOFEI_DASHBOARD_TITLE));
   GUI.drawList(
       renderer,
       Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, pageWidth,
            pageHeight -
                (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)},
-      kItemCount, selectedIndex, [](int index) { return std::string(itemLabel(index)); },
-      [&summary, &study](int index) {
-        switch (index) {
-          case 0:
-            return summary.weatherLine;
-          case 1:
-            return summary.todaySecondary;
-          case 2:
-            if (summary.loadedCards <= 0) {
-              return std::string("Import study decks to begin");
-            }
-            if (summary.againCards > 0) {
-              return "Again queue: " + std::to_string(summary.againCards);
-            }
-            return summary.dueCards > 0 ? ("Due cards: " + std::to_string(summary.dueCards))
-                                        : std::string("All caught up");
-          case 5:
-            return "Cards " + std::to_string(summary.loadedCards) + "  Later " + std::to_string(summary.laterCards);
-          default:
-            return std::string(itemSubtitle(index));
+      itemCount(), selectedIndex,
+      [](int index) {
+        if (!isShortcutRow(index)) {
+          return std::string(tr(STR_DASHBOARD_CUSTOMIZE));
         }
+        const auto id = DASHBOARD_SHORTCUTS.getShortcut(static_cast<size_t>(index));
+        const auto* definition = DashboardShortcutStore::definitionFor(id);
+        return definition != nullptr ? std::string(I18N.get(definition->labelId)) : std::string();
+      },
+      [this](int index) {
+        if (!isShortcutRow(index)) {
+          return std::string(tr(STR_DASHBOARD_CUSTOMIZE_SUBTITLE));
+        }
+        return subtitleForShortcut(DASHBOARD_SHORTCUTS.getShortcut(static_cast<size_t>(index)));
       });
 
-  const auto labels = mappedInput.mapLabels("", "Open", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels("", tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

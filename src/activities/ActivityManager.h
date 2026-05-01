@@ -81,6 +81,9 @@ class ActivityManager {
   void goToSettings();
   void goToFileBrowser(std::string path = {});
   void goToRecentBooks();
+  void goToDashboardCustomize();
+  void goToWeatherClock();
+  void goToCalendar();
   void goToBrowser();
   void goToReader(std::string path);
   void goToDesktopHub();

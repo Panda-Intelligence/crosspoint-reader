@@ -3,17 +3,20 @@
 #include <HalPowerManager.h>
 
 #include "OpdsServerStore.h"
+#include "arcade/ArcadeHubActivity.h"
 #include "boot_sleep/BootActivity.h"
 #include "boot_sleep/SleepActivity.h"
 #include "browser/OpdsBookBrowserActivity.h"
+#include "desktop/CalendarActivity.h"
 #include "desktop/DesktopHubActivity.h"
+#include "desktop/WeatherClockActivity.h"
 #include "home/CrashActivity.h"
 #include "home/DashboardActivity.h"
+#include "home/DashboardCustomizeActivity.h"
 #include "home/FileBrowserActivity.h"
 #include "home/HomeActivity.h"
 #include "home/RecentBooksActivity.h"
 #include "network/CrossPointWebServerActivity.h"
-#include "arcade/ArcadeHubActivity.h"
 #include "reader/ReaderActivity.h"
 #include "reader/ReadingHubActivity.h"
 #include "settings/OpdsServerListActivity.h"
@@ -189,6 +192,16 @@ void ActivityManager::goToRecentBooks() {
   replaceActivity(std::make_unique<RecentBooksActivity>(renderer, mappedInput));
 }
 
+void ActivityManager::goToDashboardCustomize() {
+  replaceActivity(std::make_unique<DashboardCustomizeActivity>(renderer, mappedInput));
+}
+
+void ActivityManager::goToWeatherClock() {
+  replaceActivity(std::make_unique<WeatherClockActivity>(renderer, mappedInput));
+}
+
+void ActivityManager::goToCalendar() { replaceActivity(std::make_unique<CalendarActivity>(renderer, mappedInput)); }
+
 void ActivityManager::goToBrowser() {
   const auto& servers = OPDS_STORE.getServers();
   // Skip the server picker when there's only one server configured
@@ -203,21 +216,13 @@ void ActivityManager::goToReader(std::string path) {
   replaceActivity(std::make_unique<ReaderActivity>(renderer, mappedInput, std::move(path)));
 }
 
-void ActivityManager::goToDesktopHub() {
-  replaceActivity(std::make_unique<DesktopHubActivity>(renderer, mappedInput));
-}
+void ActivityManager::goToDesktopHub() { replaceActivity(std::make_unique<DesktopHubActivity>(renderer, mappedInput)); }
 
-void ActivityManager::goToStudyHub() {
-  replaceActivity(std::make_unique<StudyHubActivity>(renderer, mappedInput));
-}
+void ActivityManager::goToStudyHub() { replaceActivity(std::make_unique<StudyHubActivity>(renderer, mappedInput)); }
 
-void ActivityManager::goToReadingHub() {
-  replaceActivity(std::make_unique<ReadingHubActivity>(renderer, mappedInput));
-}
+void ActivityManager::goToReadingHub() { replaceActivity(std::make_unique<ReadingHubActivity>(renderer, mappedInput)); }
 
-void ActivityManager::goToArcadeHub() {
-  replaceActivity(std::make_unique<ArcadeHubActivity>(renderer, mappedInput));
-}
+void ActivityManager::goToArcadeHub() { replaceActivity(std::make_unique<ArcadeHubActivity>(renderer, mappedInput)); }
 
 void ActivityManager::goToSleep() {
   replaceActivity(std::make_unique<SleepActivity>(renderer, mappedInput));
