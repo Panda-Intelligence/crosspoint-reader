@@ -14,6 +14,8 @@ class EpubReaderMenuActivity final : public Activity {
   enum class MenuAction {
     SELECT_CHAPTER,
     FOOTNOTES,
+    TOGGLE_BOOKMARK,
+    BOOKMARKS,
     FONT_SIZE_DOWN,
     FONT_SIZE_UP,
     TOUCH_LOCK,
@@ -30,7 +32,7 @@ class EpubReaderMenuActivity final : public Activity {
   explicit EpubReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& title,
                                   const int currentPage, const int totalPages, const int bookProgressPercent,
                                   const uint8_t currentOrientation, const bool hasFootnotes, const uint8_t fontSize,
-                                  const bool touchLockEnabled);
+                                  const bool touchLockEnabled, const bool currentPageBookmarked);
 
   void onEnter() override;
   void onExit() override;
@@ -59,6 +61,7 @@ class EpubReaderMenuActivity final : public Activity {
   bool pageTurnOptionChanged = false;
   uint8_t currentFontSize = 0;
   bool touchLockEnabled = false;
+  bool currentPageBookmarked = false;
   const std::vector<StrId> orientationLabels = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_INVERTED,
                                                 StrId::STR_LANDSCAPE_CCW};
   const std::vector<StrId> fontSizeLabels = {StrId::STR_SMALL, StrId::STR_MEDIUM, StrId::STR_LARGE, StrId::STR_X_LARGE};

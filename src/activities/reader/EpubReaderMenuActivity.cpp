@@ -37,13 +37,14 @@ EpubReaderMenuActivity::EpubReaderMenuActivity(GfxRenderer& renderer, MappedInpu
                                                const std::string& title, const int currentPage, const int totalPages,
                                                const int bookProgressPercent, const uint8_t currentOrientation,
                                                const bool hasFootnotes, const uint8_t fontSize,
-                                               const bool touchLockEnabled)
+                                               const bool touchLockEnabled, const bool currentPageBookmarked)
     : Activity("EpubReaderMenu", renderer, mappedInput),
       menuItems(buildMenuItems(hasFootnotes)),
       title(title),
       pendingOrientation(currentOrientation),
       currentFontSize(fontSize),
       touchLockEnabled(touchLockEnabled),
+      currentPageBookmarked(currentPageBookmarked),
       currentPage(currentPage),
       totalPages(totalPages),
       bookProgressPercent(bookProgressPercent) {}
@@ -55,6 +56,8 @@ std::vector<EpubReaderMenuActivity::MenuItem> EpubReaderMenuActivity::buildMenuI
   if (hasFootnotes) {
     items.push_back({MenuAction::FOOTNOTES, StrId::STR_FOOTNOTES});
   }
+  items.push_back({MenuAction::TOGGLE_BOOKMARK, StrId::STR_ADD_BOOKMARK});
+  items.push_back({MenuAction::BOOKMARKS, StrId::STR_BOOKMARKS});
   items.push_back({MenuAction::FONT_SIZE_DOWN, StrId::STR_READER_FONT_SIZE_DOWN});
   items.push_back({MenuAction::FONT_SIZE_UP, StrId::STR_READER_FONT_SIZE_UP});
   items.push_back({MenuAction::TOUCH_LOCK, StrId::STR_TOUCH_LOCK});
@@ -205,7 +208,11 @@ void EpubReaderMenuActivity::render(RenderLock&&) {
       renderer.fillRect(contentX, displayY, contentWidth - 1, kMenuLineHeight, true);
     }
 
-    renderer.drawText(UI_10_FONT_ID, contentX + 20, displayY, I18N.get(menuItems[i].labelId), !isSelected);
+    StrId labelId = menuItems[i].labelId;
+    if (menuItems[i].action == MenuAction::TOGGLE_BOOKMARK && currentPageBookmarked) {
+      labelId = StrId::STR_REMOVE_BOOKMARK;
+    }
+    renderer.drawText(UI_10_FONT_ID, contentX + 20, displayY, I18N.get(labelId), !isSelected);
 
     if (menuItems[i].action == MenuAction::ROTATE_SCREEN) {
       // Render current orientation value on the right edge of the content area.

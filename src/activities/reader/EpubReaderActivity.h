@@ -2,6 +2,7 @@
 #include <Epub.h>
 #include <Epub/FootnoteEntry.h>
 #include <Epub/Section.h>
+#include <EpubBookmarkStore.h>
 
 #include <optional>
 
@@ -31,6 +32,7 @@ class EpubReaderActivity final : public Activity {
   bool skipNextButtonCheck = false;  // Skip button processing for one frame after subactivity exit
   bool automaticPageTurnActive = false;
   bool touchLockEnabled = false;
+  EpubBookmarkStore bookmarkStore;
 
   // Footnote support
   std::vector<FootnoteEntry> currentPageFootnotes;
@@ -54,6 +56,9 @@ class EpubReaderActivity final : public Activity {
   void toggleAutoPageTurn(uint8_t selectedPageTurnOption);
   void changeFontSize(int delta);
   void toggleTouchLock();
+  EpubBookmark currentBookmark() const;
+  void toggleCurrentBookmark();
+  void openBookmarks();
   void openReaderMenu();
   void pageTurn(bool isForwardTurn);
 
