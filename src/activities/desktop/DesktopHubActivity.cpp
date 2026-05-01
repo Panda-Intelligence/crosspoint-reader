@@ -4,23 +4,40 @@
 
 #include "CalendarActivity.h"
 #include "ClockFocusActivity.h"
+#include "StickyNotesActivity.h"
 #include "WeatherClockActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/TouchHitTest.h"
 
 namespace {
-constexpr int kItemCount = 3;
+constexpr int kItemCount = 4;
 
-const char* itemLabel(int index) {
+StrId itemLabel(int index) {
   switch (index) {
     case 0:
-      return "Weather & Clock";
+      return StrId::STR_DASHBOARD_WEATHER;
     case 1:
-      return "Calendar";
+      return StrId::STR_DESKTOP_CALENDAR;
     case 2:
+      return StrId::STR_DESKTOP_CLOCK_FOCUS;
+    case 3:
     default:
-      return "Clock Focus";
+      return StrId::STR_NOTES_TITLE;
+  }
+}
+
+StrId itemSubtitle(int index) {
+  switch (index) {
+    case 0:
+      return StrId::STR_DESKTOP_WEATHER_SUBTITLE;
+    case 1:
+      return StrId::STR_DESKTOP_CALENDAR_SUBTITLE;
+    case 2:
+      return StrId::STR_DESKTOP_CLOCK_FOCUS_SUBTITLE;
+    case 3:
+    default:
+      return StrId::STR_DESKTOP_NOTES_SUBTITLE;
   }
 }
 }  // namespace
@@ -41,6 +58,9 @@ void DesktopHubActivity::openCurrentSelection() {
       break;
     case 2:
       activityManager.replaceActivity(std::make_unique<ClockFocusActivity>(renderer, mappedInput));
+      break;
+    case 3:
+      activityManager.replaceActivity(std::make_unique<StickyNotesActivity>(renderer, mappedInput));
       break;
     default:
       requestUpdate();
@@ -109,26 +129,16 @@ void DesktopHubActivity::render(RenderLock&&) {
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, "Desktop");
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_DASHBOARD_DESKTOP));
   GUI.drawList(
       renderer,
       Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, pageWidth,
            pageHeight -
                (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)},
-      kItemCount, selectedIndex, [](int index) { return std::string(itemLabel(index)); },
-      [](int index) {
-        switch (index) {
-          case 0:
-            return std::string("Time, weather, AQI");
-          case 1:
-            return std::string("Today, week, month");
-          case 2:
-          default:
-            return std::string("Pomodoro and countdowns");
-        }
-      });
+      kItemCount, selectedIndex, [](int index) { return std::string(I18N.get(itemLabel(index))); },
+      [](int index) { return std::string(I18N.get(itemSubtitle(index))); });
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), "Open", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }
