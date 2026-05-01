@@ -8,6 +8,7 @@
 
 #include "ArcadeChallengesActivity.h"
 #include "DailyMazeActivity.h"
+#include "FortuneActivity.h"
 #include "Game2048Activity.h"
 #include "MemoryGameActivity.h"
 #include "SokobanActivity.h"
@@ -20,14 +21,16 @@
 namespace {
 using GameEntry = ArcadeHubActivity::GameEntry;
 
-constexpr std::array<GameEntry, 7> kEntries{{
-    {"2048", "Merge tiles, reach high score", "Up/Down choose · Confirm open"},
-    {"Sudoku", "Daily puzzle with 3 levels", "Confirm starts selected puzzle"},
-    {"Sokoban", "Push boxes to target points", "4-way movement, no animation"},
-    {"Memory", "Flip cards and match pairs", "Short rounds for e-ink refresh"},
-    {"Word Puzzle", "Spelling and anagram drills", "Language pack from companion"},
-    {"Daily Maze", "One maze challenge per day", "Solve path with step hints"},
-    {"Challenges", "Streak and achievement board", "Weekly missions + rewards"},
+constexpr std::array<GameEntry, 8> kEntries{{
+    {StrId::STR_ARCADE_GAME_2048, StrId::STR_ARCADE_GAME_2048_DESC, StrId::STR_ARCADE_GAME_2048_CONTROLS},
+    {StrId::STR_ARCADE_GAME_SUDOKU, StrId::STR_ARCADE_GAME_SUDOKU_DESC, StrId::STR_ARCADE_GAME_SUDOKU_CONTROLS},
+    {StrId::STR_ARCADE_GAME_SOKOBAN, StrId::STR_ARCADE_GAME_SOKOBAN_DESC, StrId::STR_ARCADE_GAME_SOKOBAN_CONTROLS},
+    {StrId::STR_ARCADE_GAME_MEMORY, StrId::STR_ARCADE_GAME_MEMORY_DESC, StrId::STR_ARCADE_GAME_MEMORY_CONTROLS},
+    {StrId::STR_ARCADE_GAME_WORD, StrId::STR_ARCADE_GAME_WORD_DESC, StrId::STR_ARCADE_GAME_WORD_CONTROLS},
+    {StrId::STR_ARCADE_GAME_MAZE, StrId::STR_ARCADE_GAME_MAZE_DESC, StrId::STR_ARCADE_GAME_MAZE_CONTROLS},
+    {StrId::STR_ARCADE_GAME_CHALLENGES, StrId::STR_ARCADE_GAME_CHALLENGES_DESC,
+     StrId::STR_ARCADE_GAME_CHALLENGES_CONTROLS},
+    {StrId::STR_FORTUNE_TITLE, StrId::STR_ARCADE_GAME_FORTUNE_DESC, StrId::STR_ARCADE_GAME_FORTUNE_CONTROLS},
 }};
 }  // namespace
 
@@ -59,6 +62,8 @@ void ArcadeHubActivity::openCurrentSelection() {
     activityManager.replaceActivity(std::make_unique<DailyMazeActivity>(renderer, mappedInput));
   } else if (selectedIndex == 6) {
     activityManager.replaceActivity(std::make_unique<ArcadeChallengesActivity>(renderer, mappedInput));
+  } else if (selectedIndex == 7) {
+    activityManager.replaceActivity(std::make_unique<FortuneActivity>(renderer, mappedInput));
   } else {
     showingDetail = true;
     requestUpdate();
@@ -154,22 +159,22 @@ void ArcadeHubActivity::render(RenderLock&&) {
   if (showingDetail) {
     const auto& selected = entry(selectedIndex);
     const int startY = metrics.topPadding + metrics.headerHeight + 24;
-    renderer.drawCenteredText(UI_12_FONT_ID, startY, selected.title, true, EpdFontFamily::BOLD);
-    renderer.drawCenteredText(UI_10_FONT_ID, startY + 42, selected.description);
-    renderer.drawCenteredText(UI_10_FONT_ID, startY + 78, selected.controls);
-    renderer.drawCenteredText(SMALL_FONT_ID, startY + 122, "Playable mini-game comes in next phase");
+    renderer.drawCenteredText(UI_12_FONT_ID, startY, I18N.get(selected.title), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, startY + 42, I18N.get(selected.description));
+    renderer.drawCenteredText(UI_10_FONT_ID, startY + 78, I18N.get(selected.controls));
+    renderer.drawCenteredText(SMALL_FONT_ID, startY + 122, tr(STR_ARCADE_DETAIL_HINT));
   } else {
     GUI.drawList(
         renderer,
         Rect{0, metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing, pageWidth,
              pageHeight -
                  (metrics.topPadding + metrics.headerHeight + metrics.buttonHintsHeight + metrics.verticalSpacing * 2)},
-        itemCount(), selectedIndex, [](int index) { return std::string(kEntries[index].title); },
-        [](int index) { return std::string(kEntries[index].description); });
+        itemCount(), selectedIndex, [](int index) { return std::string(I18N.get(kEntries[index].title)); },
+        [](int index) { return std::string(I18N.get(kEntries[index].description)); });
   }
 
-  const auto labels =
-      mappedInput.mapLabels(tr(STR_BACK), showingDetail ? "Back" : "Open", tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const auto labels = mappedInput.mapLabels(tr(STR_BACK), showingDetail ? tr(STR_BACK) : tr(STR_OPEN), tr(STR_DIR_UP),
+                                            tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

@@ -1,14 +1,16 @@
 #pragma once
 
+#include <I18n.h>
+
 #include "../Activity.h"
 #include "util/ButtonNavigator.h"
 
 class ArcadeHubActivity final : public Activity {
  public:
   struct GameEntry {
-    const char* title;
-    const char* description;
-    const char* controls;
+    StrId title;
+    StrId description;
+    StrId controls;
   };
 
   explicit ArcadeHubActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
