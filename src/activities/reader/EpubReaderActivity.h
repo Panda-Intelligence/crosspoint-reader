@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "EpubReaderMenuActivity.h"
+#include "EpubSearchResultsActivity.h"
 #include "activities/Activity.h"
 
 class EpubReaderActivity final : public Activity {
@@ -56,6 +57,8 @@ class EpubReaderActivity final : public Activity {
   void toggleAutoPageTurn(uint8_t selectedPageTurnOption);
   void changeFontSize(int delta);
   void toggleTouchLock();
+  void openChapterSearch();
+  std::vector<EpubSearchResult> searchCurrentChapter(const std::string& query) const;
   EpubBookmark currentBookmark() const;
   void toggleCurrentBookmark();
   void openBookmarks();

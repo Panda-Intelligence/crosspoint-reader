@@ -56,6 +56,7 @@ std::vector<EpubReaderMenuActivity::MenuItem> EpubReaderMenuActivity::buildMenuI
   if (hasFootnotes) {
     items.push_back({MenuAction::FOOTNOTES, StrId::STR_FOOTNOTES});
   }
+  items.push_back({MenuAction::SEARCH, StrId::STR_SEARCH_CURRENT_CHAPTER});
   items.push_back({MenuAction::TOGGLE_BOOKMARK, StrId::STR_ADD_BOOKMARK});
   items.push_back({MenuAction::BOOKMARKS, StrId::STR_BOOKMARKS});
   items.push_back({MenuAction::FONT_SIZE_DOWN, StrId::STR_READER_FONT_SIZE_DOWN});
