@@ -9,6 +9,8 @@
 #include "RecentBooksStore.h"
 #include "util/ButtonNavigator.h"
 
+struct Rect;
+
 class RecentBooksActivity final : public Activity {
  private:
   ButtonNavigator buttonNavigator;
@@ -20,6 +22,9 @@ class RecentBooksActivity final : public Activity {
 
   // Data loading
   void loadRecentBooks();
+  void drawRecentBookRow(const RecentBook& book, int index, Rect rowRect, bool selected);
+  bool drawBookCover(const RecentBook& book, int x, int y, int width, int height);
+  std::string subtitleForBook(const RecentBook& book) const;
 
  public:
   explicit RecentBooksActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
