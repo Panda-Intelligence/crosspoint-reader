@@ -10,10 +10,12 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "MappedInputManager.h"
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "images/Logo120.h"
+#include "util/TouchHitTest.h"
 
 void SleepActivity::onEnter() {
   Activity::onEnter();
@@ -46,6 +48,34 @@ void SleepActivity::onEnter() {
       }
     default:
       return renderDefaultSleepScreen();
+  }
+}
+
+void SleepActivity::onExit() {
+  Activity::onExit();
+  if (previewMode) {
+    renderer.setOrientation(GfxRenderer::Orientation::Portrait);
+  }
+}
+
+void SleepActivity::loop() {
+  if (!previewMode) {
+    return;
+  }
+
+  InputTouchEvent touchEvent;
+  if (mappedInput.consumeTouchEvent(&touchEvent, renderer)) {
+    const bool buttonHintTap = mappedInput.isTouchButtonHintTap(touchEvent);
+    if (!buttonHintTap && (touchEvent.isTap() || TouchHitTest::isBackwardSwipe(touchEvent))) {
+      mappedInput.suppressTouchButtonFallback();
+      finish();
+      return;
+    }
+  }
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Back) ||
+      mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    finish();
   }
 }
 
