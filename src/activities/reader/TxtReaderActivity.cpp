@@ -408,10 +408,7 @@ void TxtReaderActivity::renderPage() {
   renderStatusBar();
 
   ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
-
-  if (SETTINGS.textAntiAliasing) {
-    ReaderUtils::renderAntiAliased(renderer, [&renderLines]() { renderLines(); });
-  }
+  // TXT uses one stable BW frame; grayscale two-pass rendering can make plain text fade on e-ink.
   // scope destructor clears font cache via FontCacheManager
 }
 
