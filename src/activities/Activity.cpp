@@ -1,10 +1,16 @@
 #include "Activity.h"
 
+#include <I18n.h>
+
 #include "ActivityManager.h"
 
-void Activity::onEnter() { LOG_DBG("ACT", "Entering activity: %s", name.c_str()); }
+void Activity::onEnter() {
+  LOG_INF("ACT", "Entering activity: %s (lang=%d)", name.c_str(), static_cast<int>(I18N.getLanguage()));
+}
 
-void Activity::onExit() { LOG_DBG("ACT", "Exiting activity: %s", name.c_str()); }
+void Activity::onExit() {
+  LOG_INF("ACT", "Exiting activity: %s (lang=%d)", name.c_str(), static_cast<int>(I18N.getLanguage()));
+}
 
 void Activity::requestUpdate(bool immediate) { activityManager.requestUpdate(immediate); }
 
