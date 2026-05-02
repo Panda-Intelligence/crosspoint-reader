@@ -158,7 +158,8 @@ void EpubReaderMenuActivity::loop() {
         if (buttonIndex == HalGPIO::BTN_BACK) {
           ActivityResult result;
           result.isCancelled = true;
-          result.data = MenuResult{-1, pendingOrientation, selectedPageTurnOption, pageTurnOptionChanged, currentFontSize, touchLockEnabled};
+          result.data = MenuResult{
+              -1, pendingOrientation, selectedPageTurnOption, pageTurnOptionChanged, currentFontSize, touchLockEnabled};
           setResult(std::move(result));
           finish();
         } else if (buttonIndex == HalGPIO::BTN_CONFIRM) {
@@ -172,9 +173,6 @@ void EpubReaderMenuActivity::loop() {
         }
       }
 #endif
-      mappedInput.suppressTouchButtonFallback();
-      return;
-    } else if (!buttonHintTap) {
       mappedInput.suppressTouchButtonFallback();
       return;
     }

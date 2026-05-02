@@ -10,6 +10,7 @@
 #include <Logging.h>
 #include <esp_system.h>
 
+#include <algorithm>
 #include <limits>
 
 #include "CrossPointSettings.h"
@@ -50,11 +51,12 @@ int clampPercent(int percent) {
 }
 
 std::string asciiLowerCopy(std::string text) {
-  for (char& c : text) {
+  std::transform(text.begin(), text.end(), text.begin(), [](char c) {
     if (c >= 'A' && c <= 'Z') {
-      c = static_cast<char>(c - 'A' + 'a');
+      return static_cast<char>(c - 'A' + 'a');
     }
-  }
+    return c;
+  });
   return text;
 }
 
