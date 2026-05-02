@@ -318,25 +318,29 @@ void DashboardActivity::render(RenderLock&& lock) {
     const auto id = DASHBOARD_SHORTCUTS.getShortcut(static_cast<size_t>(idx));
     const auto* definition = DashboardShortcutStore::definitionFor(id);
     const char* label = definition != nullptr ? I18N.get(definition->labelId) : "";
+    const std::string subtitle = subtitleForShortcut(id);
 
-    // Label centered horizontally near the top half of the cell.
-    const int labelTextX = cell.x + kCellInnerPadPx;
+    // Use dynamic metrics for perfect centering
     const int labelTextW = std::max(cell.width - 2 * kCellInnerPadPx, 0);
-    const int labelY = cell.y + kCellInnerPadPx + cell.height / 6;
-    
+    const int labelLineH = renderer.getLineHeight(UI_12_FONT_ID);
+    const int subLineH = subtitle.empty() ? 0 : renderer.getLineHeight(SMALL_FONT_ID);
+    const int gap = (subtitle.empty() || labelLineH == 0) ? 0 : 4;
+    const int totalTextH = labelLineH + gap + subLineH;
+    const int startY = cell.y + (cell.height - totalTextH) / 2;
+
+    // Label centered horizontally and positioned in the vertical block.
+    const int labelTextX = cell.x + kCellInnerPadPx;
     std::string truncLabel = renderer.truncatedText(UI_12_FONT_ID, label, labelTextW, EpdFontFamily::BOLD);
     const int labelWidth = renderer.getTextWidth(UI_12_FONT_ID, truncLabel.c_str(), EpdFontFamily::BOLD);
     const int labelDrawX = labelWidth < labelTextW ? labelTextX + (labelTextW - labelWidth) / 2 : labelTextX;
-    renderer.drawText(UI_12_FONT_ID, labelDrawX, labelY, truncLabel.c_str(), true, EpdFontFamily::BOLD);
+    renderer.drawText(UI_12_FONT_ID, labelDrawX, startY, truncLabel.c_str(), true, EpdFontFamily::BOLD);
 
-    // Subtitle: below label, smaller font, single line truncated by cell width.
-    const std::string subtitle = subtitleForShortcut(id);
+    // Subtitle: below label, smaller font.
     if (!subtitle.empty()) {
       std::string truncSub = renderer.truncatedText(SMALL_FONT_ID, subtitle.c_str(), labelTextW);
-      const int subY = cell.y + cell.height - kCellInnerPadPx - 14;
       const int subWidth = renderer.getTextWidth(SMALL_FONT_ID, truncSub.c_str());
       const int subDrawX = subWidth < labelTextW ? labelTextX + (labelTextW - subWidth) / 2 : labelTextX;
-      renderer.drawText(SMALL_FONT_ID, subDrawX, subY, truncSub.c_str(), true);
+      renderer.drawText(SMALL_FONT_ID, subDrawX, startY + labelLineH + gap, truncSub.c_str(), true);
     }
   }
 

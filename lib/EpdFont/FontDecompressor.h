@@ -72,6 +72,10 @@ class FontDecompressor {
   uint8_t* hotGroupBuf = nullptr;
   uint32_t hotGroupCapacity = 0;
 
+  // Failure tracking
+  const EpdFontData* lastFailedFont = nullptr;
+  uint16_t lastFailedGroupIndex = UINT16_MAX;
+
   // Scratch buffer for compacting a single glyph from the hot group.
   // Valid until the next getBitmap() call.
   std::vector<uint8_t> hotGlyphBuf;

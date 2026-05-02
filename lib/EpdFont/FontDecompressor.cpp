@@ -67,12 +67,23 @@ bool FontDecompressor::decompressGroup(const EpdFontData* fontData, uint16_t gro
   const uint32_t tDecomp = millis();
   inflateReader.init(false);
   inflateReader.setSource(&fontData->bitmap[group.compressedOffset], group.compressedSize);
+  
+  // Delay to ensure the Idle task (priority 0) gets CPU time to feed the task watchdog
+  delay(1);
+  
   if (!inflateReader.read(outBuf, outSize)) {
     stats.decompressTimeMs += millis() - tDecomp;
     LOG_ERR("FDC", "Decompression failed for group %u", groupIndex);
     return false;
   }
-  stats.decompressTimeMs += millis() - tDecomp;
+  
+  delay(1);
+  
+  const uint32_t duration = millis() - tDecomp;
+  stats.decompressTimeMs += duration;
+  if (duration > 50) {
+    LOG_DBG("FDC", "Group %u decompressed %u bytes in %u ms", groupIndex, outSize, duration);
+  }
   return true;
 }
 
@@ -172,6 +183,12 @@ const uint8_t* FontDecompressor::getBitmap(const EpdFontData* fontData, const Ep
     return nullptr;
   }
 
+  // Skip if this group is known to be failing (to prevent repeated stalls/OOM loops)
+  if (fontData == lastFailedFont && groupIndex == lastFailedGroupIndex) {
+    stats.getBitmapTimeUs += micros() - tStart;
+    return nullptr;
+  }
+
   // Check if hot group already has this group decompressed — if not, decompress it
   if (!(hotGroupBuf && hotGroupFont == fontData && hotGroupIndex == groupIndex)) {
     stats.cacheMisses++;
@@ -190,6 +207,8 @@ const uint8_t* FontDecompressor::getBitmap(const EpdFontData* fontData, const Ep
       
       if (!hotGroupBuf) {
         LOG_ERR("FDC", "Failed to allocate %u bytes for hot group %u", group.uncompressedSize, groupIndex);
+        lastFailedFont = fontData;
+        lastFailedGroupIndex = groupIndex;
         hotGroupCapacity = 0;
         hotGroupFont = nullptr;
         hotGroupIndex = UINT16_MAX;
@@ -200,9 +219,17 @@ const uint8_t* FontDecompressor::getBitmap(const EpdFontData* fontData, const Ep
     }
 
     if (!decompressGroup(fontData, groupIndex, hotGroupBuf, group.uncompressedSize)) {
+      lastFailedFont = fontData;
+      lastFailedGroupIndex = groupIndex;
       freeHotGroup();
       stats.getBitmapTimeUs += micros() - tStart;
       return nullptr;
+    }
+
+    // Success - clear failure state if it matched this group
+    if (fontData == lastFailedFont && groupIndex == lastFailedGroupIndex) {
+      lastFailedFont = nullptr;
+      lastFailedGroupIndex = UINT16_MAX;
     }
 
     hotGroupFont = fontData;

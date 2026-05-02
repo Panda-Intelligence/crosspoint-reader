@@ -340,11 +340,13 @@ bool loadTraditionalChineseFonts(GfxRenderer& renderer) {
   bool anyLoaded = false;
 
   // Strategy: PSRAM-conservative load.
-  //   Always load ONLY NOTOSANS_TC_12 to ensure we have enough PSRAM for decompression.
-  //   The reader will gracefully fallback to TC_12 if a larger size is not loaded.
-  const uint8_t uiSize = CrossPointSettings::SMALL;  // 12pt is the UI baseline
+  //   Load BOTH TC_12 and TC_14. 
+  //   - TC_12 is used for SMALL_FONT_ID and UI_10_FONT_ID (hints, subtitles).
+  //   - TC_14 is used for UI_12_FONT_ID (labels, headers) as requested for better readability.
+  const uint8_t size12 = CrossPointSettings::SMALL;
+  const uint8_t size14 = CrossPointSettings::MEDIUM;
 
-  auto isTargetSize = [uiSize](uint8_t size) { return size == uiSize; };
+  auto isTargetSize = [size12, size14](uint8_t size) { return size == size12 || size == size14; };
 
   for (const auto& runtime : kPackRuntimes) {
     if (!isTargetSize(runtime.info->size)) {

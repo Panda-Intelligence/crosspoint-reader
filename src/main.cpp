@@ -204,26 +204,41 @@ void updateUiFontMapping() {
 
   if (lang == Language::ZH_CN || lang == Language::ZH_TW) {
     const bool tc12Loaded = StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::SMALL);
-    LOG_INF("UIFONT", "TC fonts loaded: 12pt=%d", tc12Loaded);
+    const bool tc14Loaded = StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::MEDIUM);
+    LOG_INF("UIFONT", "TC fonts loaded: 12pt=%d, 14pt=%d", tc12Loaded, tc14Loaded);
 
-    if (tc12Loaded) {
-      const auto& fontMap = renderer.getFontMap();
+    const auto& fontMap = renderer.getFontMap();
+    bool remapped = false;
+
+    if (tc14Loaded) {
+      auto it14 = fontMap.find(NOTOSANS_TC_14_FONT_ID);
+      if (it14 != fontMap.end()) {
+        renderer.insertFont(UI_12_FONT_ID, it14->second);
+        remapped = true;
+      }
+    } else if (tc12Loaded) {
       auto it12 = fontMap.find(NOTOSANS_TC_12_FONT_ID);
       if (it12 != fontMap.end()) {
-        // Always use TC_12 for the entire UI strip. Falling back to TC_14 produces
-        // oversized glyphs that break list/header layout, so do NOT remap to a larger
-        // size — let the Latin fallback render instead if TC_12 is missing.
-        renderer.insertFont(UI_10_FONT_ID, it12->second);
         renderer.insertFont(UI_12_FONT_ID, it12->second);
-        renderer.insertFont(SMALL_FONT_ID, it12->second);
-        LOG_INF("UIFONT", "UI strip remapped to NOTOSANS_TC_12.");
-        UITheme::getInstance().reload();
-        return;
+        remapped = true;
       }
-      LOG_ERR("UIFONT", "TC_12 reported loaded but missing from font map");
-    } else {
-      LOG_ERR("UIFONT", "TC_12 not loaded; UI strip stays Latin (CJK glyphs will render via reader-size pack only).");
     }
+
+    if (tc12Loaded) {
+      auto it12 = fontMap.find(NOTOSANS_TC_12_FONT_ID);
+      if (it12 != fontMap.end()) {
+        renderer.insertFont(UI_10_FONT_ID, it12->second);
+        renderer.insertFont(SMALL_FONT_ID, it12->second);
+        remapped = true;
+      }
+    }
+
+    if (remapped) {
+      LOG_INF("UIFONT", "UI strip remapped to TC fonts (UI12=14pt, UI10/SMALL=12pt).");
+      UITheme::getInstance().reload();
+      return;
+    }
+    LOG_ERR("UIFONT", "TC fonts reported loaded but missing from font map");
   }
 
   LOG_INF("UIFONT", "Falling back to default UI fonts (Ubuntu).");

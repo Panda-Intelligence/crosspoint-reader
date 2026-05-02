@@ -837,7 +837,8 @@ if compress:
 
     for i, (props, packed) in enumerate(all_glyphs):
         sg = get_script_group(props.code_point)
-        if sg != current_group_id:
+        # Split groups based on script OR a maximum size of 256 glyphs
+        if sg != current_group_id or group_count >= 256:
             if group_count > 0:
                 groups.append((group_start, group_count))
             current_group_id = sg
