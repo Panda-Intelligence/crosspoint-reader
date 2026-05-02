@@ -210,23 +210,10 @@ void updateUiFontMapping() {
     const auto& fontMap = renderer.getFontMap();
     bool remapped = false;
 
-    if (tc14Loaded) {
-      auto it14 = fontMap.find(NOTOSANS_TC_14_FONT_ID);
-      if (it14 != fontMap.end()) {
-        renderer.insertFont(UI_12_FONT_ID, it14->second);
-        remapped = true;
-      }
-    } else if (tc12Loaded) {
-      auto it12 = fontMap.find(NOTOSANS_TC_12_FONT_ID);
-      if (it12 != fontMap.end()) {
-        renderer.insertFont(UI_12_FONT_ID, it12->second);
-        remapped = true;
-      }
-    }
-
     if (tc12Loaded) {
       auto it12 = fontMap.find(NOTOSANS_TC_12_FONT_ID);
       if (it12 != fontMap.end()) {
+        renderer.insertFont(UI_12_FONT_ID, it12->second);
         renderer.insertFont(UI_10_FONT_ID, it12->second);
         renderer.insertFont(SMALL_FONT_ID, it12->second);
         remapped = true;
@@ -234,7 +221,7 @@ void updateUiFontMapping() {
     }
 
     if (remapped) {
-      LOG_INF("UIFONT", "UI strip remapped to TC fonts (UI12=14pt, UI10/SMALL=12pt).");
+      LOG_INF("UIFONT", "UI strip remapped to TC fonts (UI12=12pt, UI10/SMALL=12pt fallback).");
       UITheme::getInstance().reload();
       return;
     }
