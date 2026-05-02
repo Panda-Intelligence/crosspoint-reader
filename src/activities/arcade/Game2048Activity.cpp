@@ -268,8 +268,19 @@ void Game2048Activity::render(RenderLock&&) {
 
         char buffer[8];
         snprintf(buffer, sizeof(buffer), "%u", value);
-        const int textH = renderer.getTextHeight(UI_10_FONT_ID);
-        renderer.drawCenteredText(UI_10_FONT_ID, tileY + (tileH - textH) / 2, buffer, !whiteText, EpdFontFamily::BOLD);
+        int valueFontId = UI_10_FONT_ID;
+        int textW = renderer.getTextWidth(valueFontId, buffer, EpdFontFamily::BOLD);
+        int textH = renderer.getTextHeight(valueFontId);
+        const int maxTextW = std::max(tileW - 4, 0);
+        if (textW > maxTextW) {
+          valueFontId = SMALL_FONT_ID;
+          textW = renderer.getTextWidth(valueFontId, buffer);
+          textH = renderer.getTextHeight(valueFontId);
+        }
+        const int textX = tileX + std::max((tileW - textW) / 2, 0);
+        const int textY = tileY + std::max((tileH - textH) / 2, 0);
+        renderer.drawText(valueFontId, textX, textY, buffer, !whiteText,
+                          valueFontId == UI_10_FONT_ID ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
       }
     }
   }
