@@ -4,11 +4,32 @@
 #include <WiFi.h>
 #include <esp_sleep.h>
 
+#include <algorithm>
 #include <cassert>
+#include <cmath>
 
 #include "HalGPIO.h"
 
 HalPowerManager powerManager;  // Singleton instance
+
+#if MOFEI_DEVICE
+namespace {
+constexpr float MOFEI_BATTERY_DIVIDER_MULTIPLIER = 2.0f;
+constexpr uint16_t MOFEI_BATTERY_MIN_ADC_MV = 100;
+constexpr uint16_t MOFEI_BATTERY_MAX_ADC_MV = 2600;
+constexpr unsigned long MOFEI_BATTERY_LOG_INTERVAL_MS = 30000;
+
+uint16_t mofeiBatteryPercentageFromMillivolts(uint16_t millivolts) {
+  const double volts = millivolts / 1000.0;
+  // 与 open-x4-sdk BatteryMonitor 保持同一条锂电百分比曲线。
+  double percent = -144.9390 * volts * volts * volts + 1655.8629 * volts * volts - 6158.8520 * volts + 7501.3202;
+
+  percent = std::max(percent, 0.0);
+  percent = std::min(percent, 100.0);
+  return static_cast<uint16_t>(round(percent));
+}
+}  // namespace
+#endif
 
 void HalPowerManager::begin() {
 #if MOFEI_DEVICE
@@ -27,6 +48,10 @@ void HalPowerManager::begin() {
   normalFreq = getCpuFrequencyMhz();
   modeMutex = xSemaphoreCreateMutex();
   assert(modeMutex != nullptr);
+#if MOFEI_DEVICE
+  // 启动阶段先采样一次，避免首帧状态栏在 ADC 缓存填充前显示 0%。
+  (void)getBatteryPercentage();
+#endif
 }
 
 void HalPowerManager::setPowerSaving(bool enabled) {
@@ -113,7 +138,36 @@ void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
 
 uint16_t HalPowerManager::getBatteryPercentage() const {
 #if MOFEI_DEVICE
-  // Mofei BAT_ADC 分压比例尚未在现有文档中确认，避免复用 X4 BatteryMonitor 的错误模型。
+  const unsigned long now = millis();
+  if (_batteryLastPollMs != 0 && (now - _batteryLastPollMs) < BATTERY_POLL_MS) {
+    return _batteryCachedPercent;
+  }
+  _batteryLastPollMs = now;
+
+  const uint16_t adcMv = analogReadMilliVolts(BAT_GPIO0);
+  static unsigned long lastBatteryLogMs = 0;
+  if (adcMv < MOFEI_BATTERY_MIN_ADC_MV || adcMv > MOFEI_BATTERY_MAX_ADC_MV) {
+    if (lastBatteryLogMs == 0 || (now - lastBatteryLogMs) >= MOFEI_BATTERY_LOG_INTERVAL_MS) {
+      LOG_INF("PWR", "Mofei battery ADC invalid: adcMv=%u cached=%d", adcMv, _batteryCachedPercent);
+      lastBatteryLogMs = now;
+    }
+    return _batteryCachedPercent;
+  }
+
+  const uint16_t batteryMv = static_cast<uint16_t>(round(adcMv * MOFEI_BATTERY_DIVIDER_MULTIPLIER));
+  const uint16_t percent = mofeiBatteryPercentageFromMillivolts(batteryMv);
+  if (_batteryCachedPercent == 0) {
+    _batteryCachedPercent = percent;
+  } else {
+    _batteryCachedPercent = (_batteryCachedPercent * 3 + percent) / 4;
+  }
+
+  if (lastBatteryLogMs == 0 || (now - lastBatteryLogMs) >= MOFEI_BATTERY_LOG_INTERVAL_MS) {
+    LOG_INF("PWR", "Mofei battery: adcMv=%u batteryMv=%u percent=%u cached=%d", adcMv, batteryMv, percent,
+            _batteryCachedPercent);
+    lastBatteryLogMs = now;
+  }
+
   return _batteryCachedPercent;
 #else
   if (_batteryUseI2C) {
