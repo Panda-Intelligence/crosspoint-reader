@@ -20,11 +20,11 @@ std::string loadedSummary() {
 }
 
 std::string packStatus(const TraditionalChineseFontPackInfo& pack) {
-  const auto loaded = StorageFontRegistry::countLoadedTraditionalChineseStyles(pack.size);
+  const auto loaded = StorageFontRegistry::countLoadedTraditionalChineseStylesById(pack.fontId);
   if (loaded > 0) {
     return std::to_string(loaded) + "/4";
   }
-  const auto installed = StorageFontRegistry::countInstalledTraditionalChineseStyles(pack.size);
+  const auto installed = StorageFontRegistry::countInstalledTraditionalChineseStylesById(pack.fontId);
   if (installed > 0) {
     return "0/4";
   }

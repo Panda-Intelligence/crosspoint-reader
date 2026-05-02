@@ -75,7 +75,7 @@ def main():
         ("_bolditalic", args.font_bolditalic),
     ]
 
-    for size in [12, 14, 16, 18]:
+    for size in [10, 12, 14, 16, 18]:
         for suffix, font_stack in style_fonts:
             if not font_stack:
                 continue

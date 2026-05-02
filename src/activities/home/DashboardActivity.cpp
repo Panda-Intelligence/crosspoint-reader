@@ -3,9 +3,11 @@
 #include <FontCacheManager.h>
 #include <HalGPIO.h>
 #include <I18n.h>
+#include <Utf8.h>
 
 #include <algorithm>
 #include <cstdio>
+#include <vector>
 
 #include "DashboardShortcutStore.h"
 #include "DesktopSummaryStore.h"
@@ -15,9 +17,9 @@
 #include "util/TouchHitTest.h"
 
 namespace {
-constexpr int kGridGapPx = 6;
-constexpr int kCellInnerPadPx = 6;
-constexpr int kCellCornerRadiusPx = 6;
+constexpr int kGridGapPx = 0;
+constexpr int kCellInnerPadPx = 0;
+constexpr int kCellCornerRadiusPx = 0;
 constexpr int kCustomizeCornerRadiusPx = 4;
 
 bool isGridIndex(int index) { return index >= 0 && index < DashboardActivity::kGridCellCount; }
@@ -34,17 +36,58 @@ std::string formatDashboardValue(const StrId id, const int firstValue, const int
   return buffer;
 }
 
+std::vector<std::string> wrapSubtitle(const GfxRenderer& renderer, const std::string& text, int maxWidth,
+                                      int maxLines) {
+  if (text.empty() || maxWidth <= 0 || maxLines <= 0) return {};
+
+  auto lines = renderer.wrappedText(SMALL_FONT_ID, text.c_str(), maxWidth, maxLines);
+  if (lines.size() > 1 || renderer.getTextWidth(SMALL_FONT_ID, text.c_str()) <= maxWidth) {
+    return lines;
+  }
+
+  lines.clear();
+
+  const unsigned char* cursor = reinterpret_cast<const unsigned char*>(text.c_str());
+  std::string line;
+  while (*cursor != '\0') {
+    const unsigned char* charStart = cursor;
+    const uint32_t cp = utf8NextCodepoint(&cursor);
+    if (cp == 0 || cursor <= charStart) break;
+    const std::string nextToken(reinterpret_cast<const char*>(charStart), static_cast<size_t>(cursor - charStart));
+    const std::string candidate = line + nextToken;
+
+    if (!line.empty() && renderer.getTextWidth(SMALL_FONT_ID, candidate.c_str()) > maxWidth) {
+      lines.push_back(renderer.truncatedText(SMALL_FONT_ID, line.c_str(), maxWidth));
+      line = nextToken;
+      if (static_cast<int>(lines.size()) == maxLines - 1) {
+        std::string remainder = line + reinterpret_cast<const char*>(cursor);
+        lines.push_back(renderer.truncatedText(SMALL_FONT_ID, remainder.c_str(), maxWidth));
+        return lines;
+      }
+    } else {
+      line = candidate;
+    }
+  }
+
+  if (!line.empty() && static_cast<int>(lines.size()) < maxLines) {
+    lines.push_back(renderer.truncatedText(SMALL_FONT_ID, line.c_str(), maxWidth));
+  }
+
+  return lines;
+}
+
 #if MOFEI_DEVICE
-bool dispatchButtonHintTap(MappedInputManager& mappedInput, const InputTouchEvent& touchEvent,
-                           DashboardActivity& activity, int& selectedIndex, int itemCount,
-                           void (DashboardActivity::*openSelection)()) {
+bool dispatchButtonHintTap(const MappedInputManager& mappedInput, const InputTouchEvent& touchEvent, int& selectedIndex,
+                           int itemCount, bool* shouldOpenSelection) {
   uint8_t buttonIndex = 0;
   if (!gpio.mapMofeiButtonHintTapToButton(touchEvent.sourceX(), touchEvent.sourceY(), &buttonIndex)) {
     return false;
   }
   mappedInput.suppressTouchButtonFallback();
   if (buttonIndex == HalGPIO::BTN_CONFIRM) {
-    (activity.*openSelection)();
+    if (shouldOpenSelection != nullptr) {
+      *shouldOpenSelection = true;
+    }
   } else if (buttonIndex == HalGPIO::BTN_LEFT || buttonIndex == HalGPIO::BTN_UP) {
     selectedIndex = ButtonNavigator::previousIndex(selectedIndex, itemCount);
   } else if (buttonIndex == HalGPIO::BTN_RIGHT || buttonIndex == HalGPIO::BTN_DOWN) {
@@ -150,7 +193,6 @@ void DashboardActivity::layoutCells() {
       pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing - customizeRowHeight - metrics.verticalSpacing;
   const int bandHeight = std::max(bandBottom - gridTop, 0);
 
-  // Cell dimensions (3 columns × 3 rows with kGridGapPx between).
   const int usableWidth = std::max(pageWidth - 2 * sidePad - (kGridCols - 1) * kGridGapPx, 0);
   const int cellWidth = usableWidth / kGridCols;
   const int usableHeight = std::max(bandHeight - (kGridRows - 1) * kGridGapPx, 0);
@@ -187,8 +229,6 @@ void DashboardActivity::loop() {
       bool handled = false;
       if (TouchHitTest::gridCellAt(gridRect, kGridRows, kGridCols, touchEvent.x, touchEvent.y, &row, &col)) {
         const int idx = row * kGridCols + col;
-        // gridCellAt assumes uniform cells; the kGridGapPx gap can register as a cell hit
-        // at the boundary, so confirm the tap actually lies inside cellRects[idx].
         if (idx >= 0 && idx < kGridCellCount && TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, cellRects[idx])) {
           mappedInput.suppressTouchButtonFallback();
           selectedIndex = idx;
@@ -204,8 +244,12 @@ void DashboardActivity::loop() {
       }
 
 #if MOFEI_DEVICE
-      if (dispatchButtonHintTap(mappedInput, touchEvent, *this, selectedIndex, itemCount(),
-                                &DashboardActivity::openCurrentSelection)) {
+      bool shouldOpenSelection = false;
+      if (dispatchButtonHintTap(mappedInput, touchEvent, selectedIndex, itemCount(), &shouldOpenSelection)) {
+        if (shouldOpenSelection) {
+          openCurrentSelection();
+          return;
+        }
         requestUpdate();
         return;
       }
@@ -293,7 +337,7 @@ void DashboardActivity::render(RenderLock&& lock) {
     const auto labels = mappedInput.mapLabels("", tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
     allText += std::string(labels.btn1) + labels.btn2 + labels.btn3 + labels.btn4;
 
-    fcm->prewarmCache(UI_12_FONT_ID, allText.c_str(), (1 << EpdFontFamily::REGULAR) | (1 << EpdFontFamily::BOLD));
+    fcm->prewarmCache(UI_10_FONT_ID, allText.c_str(), (1 << EpdFontFamily::REGULAR) | (1 << EpdFontFamily::BOLD));
     fcm->prewarmCache(SMALL_FONT_ID, allText.c_str(), (1 << EpdFontFamily::REGULAR));
   }
 
@@ -311,8 +355,7 @@ void DashboardActivity::render(RenderLock&& lock) {
     renderer.drawRoundedRect(cell.x, cell.y, cell.width, cell.height, borderWidth, kCellCornerRadiusPx, true);
     if (selected) {
       // Inner ring to reinforce focus on a 1-bit display.
-      renderer.drawRoundedRect(cell.x + 3, cell.y + 3, cell.width - 6, cell.height - 6, 1,
-                               std::max(kCellCornerRadiusPx - 2, 2), true);
+      renderer.drawRoundedRect(cell.x + 3, cell.y + 3, cell.width - 6, cell.height - 6, 1, kCellCornerRadiusPx, true);
     }
 
     const auto id = DASHBOARD_SHORTCUTS.getShortcut(static_cast<size_t>(idx));
@@ -322,25 +365,28 @@ void DashboardActivity::render(RenderLock&& lock) {
 
     // Use dynamic metrics for perfect centering
     const int labelTextW = std::max(cell.width - 2 * kCellInnerPadPx, 0);
-    const int labelLineH = renderer.getLineHeight(UI_12_FONT_ID);
+    const int labelLineH = renderer.getLineHeight(UI_10_FONT_ID);
     const int subLineH = subtitle.empty() ? 0 : renderer.getLineHeight(SMALL_FONT_ID);
     const int gap = (subtitle.empty() || labelLineH == 0) ? 0 : 4;
-    const int totalTextH = labelLineH + gap + subLineH;
+    const auto subtitleLines = wrapSubtitle(renderer, subtitle, labelTextW, 2);
+    const int totalTextH = labelLineH + gap + subLineH * static_cast<int>(subtitleLines.size());
     const int startY = cell.y + (cell.height - totalTextH) / 2;
 
     // Label centered horizontally and positioned in the vertical block.
     const int labelTextX = cell.x + kCellInnerPadPx;
-    std::string truncLabel = renderer.truncatedText(UI_12_FONT_ID, label, labelTextW, EpdFontFamily::BOLD);
-    const int labelWidth = renderer.getTextWidth(UI_12_FONT_ID, truncLabel.c_str(), EpdFontFamily::BOLD);
+    std::string truncLabel = renderer.truncatedText(UI_10_FONT_ID, label, labelTextW, EpdFontFamily::BOLD);
+    const int labelWidth = renderer.getTextWidth(UI_10_FONT_ID, truncLabel.c_str(), EpdFontFamily::BOLD);
     const int labelDrawX = labelWidth < labelTextW ? labelTextX + (labelTextW - labelWidth) / 2 : labelTextX;
-    renderer.drawText(UI_12_FONT_ID, labelDrawX, startY, truncLabel.c_str(), true, EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, labelDrawX, startY, truncLabel.c_str(), true, EpdFontFamily::BOLD);
 
-    // Subtitle: below label, smaller font.
-    if (!subtitle.empty()) {
-      std::string truncSub = renderer.truncatedText(SMALL_FONT_ID, subtitle.c_str(), labelTextW);
-      const int subWidth = renderer.getTextWidth(SMALL_FONT_ID, truncSub.c_str());
-      const int subDrawX = subWidth < labelTextW ? labelTextX + (labelTextW - subWidth) / 2 : labelTextX;
-      renderer.drawText(SMALL_FONT_ID, subDrawX, startY + labelLineH + gap, truncSub.c_str(), true);
+    if (!subtitleLines.empty()) {
+      int subY = startY + labelLineH + gap;
+      for (const auto& line : subtitleLines) {
+        const int subWidth = renderer.getTextWidth(SMALL_FONT_ID, line.c_str());
+        const int subDrawX = subWidth < labelTextW ? labelTextX + (labelTextW - subWidth) / 2 : labelTextX;
+        renderer.drawText(SMALL_FONT_ID, subDrawX, subY, line.c_str(), true);
+        subY += subLineH;
+      }
     }
   }
 
@@ -355,11 +401,11 @@ void DashboardActivity::render(RenderLock&& lock) {
 
     const char* customizeLabel = tr(STR_DASHBOARD_CUSTOMIZE);
     const int custTextW = std::max(cust.width - 2 * kCellInnerPadPx, 0);
-    std::string truncCust = renderer.truncatedText(UI_12_FONT_ID, customizeLabel, custTextW, EpdFontFamily::BOLD);
+    std::string truncCust = renderer.truncatedText(UI_10_FONT_ID, customizeLabel, custTextW, EpdFontFamily::BOLD);
     const int textY = cust.y + (cust.height - 14) / 2;
-    const int textWidth = renderer.getTextWidth(UI_12_FONT_ID, truncCust.c_str(), EpdFontFamily::BOLD);
+    const int textWidth = renderer.getTextWidth(UI_10_FONT_ID, truncCust.c_str(), EpdFontFamily::BOLD);
     const int textX = cust.x + std::max((cust.width - textWidth) / 2, kCellInnerPadPx);
-    renderer.drawText(UI_12_FONT_ID, textX, textY, truncCust.c_str(), true, EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, textX, textY, truncCust.c_str(), true, EpdFontFamily::BOLD);
   }
 
   const auto labels = mappedInput.mapLabels("", tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN));

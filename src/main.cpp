@@ -203,34 +203,33 @@ void updateUiFontMapping() {
   LOG_INF("UIFONT", "updateUiFontMapping() called. Language: %d", static_cast<int>(lang));
 
   if (lang == Language::ZH_CN || lang == Language::ZH_TW) {
+    const bool tc10Loaded = StorageFontRegistry::isTraditionalChineseFontLoadedById(NOTOSANS_TC_10_FONT_ID);
     const bool tc12Loaded = StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::SMALL);
-    const bool tc14Loaded = StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::MEDIUM);
-    LOG_INF("UIFONT", "TC fonts loaded: 12pt=%d, 14pt=%d", tc12Loaded, tc14Loaded);
+    LOG_INF("UIFONT", "TC UI fonts loaded: 10pt=%d, 12pt=%d", tc10Loaded, tc12Loaded);
 
     const auto& fontMap = renderer.getFontMap();
-    bool remapped = false;
+    auto uiFont = tc10Loaded ? fontMap.find(NOTOSANS_TC_10_FONT_ID) : fontMap.end();
+    const char* uiFontLabel = "TC 10pt";
 
-    if (tc12Loaded) {
-      auto it12 = fontMap.find(NOTOSANS_TC_12_FONT_ID);
-      if (it12 != fontMap.end()) {
-        renderer.insertFont(UI_12_FONT_ID, it12->second);
-        renderer.insertFont(UI_10_FONT_ID, it12->second);
-        renderer.insertFont(SMALL_FONT_ID, it12->second);
-        remapped = true;
-      }
+    if (uiFont == fontMap.end()) {
+      uiFont = tc12Loaded ? fontMap.find(NOTOSANS_TC_12_FONT_ID) : fontMap.end();
+      uiFontLabel = "TC 12pt fallback";
     }
 
-    if (remapped) {
-      LOG_INF("UIFONT", "UI strip remapped to TC fonts (UI12=12pt, UI10/SMALL=12pt fallback).");
+    if (uiFont != fontMap.end()) {
+      renderer.insertFont(UI_12_FONT_ID, uiFont->second);
+      renderer.insertFont(UI_10_FONT_ID, uiFont->second);
+      renderer.insertFont(SMALL_FONT_ID, uiFont->second);
+      LOG_INF("UIFONT", "UI strip remapped to %s for all UI slots.", uiFontLabel);
       UITheme::getInstance().reload();
       return;
     }
-    LOG_ERR("UIFONT", "TC fonts reported loaded but missing from font map");
+    LOG_ERR("UIFONT", "TC UI fonts unavailable or missing from font map");
   }
 
   LOG_INF("UIFONT", "Falling back to default UI fonts (Ubuntu).");
   renderer.insertFont(UI_10_FONT_ID, ui10FontFamily);
-  renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
+  renderer.insertFont(UI_12_FONT_ID, ui10FontFamily);
   renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
   UITheme::getInstance().reload();
 }
@@ -263,7 +262,7 @@ void setupDisplayAndFonts() {
   renderer.insertFont(OPENDYSLEXIC_14_FONT_ID, opendyslexic14FontFamily);
 #endif  // OMIT_FONTS
   renderer.insertFont(UI_10_FONT_ID, ui10FontFamily);
-  renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
+  renderer.insertFont(UI_12_FONT_ID, ui10FontFamily);
   renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
   StorageFontRegistry::loadTraditionalChineseFonts(renderer);
 

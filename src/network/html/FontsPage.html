@@ -222,7 +222,7 @@
     <p class="hint">
       Upload generated <code>.epf</code> files for <strong>Noto Sans CJK</strong>.
       Files will be stored under <code>/.mofei/fonts/</code>. Optional bold, italic, and bold-italic packs are
-      supported with names like <code>notosans_tc_16_bold.epf</code>. After upload, click reload to activate them.
+      supported with names like <code>notosans_tc_10_bold.epf</code>. After upload, click reload to activate them.
       The bundled builder covers Chinese, Japanese, French, and Spanish glyph ranges.
     </p>
     <p class="hint">
@@ -239,7 +239,7 @@
     </div>
     <div class="drop-zone" id="dropZone">
       <strong>Drop .epf files here</strong>
-      <span class="hint">Supported names: <code>notosans_tc_12.epf</code>, <code>notosans_tc_12_bold.epf</code>, <code>_italic</code>, <code>_bolditalic</code>.</span>
+      <span class="hint">Supported sizes: <code>10</code>, <code>12</code>, <code>14</code>, <code>16</code>, <code>18</code>. Example: <code>notosans_tc_10.epf</code>, <code>notosans_tc_10_bold.epf</code>, <code>_italic</code>, <code>_bolditalic</code>.</span>
     </div>
     <div class="file-preview hint" id="filePreview">No files selected.</div>
     <div id="message"></div>
@@ -254,7 +254,7 @@
   <script>
     let selectedFiles = [];
 
-    const SUPPORTED_FILENAME = /^notosans_tc_(12|14|16|18)(?:_(bold|italic|bolditalic))?\.epf$/i;
+    const SUPPORTED_FILENAME = /^notosans_tc_(10|12|14|16|18)(?:_(bold|italic|bolditalic))?\.epf$/i;
 
     function showMessage(text, isError = false) {
       const box = document.getElementById('message');

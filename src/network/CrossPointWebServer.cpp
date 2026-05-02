@@ -15,8 +15,8 @@
 #include "SettingsList.h"
 #include "StorageFontRegistry.h"
 #include "WebDAVHandler.h"
-#include "html/FontsPageHtml.generated.h"
 #include "html/FilesPageHtml.generated.h"
+#include "html/FontsPageHtml.generated.h"
 #include "html/HomePageHtml.generated.h"
 #include "html/SettingsPageHtml.generated.h"
 #include "html/js/jszip_minJs.generated.h"
@@ -101,8 +101,8 @@ bool validateFontPackFile(const String& filePath) {
     return false;
   }
   char magic[4] = {};
-  const bool ok = file.read(magic, sizeof(magic)) == static_cast<int>(sizeof(magic)) &&
-                  memcmp(magic, "EPF2", sizeof(magic)) == 0;
+  const bool ok =
+      file.read(magic, sizeof(magic)) == static_cast<int>(sizeof(magic)) && memcmp(magic, "EPF2", sizeof(magic)) == 0;
   file.close();
   return ok;
 }
@@ -474,13 +474,18 @@ bool CrossPointWebServer::isEpubFile(const String& filename) const { return FsHe
 void CrossPointWebServer::handleGetFontPacks() const {
   JsonDocument doc;
   JsonArray packs = doc["packs"].to<JsonArray>();
+  const auto& families = StorageFontRegistry::getTraditionalChineseFontPacks();
 
   for (const auto& pack : StorageFontRegistry::getTraditionalChineseFontFaces()) {
     JsonObject obj = packs.add<JsonObject>();
     obj["name"] = pack.name;
     obj["path"] = pack.path;
-    obj["installed"] = StorageFontRegistry::isTraditionalChineseFontFaceInstalled(pack.size, pack.style);
-    obj["active"] = StorageFontRegistry::isTraditionalChineseFontFaceLoaded(pack.size, pack.style);
+    const auto* family =
+        std::find_if(families.begin(), families.end(),
+                     [&pack](const TraditionalChineseFontPackInfo& item) { return item.pointSize == pack.pointSize; });
+    const int fontId = family != families.end() ? family->fontId : 0;
+    obj["installed"] = StorageFontRegistry::isTraditionalChineseFontFaceInstalledById(fontId, pack.style);
+    obj["active"] = StorageFontRegistry::isTraditionalChineseFontFaceLoadedById(fontId, pack.style);
   }
 
   String json;
