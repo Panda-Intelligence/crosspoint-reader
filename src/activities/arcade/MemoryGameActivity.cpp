@@ -230,13 +230,19 @@ void MemoryGameActivity::render(RenderLock&&) {
         renderer.fillRoundedRect(x, y, cw, ch, kCardRadius, Color::DarkGray);
         renderer.drawRoundedRect(x, y, cw, ch, 1, kCardRadius, true);
         const char* sym = kSymbols[cards[idx]];
-        renderer.drawCenteredText(UI_12_FONT_ID, y + (ch - 20) / 2, sym, false, EpdFontFamily::BOLD);
+        const int textWidth = renderer.getTextWidth(UI_12_FONT_ID, sym, EpdFontFamily::BOLD);
+        const int textX = x + std::max((cw - textWidth) / 2, 0);
+        const int textY = renderer.getTextYForCentering(y, ch, UI_12_FONT_ID);
+        renderer.drawText(UI_12_FONT_ID, textX, textY, sym, false, EpdFontFamily::BOLD);
       } else if (st == CardState::Flipped) {
         // Flipped: LightGray fill, black symbol
         renderer.fillRoundedRect(x, y, cw, ch, kCardRadius, Color::LightGray);
         renderer.drawRoundedRect(x, y, cw, ch, isCursor ? 2 : 1, kCardRadius, true);
         const char* sym = kSymbols[cards[idx]];
-        renderer.drawCenteredText(UI_12_FONT_ID, y + (ch - 20) / 2, sym, true, EpdFontFamily::BOLD);
+        const int textWidth = renderer.getTextWidth(UI_12_FONT_ID, sym, EpdFontFamily::BOLD);
+        const int textX = x + std::max((cw - textWidth) / 2, 0);
+        const int textY = renderer.getTextYForCentering(y, ch, UI_12_FONT_ID);
+        renderer.drawText(UI_12_FONT_ID, textX, textY, sym, true, EpdFontFamily::BOLD);
       } else {
         // Hidden: outline only; thicker border if cursor
         renderer.drawRoundedRect(x, y, cw, ch, isCursor ? 2 : 1, kCardRadius, true);

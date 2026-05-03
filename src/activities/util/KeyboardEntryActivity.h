@@ -217,6 +217,7 @@ class KeyboardEntryActivity : public Activity {
     int lineHeight = 0;
     int inputStartY = 0;
     int inputHeight = 0;
+    int inputFieldHeight = 0;
     int effectiveMargin = 0;
     int textAreaWidth = 0;
     int toggleX = 0;

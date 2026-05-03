@@ -146,17 +146,20 @@ void ClockFocusActivity::render(RenderLock&&) {
 
   renderer.drawCenteredText(UI_10_FONT_ID, metrics.topPadding + metrics.headerHeight + 12,
                             I18n::getInstance().get(kPresets[presetIndex].name), true, EpdFontFamily::BOLD);
-  renderer.drawCenteredText(UI_12_FONT_ID, pageHeight / 2 - 40, timeBuffer, true, EpdFontFamily::BOLD);
+  const int h = renderer.getLineHeight(UI_10_FONT_ID);
+  const int centerY = renderer.getTextYForCentering(0, pageHeight, UI_10_FONT_ID);
+  renderer.drawCenteredText(UI_12_FONT_ID, renderer.getTextYForCentering(0, pageHeight, UI_12_FONT_ID) - 40, timeBuffer,
+                            true, EpdFontFamily::BOLD);
 
   if (hasFinished) {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, tr(STR_FOCUS_COMPLETE));
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 45, tr(STR_FOCUS_RESET_HINT));
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + 10, tr(STR_FOCUS_COMPLETE));
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + 10 + h, tr(STR_FOCUS_RESET_HINT));
   } else if (isRunning) {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, tr(STR_FOCUS_RUNNING));
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 45, tr(STR_FOCUS_PAUSE_HINT));
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + 10, tr(STR_FOCUS_RUNNING));
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + 10 + h, tr(STR_FOCUS_PAUSE_HINT));
   } else {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, tr(STR_FOCUS_READY));
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 45, tr(STR_FOCUS_PRESET_HINT));
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + 10, tr(STR_FOCUS_READY));
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + 10 + h, tr(STR_FOCUS_PRESET_HINT));
   }
 
   const auto labels =

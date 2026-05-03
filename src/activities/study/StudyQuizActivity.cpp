@@ -36,10 +36,9 @@ void drawOptionButton(const GfxRenderer& renderer, int x, int y, int w, int h, c
   const std::string line = renderer.truncatedText(SMALL_FONT_ID, text.c_str(), w - 20);
   const int tw = renderer.getTextWidth(SMALL_FONT_ID, line.c_str(),
                                        reveal && correct ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
-  const int th = renderer.getTextHeight(SMALL_FONT_ID);
   const bool blackText = !(reveal && correct);
-  renderer.drawText(SMALL_FONT_ID, x + (w - tw) / 2, y + (h - th) / 2, line.c_str(), blackText,
-                    reveal && correct ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+  renderer.drawText(SMALL_FONT_ID, x + (w - tw) / 2, renderer.getTextYForCentering(y, h, SMALL_FONT_ID), line.c_str(),
+                    blackText, reveal && correct ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
 }
 }  // namespace
 

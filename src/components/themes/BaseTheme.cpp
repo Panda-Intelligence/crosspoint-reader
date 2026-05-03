@@ -147,7 +147,6 @@ void BaseTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
   constexpr int buttonWidth = 106;
   constexpr int buttonHeight = BaseMetrics::values.buttonHintsHeight;
   constexpr int buttonY = BaseMetrics::values.buttonHintsHeight;  // Distance from bottom
-  constexpr int textYOffset = 7;                                  // Distance from top of button to text baseline
   // X3 has wider screen in portrait (528 vs 480), use more spacing
   constexpr int x4ButtonPositions[] = {25, 130, 245, 350};
   constexpr int x3ButtonPositions[] = {38, 154, 268, 384};
@@ -163,7 +162,8 @@ void BaseTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
       renderer.drawRect(x, y, buttonWidth, buttonHeight);
       const int textWidth = renderer.getTextWidth(UI_10_FONT_ID, labels[i]);
       const int textX = x + (buttonWidth - 1 - textWidth) / 2;
-      const int textY = renderer.getTextYForCentering(y, buttonHeight, UI_10_FONT_ID);
+      const int textHeight = renderer.getTextHeight(UI_10_FONT_ID);
+      const int textY = y + (buttonHeight - textHeight) / 2;
       renderer.drawText(UI_10_FONT_ID, textX, textY, labels[i]);
     }
   }
@@ -286,22 +286,32 @@ void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
     auto itemName = rowTitle(i);
     auto font = (rowSubtitle != nullptr) ? UI_12_FONT_ID : UI_10_FONT_ID;
     auto item = renderer.truncatedText(font, itemName.c_str(), textWidth);
-    renderer.drawText(font, rect.x + BaseMetrics::values.contentSidePadding, itemY, item.c_str(), i != selectedIndex);
 
     if (rowSubtitle != nullptr) {
-      // Draw subtitle
       std::string subtitleText = rowSubtitle(i);
       auto subtitle = renderer.truncatedText(UI_10_FONT_ID, subtitleText.c_str(), textWidth);
-      renderer.drawText(UI_10_FONT_ID, rect.x + BaseMetrics::values.contentSidePadding, itemY + 30, subtitle.c_str(),
+
+      const int titleLineH = renderer.getLineHeight(font);
+      const int subLineH = renderer.getLineHeight(UI_10_FONT_ID);
+      const int gap = 2;
+      const int startY = itemY + (rowHeight - (titleLineH + gap + subLineH)) / 2;
+
+      renderer.drawText(font, rect.x + BaseMetrics::values.contentSidePadding, startY, item.c_str(),
                         i != selectedIndex);
+      renderer.drawText(UI_10_FONT_ID, rect.x + BaseMetrics::values.contentSidePadding, startY + titleLineH + gap,
+                        subtitle.c_str(), i != selectedIndex);
+    } else {
+      const int textY = renderer.getTextYForCentering(itemY, rowHeight, font);
+      renderer.drawText(font, rect.x + BaseMetrics::values.contentSidePadding, textY, item.c_str(), i != selectedIndex);
     }
 
     if (rowValue != nullptr) {
       // Draw value
       std::string valueText = rowValue(i);
       const auto valueTextWidth = renderer.getTextWidth(UI_10_FONT_ID, valueText.c_str());
+      const int valTextY = renderer.getTextYForCentering(itemY, rowHeight, UI_10_FONT_ID);
       renderer.drawText(UI_10_FONT_ID, rect.x + contentWidth - BaseMetrics::values.contentSidePadding - valueTextWidth,
-                        itemY, valueText.c_str(), i != selectedIndex);
+                        valTextY, valueText.c_str(), i != selectedIndex);
     }
   }
 }
@@ -861,7 +871,8 @@ void BaseTheme::drawKeyboardKey(const GfxRenderer& renderer, Rect rect, const ch
   const bool hasSecondary = secondaryLabel != nullptr && secondaryLabel[0] != '\0';
   const int itemWidth = renderer.getTextWidth(UI_12_FONT_ID, label);
   const int textX = rect.x + (rect.width - itemWidth) / 2;
-  const int textY = renderer.getTextYForCentering(rect.y, rect.height, UI_12_FONT_ID);
+  const int textHeight = renderer.getTextHeight(UI_12_FONT_ID);
+  const int textY = rect.y + (rect.height - textHeight) / 2;
 
   renderer.drawText(UI_12_FONT_ID, textX, textY, label, !invert);
 

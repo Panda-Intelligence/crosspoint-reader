@@ -185,18 +185,23 @@ void CalibreConnectActivity::render(RenderLock&&) {
   renderer.clearScreen();
 
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_CALIBRE_WIRELESS));
-  const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-  const auto top = (pageHeight - height) / 2;
+  const int bodyTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  const int bodyBottom = pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing;
 
   if (state == CalibreConnectState::SERVER_STARTING) {
-    renderer.drawCenteredText(UI_12_FONT_ID, top, tr(STR_CALIBRE_STARTING));
+    const int textHeight = renderer.getTextHeight(UI_12_FONT_ID);
+    const int startY = bodyTop + (bodyBottom - bodyTop - textHeight) / 2;
+    renderer.drawCenteredText(UI_12_FONT_ID, startY, tr(STR_CALIBRE_STARTING));
   } else if (state == CalibreConnectState::ERROR) {
-    renderer.drawCenteredText(UI_12_FONT_ID, top, tr(STR_CONNECTION_FAILED), true, EpdFontFamily::BOLD);
+    const int textHeight = renderer.getTextHeight(UI_12_FONT_ID);
+    const int startY = bodyTop + (bodyBottom - bodyTop - textHeight) / 2;
+    renderer.drawCenteredText(UI_12_FONT_ID, startY, tr(STR_CONNECTION_FAILED), true, EpdFontFamily::BOLD);
   } else if (state == CalibreConnectState::SERVER_RUNNING) {
     GUI.drawSubHeader(renderer, Rect{0, metrics.topPadding + metrics.headerHeight, pageWidth, metrics.tabBarHeight},
                       connectedSSID.c_str(), (std::string(tr(STR_IP_ADDRESS_PREFIX)) + connectedIP).c_str());
 
     int y = metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing * 4;
+    const auto height = renderer.getLineHeight(UI_10_FONT_ID);
     const auto heightText12 = renderer.getTextHeight(UI_12_FONT_ID);
     renderer.drawText(UI_12_FONT_ID, metrics.contentSidePadding, y, tr(STR_CALIBRE_SETUP), true, EpdFontFamily::BOLD);
     y += heightText12 + metrics.verticalSpacing * 2;

@@ -283,7 +283,6 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
   // Draw all items
   const auto pageStartIndex = selectedIndex / pageItems * pageItems;
-  int iconY = (rowSubtitle != nullptr) ? 16 : 10;
   for (int i = pageStartIndex; i < itemCount && i < pageStartIndex + pageItems; i++) {
     const int itemY = rect.y + (i % pageItems) * rowHeight;
     int rowTextWidth = textWidth;
@@ -300,22 +299,31 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
     auto itemName = rowTitle(i);
     auto item = renderer.truncatedText(UI_10_FONT_ID, itemName.c_str(), rowTextWidth);
-    renderer.drawText(UI_10_FONT_ID, textX, itemY + 7, item.c_str(), true);
+
+    if (rowSubtitle != nullptr) {
+      std::string subtitleText = rowSubtitle(i);
+      auto subtitle = renderer.truncatedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth);
+
+      const int titleLineH = renderer.getLineHeight(UI_10_FONT_ID);
+      const int subLineH = renderer.getLineHeight(SMALL_FONT_ID);
+      const int gap = 2;
+      const int startY = itemY + (rowHeight - (titleLineH + gap + subLineH)) / 2;
+
+      renderer.drawText(UI_10_FONT_ID, textX, startY, item.c_str(), true);
+      renderer.drawText(SMALL_FONT_ID, textX, startY + titleLineH + gap, subtitle.c_str(), true);
+    } else {
+      const int textY = renderer.getTextYForCentering(itemY, rowHeight, UI_10_FONT_ID);
+      renderer.drawText(UI_10_FONT_ID, textX, textY, item.c_str(), true);
+    }
 
     if (rowIcon != nullptr) {
       UIIcon icon = rowIcon(i);
       const uint8_t* iconBitmap = iconForName(icon, iconSize);
       if (iconBitmap != nullptr) {
-        renderer.drawIcon(iconBitmap, rect.x + LyraMetrics::values.contentSidePadding + hPaddingInSelection,
-                          itemY + iconY, iconSize, iconSize);
+        const int iconY = itemY + (rowHeight - iconSize) / 2;
+        renderer.drawIcon(iconBitmap, rect.x + LyraMetrics::values.contentSidePadding + hPaddingInSelection, iconY,
+                          iconSize, iconSize);
       }
-    }
-
-    if (rowSubtitle != nullptr) {
-      // Draw subtitle
-      std::string subtitleText = rowSubtitle(i);
-      auto subtitle = renderer.truncatedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth);
-      renderer.drawText(SMALL_FONT_ID, textX, itemY + 30, subtitle.c_str(), true);
     }
 
     // Draw value
@@ -326,8 +334,9 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
             valueWidth + hPaddingInSelection, rowHeight, cornerRadius, Color::Black);
       }
 
+      const int valTextY = renderer.getTextYForCentering(itemY, rowHeight, UI_10_FONT_ID);
       renderer.drawText(UI_10_FONT_ID, rect.x + contentWidth - LyraMetrics::values.contentSidePadding - valueWidth,
-                        itemY + 6, valueText.c_str(), !(i == selectedIndex && highlightValue));
+                        valTextY, valueText.c_str(), !(i == selectedIndex && highlightValue));
     }
   }
 }
@@ -342,7 +351,6 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
   constexpr int smallButtonHeight = 15;
   constexpr int buttonHeight = LyraMetrics::values.buttonHintsHeight;
   constexpr int buttonY = LyraMetrics::values.buttonHintsHeight;  // Distance from bottom
-  constexpr int textYOffset = 7;                                  // Distance from top of button to text baseline
   // X3 has wider screen in portrait (528 vs 480), use more spacing
   constexpr int x4ButtonPositions[] = {58, 146, 254, 342};
   constexpr int x3ButtonPositions[] = {65, 157, 291, 383};
@@ -355,8 +363,7 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
       const int y = pageHeight - buttonY;
       // Draw the filled background and border for a FULL-sized button
       renderer.fillRoundedRect(x, y, buttonWidth, buttonHeight, cornerRadius, Color::White);
-      renderer.drawRoundedRect(x, y, buttonWidth, buttonHeight, 1, cornerRadius, true, true, false,
-                               false, true);
+      renderer.drawRoundedRect(x, y, buttonWidth, buttonHeight, 1, cornerRadius, true, true, false, false, true);
       const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, labels[i]);
       const int textX = x + (buttonWidth - 1 - textWidth) / 2;
       const int textY = renderer.getTextYForCentering(y, buttonHeight, SMALL_FONT_ID);

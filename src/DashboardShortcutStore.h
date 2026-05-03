@@ -29,7 +29,7 @@ struct DashboardShortcutDefinition {
 
 class DashboardShortcutStore {
  public:
-  static constexpr size_t SLOT_COUNT = 9;
+  static constexpr size_t SLOT_COUNT = static_cast<size_t>(DashboardShortcutId::Count);
   using ShortcutList = std::array<DashboardShortcutId, SLOT_COUNT>;
 
   static DashboardShortcutStore& getInstance() { return instance; }

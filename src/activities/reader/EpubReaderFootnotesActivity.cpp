@@ -106,6 +106,7 @@ void EpubReaderFootnotesActivity::render(RenderLock&&) {
   renderer.clearScreen();
 
   const auto pageWidth = renderer.getScreenWidth();
+  const auto pageHeight = renderer.getScreenHeight();
   const auto orientation = renderer.getOrientation();
   // Landscape orientation: reserve a horizontal gutter for button hints.
   const bool isLandscapeCw = orientation == GfxRenderer::Orientation::LandscapeClockwise;
@@ -125,7 +126,9 @@ void EpubReaderFootnotesActivity::render(RenderLock&&) {
   renderer.drawText(UI_12_FONT_ID, titleX, 15 + contentY, tr(STR_FOOTNOTES), true, EpdFontFamily::BOLD);
 
   if (footnotes.empty()) {
-    renderer.drawCenteredText(UI_10_FONT_ID, 90 + contentY, tr(STR_NO_FOOTNOTES));
+    renderer.drawCenteredText(UI_10_FONT_ID,
+                              renderer.getTextYForCentering(contentY, pageHeight - contentY, UI_10_FONT_ID),
+                              tr(STR_NO_FOOTNOTES));
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
     renderer.displayBuffer();

@@ -147,13 +147,15 @@ void EpubSearchResultsActivity::render(RenderLock&&) {
   const int contentWidth = pageWidth - hintGutterWidth;
   const int hintGutterHeight = isPortraitInverted ? 50 : 0;
   const int contentY = hintGutterHeight;
+  const int contentHeight = renderer.getScreenHeight() - contentY;
 
   const int titleX =
       contentX + (contentWidth - renderer.getTextWidth(UI_12_FONT_ID, tr(STR_SEARCH_RESULTS), EpdFontFamily::BOLD)) / 2;
   renderer.drawText(UI_12_FONT_ID, titleX, 15 + contentY, tr(STR_SEARCH_RESULTS), true, EpdFontFamily::BOLD);
 
   if (results.empty()) {
-    renderer.drawCenteredText(UI_10_FONT_ID, 90 + contentY, tr(STR_NO_SEARCH_RESULTS));
+    renderer.drawCenteredText(UI_10_FONT_ID, renderer.getTextYForCentering(contentY, contentHeight, UI_10_FONT_ID),
+                              tr(STR_NO_SEARCH_RESULTS));
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
     renderer.displayBuffer();

@@ -189,10 +189,13 @@ void StickyNotesActivity::render(RenderLock&&) {
     const int cardH = 132;
     const int cardY = contentTop + (contentHeight - cardH) / 2;
     const int pad = metrics.contentSidePadding;
+    const int h = renderer.getLineHeight(UI_10_FONT_ID);
+    const int titleY = renderer.getTextYForCentering(cardY, cardH / 2, UI_10_FONT_ID);
     renderer.drawRoundedRect(pad, cardY, pageWidth - pad * 2, cardH, 1, 8, true);
-    renderer.drawCenteredText(UI_10_FONT_ID, cardY + 24, tr(STR_NOTES_EMPTY_TITLE), true, EpdFontFamily::BOLD);
-    renderer.drawLine(pad + 18, cardY + 54, pageWidth - pad - 18, cardY + 54, true);
-    renderer.drawCenteredText(SMALL_FONT_ID, cardY + 76, tr(STR_NOTES_EMPTY_HINT));
+    renderer.drawCenteredText(UI_10_FONT_ID, titleY, tr(STR_NOTES_EMPTY_TITLE), true, EpdFontFamily::BOLD);
+    renderer.drawLine(pad + 18, cardY + cardH / 2, pageWidth - pad - 18, cardY + cardH / 2, true);
+    renderer.drawCenteredText(SMALL_FONT_ID, renderer.getTextYForCentering(cardY + cardH / 2, cardH / 2, SMALL_FONT_ID),
+                              tr(STR_NOTES_EMPTY_HINT));
   } else {
     const auto& notes = STICKY_NOTES.getNotes();
     GUI.drawList(

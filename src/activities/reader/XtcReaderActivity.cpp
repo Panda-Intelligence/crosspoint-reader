@@ -87,7 +87,6 @@ void XtcReaderActivity::onEnter() {
 void XtcReaderActivity::onExit() {
   Activity::onExit();
 
-  renderer.setOrientation(GfxRenderer::Orientation::Portrait);
   APP_STATE.readerActivityLoadCount = 0;
   APP_STATE.saveToFile();
   xtc.reset();
@@ -209,7 +208,9 @@ void XtcReaderActivity::render(RenderLock&&) {
   if (currentPage >= xtc->getPageCount()) {
     // Show end of book screen
     renderer.clearScreen();
-    renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_END_OF_BOOK), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_12_FONT_ID,
+                              renderer.getTextYForCentering(0, renderer.getScreenHeight(), UI_12_FONT_ID),
+                              tr(STR_END_OF_BOOK), true, EpdFontFamily::BOLD);
     renderer.displayBuffer();
     return;
   }
@@ -238,7 +239,9 @@ void XtcReaderActivity::renderPage() {
   if (!pageBuffer) {
     LOG_ERR("XTR", "Failed to allocate page buffer (%lu bytes)", pageBufferSize);
     renderer.clearScreen();
-    renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_MEMORY_ERROR), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_12_FONT_ID,
+                              renderer.getTextYForCentering(0, renderer.getScreenHeight(), UI_12_FONT_ID),
+                              tr(STR_MEMORY_ERROR), true, EpdFontFamily::BOLD);
     renderer.displayBuffer();
     return;
   }
@@ -249,7 +252,9 @@ void XtcReaderActivity::renderPage() {
     LOG_ERR("XTR", "Failed to load page %lu", currentPage);
     free(pageBuffer);
     renderer.clearScreen();
-    renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_PAGE_LOAD_ERROR), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_12_FONT_ID,
+                              renderer.getTextYForCentering(0, renderer.getScreenHeight(), UI_12_FONT_ID),
+                              tr(STR_PAGE_LOAD_ERROR), true, EpdFontFamily::BOLD);
     renderer.displayBuffer();
     return;
   }

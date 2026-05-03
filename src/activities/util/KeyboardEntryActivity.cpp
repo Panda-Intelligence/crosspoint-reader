@@ -242,6 +242,8 @@ KeyboardEntryActivity::KeyboardLayoutInfo KeyboardEntryActivity::buildKeyboardLa
     }
   }
 
+  layout.inputFieldHeight = layout.inputHeight + layout.lineHeight + metrics.verticalSpacing;
+
   if (isPassword) {
     const char* toggleLabel = passwordVisible ? "[***]" : "[abc]";
     layout.toggleWidth = renderer.getTextWidth(UI_12_FONT_ID, toggleLabel);
@@ -290,9 +292,8 @@ KeyboardEntryActivity::KeyboardLayoutInfo KeyboardEntryActivity::buildKeyboardLa
 bool KeyboardEntryActivity::handleTouchTap(uint16_t x, uint16_t y) {
   const KeyboardLayoutInfo layout = buildKeyboardLayoutInfo();
 
-  // Expand hit targets by half spacing to remove dead zones between keys
-  const int hPad = layout.keySpacing / 2;
-  const int vPad = layout.keySpacing / 2;
+  const int keyHExpand = layout.keySpacing > 0 ? layout.keySpacing / 2 : 0;
+  const int keyVExpand = layout.keySpacing > 0 ? layout.keySpacing / 2 : 0;
 
   for (int row = 0; row < layout.contentRows; row++) {
     const int rowY = layout.keyboardStartY + row * (layout.keyHeight + layout.keySpacing);
@@ -304,8 +305,8 @@ bool KeyboardEntryActivity::handleTouchTap(uint16_t x, uint16_t y) {
       }
       const int keyX = rowLeftMargin + col * (layout.keyWidth + layout.keySpacing);
       if (TouchHitTest::pointInRect(x, y,
-                                    Rect{keyX - hPad, rowY - vPad, layout.keyWidth + layout.keySpacing,
-                                         layout.keyHeight + layout.keySpacing})) {
+                                    Rect{keyX - keyHExpand, rowY - keyVExpand, layout.keyWidth + keyHExpand * 2,
+                                         layout.keyHeight + keyVExpand * 2})) {
         cursorMode = false;
         togglePos = false;
         selectedRow = row;
@@ -318,12 +319,15 @@ bool KeyboardEntryActivity::handleTouchTap(uint16_t x, uint16_t y) {
     }
   }
 
+  const int bottomHExpand = layout.bkSpacing > 0 ? layout.bkSpacing / 2 : 0;
+  const int bottomTopExpand = layout.bottomRowGap > 0 ? layout.bottomRowGap / 2 : 0;
+  const int bottomBottomExpand = layout.bkSpacing > 0 ? layout.bkSpacing / 2 : 0;
   for (int col = 0; col < BOTTOM_KEY_COUNT; col++) {
     const int keyX = layout.bottomLeftMargin + col * (layout.bottomKeyWidth + layout.bkSpacing);
     if (TouchHitTest::pointInRect(
             x, y,
-            Rect{keyX - hPad, layout.bottomRowY - layout.bottomRowGap / 2, layout.bottomKeyWidth + layout.bkSpacing,
-                 layout.bottomKeyHeight + layout.bottomRowGap})) {
+            Rect{keyX - bottomHExpand, layout.bottomRowY - bottomTopExpand, layout.bottomKeyWidth + bottomHExpand * 2,
+                 layout.bottomKeyHeight + bottomTopExpand + bottomBottomExpand})) {
       cursorMode = false;
       togglePos = false;
       selectedRow = getContentRowCount();
@@ -336,7 +340,10 @@ bool KeyboardEntryActivity::handleTouchTap(uint16_t x, uint16_t y) {
   }
 
   if (inputType == InputType::Password && layout.toggleWidth > 0) {
-    const Rect toggleRect{layout.toggleX - 8, layout.toggleY - 8, layout.toggleWidth + 16, layout.lineHeight + 16};
+    const int togglePadX = layout.keySpacing > 0 ? layout.keySpacing / 2 : 8;
+    const int togglePadY = layout.keySpacing > 0 ? layout.keySpacing / 2 : 8;
+    const Rect toggleRect{layout.toggleX - togglePadX, layout.toggleY - togglePadY, layout.toggleWidth + togglePadX * 2,
+                          renderer.getTextHeight(UI_12_FONT_ID) + togglePadY * 2};
     if (TouchHitTest::pointInRect(x, y, toggleRect)) {
       passwordVisible = !passwordVisible;
       cursorMode = true;
@@ -348,7 +355,7 @@ bool KeyboardEntryActivity::handleTouchTap(uint16_t x, uint16_t y) {
     }
   }
 
-  const Rect textRect{layout.effectiveMargin, layout.inputStartY, layout.textAreaWidth, layout.lineHeight * 2};
+  const Rect textRect{layout.effectiveMargin, layout.inputStartY, layout.textAreaWidth, layout.inputFieldHeight};
   if (TouchHitTest::pointInRect(x, y, textRect)) {
     cursorMode = true;
     togglePos = false;
@@ -595,15 +602,14 @@ void KeyboardEntryActivity::loop() {
 void KeyboardEntryActivity::render(RenderLock&&) {
   renderer.clearScreen();
 
+  const KeyboardLayoutInfo layoutInfo = buildKeyboardLayoutInfo();
   const auto pageWidth = renderer.getScreenWidth();
-  const auto pageHeight = renderer.getScreenHeight();
   const auto& metrics = UITheme::getInstance().getMetrics();
 
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, title.c_str());
 
-  const int lineHeight = renderer.getLineHeight(UI_12_FONT_ID);
-  const int inputStartY = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing +
-                          metrics.verticalSpacing * 4 + metrics.keyboardVerticalOffset;
+  const int lineHeight = layoutInfo.lineHeight;
+  const int inputStartY = layoutInfo.inputStartY;
   int inputHeight = 0;
 
   std::string displayText;
@@ -625,18 +631,8 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   }
 
   const bool isPassword = (inputType == InputType::Password);
-  int availableWidth = pageWidth;
-  if (gpio.deviceIsX3()) {
-    availableWidth -= 2 * metrics.sideButtonHintsWidth;
-  }
-  const int effectiveMargin = (pageWidth - availableWidth * metrics.keyboardTextFieldWidthPercent / 100) / 2;
-  const int toggleGap = isPassword ? 4 : 0;
-  const int toggleReserve = isPassword ? std::max(renderer.getTextWidth(UI_12_FONT_ID, "[abc]"),
-                                                  renderer.getTextWidth(UI_12_FONT_ID, "[***]")) +
-                                             toggleGap
-                                       : 0;
-  const int textAreaWidth = pageWidth - 2 * effectiveMargin - toggleReserve;
-  const int maxLineWidth = textAreaWidth;
+  const int effectiveMargin = layoutInfo.effectiveMargin;
+  const int maxLineWidth = layoutInfo.textAreaWidth;
   const bool centerText = metrics.keyboardCenteredText;
 
   int cursorCharWidth = 6;
@@ -740,9 +736,9 @@ void KeyboardEntryActivity::render(RenderLock&&) {
 
   if (isPassword) {
     const char* toggleLabel = passwordVisible ? "[***]" : "[abc]";
-    const int toggleWidth = renderer.getTextWidth(UI_12_FONT_ID, toggleLabel);
-    const int toggleX = pageWidth - effectiveMargin - toggleWidth;
-    const int toggleY = inputStartY + inputHeight;
+    const int toggleWidth = layoutInfo.toggleWidth;
+    const int toggleX = layoutInfo.toggleX;
+    const int toggleY = layoutInfo.toggleY;
     const bool toggleSelected = cursorMode && togglePos;
 
     if (toggleSelected) {
@@ -778,20 +774,15 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     }
   }
 
-  const int keyHeight = metrics.keyboardKeyHeight;
-  const int bottomKeyHeight = metrics.keyboardBottomKeyHeight;
-  const int keySpacing = metrics.keyboardKeySpacing;
-  const int contentCols = getContentColCount();
-  const int keyboardWidth = pageWidth * metrics.keyboardWidthPercent / 100;
-  const int keyWidth = (keyboardWidth - (contentCols - 1) * keySpacing) / contentCols;
-  const int leftMargin = (pageWidth - (contentCols * keyWidth + (contentCols - 1) * keySpacing)) / 2;
-
-  const int bottomRowGap = metrics.keyboardBottomKeySpacing > 0 ? 4 : 0;
-  const int keyboardStartY = metrics.keyboardBottomAligned
-                                 ? pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing -
-                                       (keyHeight + keySpacing) * getContentRowCount() - bottomKeyHeight -
-                                       bottomRowGap + metrics.keyboardVerticalOffset
-                                 : inputStartY + inputHeight + lineHeight + metrics.verticalSpacing;
+  const int keyHeight = layoutInfo.keyHeight;
+  const int bottomKeyHeight = layoutInfo.bottomKeyHeight;
+  const int keySpacing = layoutInfo.keySpacing;
+  const int contentCols = layoutInfo.contentCols;
+  const int keyboardWidth = layoutInfo.keyboardWidth;
+  const int keyWidth = layoutInfo.keyWidth;
+  const int leftMargin = layoutInfo.leftMargin;
+  const int bottomRowGap = layoutInfo.bottomRowGap;
+  const int keyboardStartY = layoutInfo.keyboardStartY;
 
   const int tipsLh = renderer.getLineHeight(SMALL_FONT_ID);
   const int underlineBottom = inputStartY + inputHeight + lineHeight + metrics.verticalSpacing + 4;
@@ -845,23 +836,13 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     }
   }
 
-  const int bkSpacing = metrics.keyboardBottomKeySpacing;
-  const int abcKeyWidth = (keyboardWidth - (COLS - 1) * keySpacing) / COLS;
-  const int contentTotalWidth = COLS * abcKeyWidth + (COLS - 1) * keySpacing;
-  const int bottomKeyWidth = (contentTotalWidth - (BOTTOM_KEY_COUNT - 1) * bkSpacing) / BOTTOM_KEY_COUNT;
-  const int bottomLeftMargin =
-      (pageWidth - (BOTTOM_KEY_COUNT * bottomKeyWidth + (BOTTOM_KEY_COUNT - 1) * bkSpacing)) / 2;
-
-  int urlLeftMargin = leftMargin;
-  if (urlMode) {
-    const int urlTotalWidth = 3 * keyWidth + 2 * keySpacing;
-    const int urlCenterX =
-        bottomLeftMargin + static_cast<int>(SpecialKeyType::Space) * (bottomKeyWidth + bkSpacing) + bottomKeyWidth / 2;
-    urlLeftMargin = urlCenterX - urlTotalWidth / 2;
-  }
+  const int bkSpacing = layoutInfo.bkSpacing;
+  const int bottomKeyWidth = layoutInfo.bottomKeyWidth;
+  const int bottomLeftMargin = layoutInfo.bottomLeftMargin;
+  const int urlLeftMargin = layoutInfo.urlLeftMargin;
 
   const KeyDef(*layout)[COLS] = symMode ? symLayout : (inputType == InputType::Url ? urlLayout : abcLayout);
-  const int contentRows = getContentRowCount();
+  const int contentRows = layoutInfo.contentRows;
 
   for (int row = 0; row < contentRows; row++) {
     const int rowY = keyboardStartY + row * (keyHeight + keySpacing);
@@ -898,7 +879,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     }
   }
 
-  const int bottomRowY = keyboardStartY + contentRows * (keyHeight + keySpacing) + bottomRowGap;
+  const int bottomRowY = layoutInfo.bottomRowY;
   const bool bottomSelected = isBottomRow(selectedRow);
 
   struct BottomKeyInfo {

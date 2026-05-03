@@ -119,10 +119,12 @@ void FortuneActivity::render(RenderLock&&) {
 
   renderer.drawRoundedRect(rect.x, rect.y, rect.width, rect.height, 1, 8, true);
   renderer.drawCenteredText(UI_10_FONT_ID, rect.y + 24, modeLabel(), true, EpdFontFamily::BOLD);
-  renderer.drawCenteredText(UI_12_FONT_ID, rect.y + rect.height / 2 - 34, resultTitle(), true, EpdFontFamily::BOLD);
+
+  const int centerY = renderer.getTextYForCentering(rect.y, rect.height, UI_12_FONT_ID);
+  renderer.drawCenteredText(UI_12_FONT_ID, centerY - 24, resultTitle(), true, EpdFontFamily::BOLD);
 
   const std::string detail = renderer.truncatedText(UI_10_FONT_ID, resultDetail(), rect.width - 32);
-  renderer.drawCenteredText(UI_10_FONT_ID, rect.y + rect.height / 2 + 14, detail.c_str());
+  renderer.drawCenteredText(UI_10_FONT_ID, centerY + 24, detail.c_str());
   renderer.drawCenteredText(SMALL_FONT_ID, rect.y + rect.height - 38, tr(STR_FORTUNE_TAP_HINT));
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_FORTUNE_DRAW), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));

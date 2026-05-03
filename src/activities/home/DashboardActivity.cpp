@@ -75,54 +75,39 @@ std::vector<std::string> wrapSubtitle(const GfxRenderer& renderer, const std::st
   return lines;
 }
 
-int verticallyMovedSelection(const int selectedIndex, const int itemCount, const int columnCount, const int delta) {
-  const int customize = itemCount;
-  if (delta == 0) {
-    return selectedIndex;
-  }
-  if (itemCount <= 0 || columnCount <= 0) {
-    return customize;
+int rowItemCount(const int row, const int itemCount, const int columnCount) {
+  if (row < 0 || itemCount <= 0 || columnCount <= 0) {
+    return 0;
   }
 
-  if (delta > 0) {
-    if (selectedIndex == customize) {
-      return 0;
-    }
-    const int next = selectedIndex + columnCount;
-    if (next < itemCount) {
-      return next;
-    }
-    const int currentRow = selectedIndex / columnCount;
-    const int lastRow = (itemCount - 1) / columnCount;
-    return currentRow < lastRow ? itemCount - 1 : customize;
+  const int rowStart = row * columnCount;
+  if (rowStart >= itemCount) {
+    return 0;
+  }
+  return std::min(columnCount, itemCount - rowStart);
+}
+
+int clampedIndexForRowAndColumn(const int row, const int column, const int itemCount, const int columnCount) {
+  const int itemsInRow = rowItemCount(row, itemCount, columnCount);
+  if (itemsInRow <= 0) {
+    return -1;
   }
 
-  if (selectedIndex == customize) {
-    return itemCount - 1;
-  }
-
-  const int previous = selectedIndex - columnCount;
-  return previous >= 0 ? previous : customize;
+  const int clampedColumn = std::clamp(column, 0, itemsInRow - 1);
+  return row * columnCount + clampedColumn;
 }
 
 #if MOFEI_DEVICE
-bool dispatchButtonHintTap(const MappedInputManager& mappedInput, const InputTouchEvent& touchEvent, int& selectedIndex,
-                           const int itemCount, bool* shouldOpenSelection) {
+bool mapButtonHintTap(const InputTouchEvent& touchEvent, uint8_t* outButtonIndex) {
+  if (outButtonIndex == nullptr) {
+    return false;
+  }
+
   uint8_t buttonIndex = 0;
   if (!gpio.mapMofeiButtonHintTapToButton(touchEvent.sourceX(), touchEvent.sourceY(), &buttonIndex)) {
     return false;
   }
-  mappedInput.suppressTouchButtonFallback();
-  if (buttonIndex == HalGPIO::BTN_CONFIRM) {
-    if (shouldOpenSelection != nullptr) {
-      *shouldOpenSelection = true;
-    }
-  } else if (buttonIndex == HalGPIO::BTN_LEFT || buttonIndex == HalGPIO::BTN_UP) {
-    selectedIndex = ButtonNavigator::previousIndex(selectedIndex, itemCount + 1);
-  } else if (buttonIndex == HalGPIO::BTN_RIGHT || buttonIndex == HalGPIO::BTN_DOWN) {
-    selectedIndex = ButtonNavigator::nextIndex(selectedIndex, itemCount + 1);
-  }
-  selectedIndex = std::clamp(selectedIndex, 0, itemCount);
+  *outButtonIndex = buttonIndex;
   return true;
 }
 #endif
@@ -261,15 +246,69 @@ void DashboardActivity::moveSelectionHorizontally(const int delta) {
   if (delta == 0) {
     return;
   }
-  if (delta < 0) {
-    selectedIndex = ButtonNavigator::previousIndex(selectedIndex, selectionCount());
+
+  if (selectedIndex == customizeIndex()) {
     return;
   }
-  selectedIndex = ButtonNavigator::nextIndex(selectedIndex, selectionCount());
+
+  const int count = itemCount();
+  if (count <= 0) {
+    selectedIndex = customizeIndex();
+    return;
+  }
+
+  const int row = selectedIndex / kGridCols;
+  const int itemsInRow = rowItemCount(row, count, kGridCols);
+  if (itemsInRow <= 1) {
+    return;
+  }
+
+  int column = selectedIndex % kGridCols;
+  column += delta > 0 ? 1 : -1;
+  if (column < 0) {
+    column = itemsInRow - 1;
+  } else if (column >= itemsInRow) {
+    column = 0;
+  }
+
+  selectedIndex = row * kGridCols + column;
 }
 
 void DashboardActivity::moveSelectionVertically(const int delta) {
-  selectedIndex = verticallyMovedSelection(selectedIndex, itemCount(), kGridCols, delta);
+  if (delta == 0) {
+    return;
+  }
+
+  const int count = itemCount();
+  if (count <= 0) {
+    selectedIndex = customizeIndex();
+    return;
+  }
+
+  const int customize = customizeIndex();
+  const int lastRow = std::max(gridRowCount() - 1, 0);
+  if (selectedIndex == customize) {
+    selectedIndex = delta > 0 ? 0 : clampedIndexForRowAndColumn(lastRow, kGridCols - 1, count, kGridCols);
+    return;
+  }
+
+  const int row = selectedIndex / kGridCols;
+  const int column = selectedIndex % kGridCols;
+  if (delta > 0) {
+    if (row >= lastRow) {
+      selectedIndex = customize;
+      return;
+    }
+    selectedIndex = clampedIndexForRowAndColumn(row + 1, column, count, kGridCols);
+    return;
+  }
+
+  if (row == 0) {
+    selectedIndex = clampedIndexForRowAndColumn(lastRow, column, count, kGridCols);
+    return;
+  }
+
+  selectedIndex = clampedIndexForRowAndColumn(row - 1, column, count, kGridCols);
 }
 
 void DashboardActivity::loop() {
@@ -294,11 +333,21 @@ void DashboardActivity::loop() {
       }
 
 #if MOFEI_DEVICE
-      bool shouldOpenSelection = false;
-      if (dispatchButtonHintTap(mappedInput, touchEvent, selectedIndex, itemCount(), &shouldOpenSelection)) {
-        if (shouldOpenSelection) {
+      uint8_t buttonIndex = 0;
+      if (mapButtonHintTap(touchEvent, &buttonIndex)) {
+        mappedInput.suppressTouchButtonFallback();
+        if (buttonIndex == HalGPIO::BTN_CONFIRM) {
           openCurrentSelection();
           return;
+        }
+        if (buttonIndex == HalGPIO::BTN_LEFT) {
+          moveSelectionHorizontally(-1);
+        } else if (buttonIndex == HalGPIO::BTN_RIGHT) {
+          moveSelectionHorizontally(1);
+        } else if (buttonIndex == HalGPIO::BTN_UP) {
+          moveSelectionVertically(-1);
+        } else if (buttonIndex == HalGPIO::BTN_DOWN) {
+          moveSelectionVertically(1);
         }
         requestUpdate();
         return;

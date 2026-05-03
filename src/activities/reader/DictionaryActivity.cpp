@@ -179,10 +179,10 @@ void DictionaryActivity::render(RenderLock&&) {
         [](int index) { return std::string(kEntries[index].word); },
         [](int index) { return std::string(kEntries[index].meaning); });
   } else {
-    renderer.drawCenteredText(UI_12_FONT_ID, pageHeight / 2 - 40, kEntries[selectedIndex].word, true,
-                              EpdFontFamily::BOLD);
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, kEntries[selectedIndex].meaning);
-    renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 50, I18N.get(statusMessage));
+    const int centerY = renderer.getTextYForCentering(0, pageHeight, UI_12_FONT_ID);
+    renderer.drawCenteredText(UI_12_FONT_ID, centerY - 40, kEntries[selectedIndex].word, true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + 10, kEntries[selectedIndex].meaning);
+    renderer.drawCenteredText(SMALL_FONT_ID, centerY + 50, I18N.get(statusMessage));
   }
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), showingDetail ? tr(STR_STUDY_ACTION_SAVE) : tr(STR_OPEN),

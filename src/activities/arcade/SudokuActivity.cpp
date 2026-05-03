@@ -235,13 +235,16 @@ void SudokuActivity::render(RenderLock&&) {
       const uint8_t value = board[r][c];
       if (value != 0) {
         const char text[2] = {static_cast<char>('0' + value), '\0'};
-        const int textY = y + (cell / 2) - 8;
+        const int textY = renderer.getTextYForCentering(cy, ch, UI_10_FONT_ID);
+        const EpdFontFamily::Style style =
+            (conflict || cursor) ? EpdFontFamily::BOLD : (editable ? EpdFontFamily::REGULAR : EpdFontFamily::BOLD);
+        const int textWidth = renderer.getTextWidth(UI_10_FONT_ID, text, style);
+        const int textX = cx + std::max((cw - textWidth) / 2, 0);
         if (conflict || cursor) {
           // Inverted text for cursor/conflict
-          renderer.drawCenteredText(UI_10_FONT_ID, textY, text, false, EpdFontFamily::BOLD);
+          renderer.drawText(UI_10_FONT_ID, textX, textY, text, false, style);
         } else {
-          renderer.drawCenteredText(UI_10_FONT_ID, textY, text, true,
-                                    editable ? EpdFontFamily::REGULAR : EpdFontFamily::BOLD);
+          renderer.drawText(UI_10_FONT_ID, textX, textY, text, true, style);
         }
       }
     }

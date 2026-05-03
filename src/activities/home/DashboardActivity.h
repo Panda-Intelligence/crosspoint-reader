@@ -5,15 +5,11 @@
 #include "../Activity.h"
 #include "DashboardShortcutStore.h"
 #include "components/themes/BaseTheme.h"
-#include "util/ButtonNavigator.h"
 
 class DashboardActivity final : public Activity {
  public:
-  static constexpr int kGridRows = 3;
   static constexpr int kGridCols = 3;
-  static constexpr int kGridCellCount = kGridRows * kGridCols;
-  // Index of the dedicated Customize entry (rendered as a footer row below the grid).
-  static constexpr int kCustomizeIndex = kGridCellCount;
+  static constexpr int kGridCellCount = static_cast<int>(DashboardShortcutStore::SLOT_COUNT);
   static constexpr int kItemCount = kGridCellCount + 1;
 
   explicit DashboardActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
@@ -24,14 +20,19 @@ class DashboardActivity final : public Activity {
   void render(RenderLock&&) override;
 
  private:
-  ButtonNavigator buttonNavigator;
   int selectedIndex = 0;
-  // Cached layout rects. cellRects[0..8] = grid cells (row-major); cellRects[9] = Customize row.
+  // Cached layout rects. cellRects[0..itemCount-1] = grid cells (row-major); cellRects[itemCount] = Customize row.
   // Recomputed by layoutCells(); render() and loop() must call layoutCells() before use.
   std::array<Rect, kItemCount> cellRects;
 
-  int itemCount() const { return kItemCount; }
+  int gridRowCount() const;
+  int itemCount() const { return static_cast<int>(DASHBOARD_SHORTCUTS.getShortcuts().size()); }
+  int customizeIndex() const { return itemCount(); }
+  int selectionCount() const { return itemCount() + 1; }
+  bool isGridIndex(int index) const;
   std::string subtitleForShortcut(DashboardShortcutId id) const;
   void openCurrentSelection();
   void layoutCells();
+  void moveSelectionHorizontally(int delta);
+  void moveSelectionVertically(int delta);
 };

@@ -79,19 +79,23 @@ void KOReaderAuthActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
+  const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  const int contentHeight = pageHeight - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing;
 
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_KOREADER_AUTH));
   const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-  const auto top = (pageHeight - height) / 2;
 
   if (state == AUTHENTICATING) {
-    renderer.drawCenteredText(UI_10_FONT_ID, top, statusMessage.c_str());
+    renderer.drawCenteredText(UI_10_FONT_ID, renderer.getTextYForCentering(contentTop, contentHeight, UI_10_FONT_ID),
+                              statusMessage.c_str());
   } else if (state == SUCCESS) {
-    renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_AUTH_SUCCESS), true, EpdFontFamily::BOLD);
-    renderer.drawCenteredText(UI_10_FONT_ID, top + height + 10, tr(STR_SYNC_READY));
+    const int startY = contentTop + (contentHeight - (height * 2 + 10)) / 2;
+    renderer.drawCenteredText(UI_10_FONT_ID, startY, tr(STR_AUTH_SUCCESS), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, startY + height + 10, tr(STR_SYNC_READY));
   } else if (state == FAILED) {
-    renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_AUTH_FAILED), true, EpdFontFamily::BOLD);
-    renderer.drawCenteredText(UI_10_FONT_ID, top + height + 10, errorMessage.c_str());
+    const int startY = contentTop + (contentHeight - (height * 2 + 10)) / 2;
+    renderer.drawCenteredText(UI_10_FONT_ID, startY, tr(STR_AUTH_FAILED), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, startY + height + 10, errorMessage.c_str());
   }
 
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");

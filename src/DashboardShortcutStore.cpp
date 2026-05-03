@@ -34,6 +34,7 @@ const DashboardShortcutStore::ShortcutList kDefaultShortcuts = {
     DashboardShortcutId::RecentReading, DashboardShortcutId::ReadingHub, DashboardShortcutId::StudyHub,
     DashboardShortcutId::DesktopHub,    DashboardShortcutId::ArcadeHub,  DashboardShortcutId::ImportSync,
     DashboardShortcutId::FileBrowser,   DashboardShortcutId::Settings,   DashboardShortcutId::WeatherClock,
+    DashboardShortcutId::Today,         DashboardShortcutId::StudyToday,
 };
 
 bool containsShortcut(const DashboardShortcutStore::ShortcutList& list, DashboardShortcutId id) {

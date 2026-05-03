@@ -78,12 +78,15 @@ void OtaUpdateActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
+  const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  const int contentBottom = pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing;
+  const int contentHeight = std::max(contentBottom - contentTop, 0);
 
   renderer.clearScreen();
 
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_UPDATE));
   const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-  const auto top = (pageHeight - height) / 2;
+  const auto top = renderer.getTextYForCentering(contentTop, contentHeight, UI_10_FONT_ID);
 
   float updaterProgress = 0;
   if (state == UPDATE_IN_PROGRESS) {
@@ -99,10 +102,11 @@ void OtaUpdateActivity::render(RenderLock&&) {
   if (state == CHECKING_FOR_UPDATE) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_CHECKING_UPDATE));
   } else if (state == WAITING_CONFIRMATION) {
-    renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_NEW_UPDATE), true, EpdFontFamily::BOLD);
-    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, top + height + metrics.verticalSpacing,
+    const int startY = contentTop + (contentHeight - (height * 3 + metrics.verticalSpacing * 2)) / 2;
+    renderer.drawCenteredText(UI_10_FONT_ID, startY, tr(STR_NEW_UPDATE), true, EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, startY + height + metrics.verticalSpacing,
                       (std::string(tr(STR_CURRENT_VERSION)) + CROSSPOINT_VERSION).c_str());
-    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, top + height * 2 + metrics.verticalSpacing * 2,
+    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, startY + height * 2 + metrics.verticalSpacing * 2,
                       (std::string(tr(STR_NEW_VERSION)) + updater.getLatestVersion()).c_str());
 
     const auto labels = mappedInput.mapLabels(tr(STR_CANCEL), tr(STR_UPDATE), "", "");
@@ -132,8 +136,9 @@ void OtaUpdateActivity::render(RenderLock&&) {
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   } else if (state == FINISHED) {
-    renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_UPDATE_COMPLETE), true, EpdFontFamily::BOLD);
-    renderer.drawCenteredText(UI_10_FONT_ID, top + height + metrics.verticalSpacing, tr(STR_POWER_ON_HINT));
+    const int startY = contentTop + (contentHeight - (height * 2 + metrics.verticalSpacing)) / 2;
+    renderer.drawCenteredText(UI_10_FONT_ID, startY, tr(STR_UPDATE_COMPLETE), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, startY + height + metrics.verticalSpacing, tr(STR_POWER_ON_HINT));
   }
 
   renderer.displayBuffer();

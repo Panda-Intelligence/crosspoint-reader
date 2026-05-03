@@ -37,9 +37,8 @@ void drawActionButton(const GfxRenderer& renderer, int x, int y, int w, int h, c
   }
 
   const int tw = renderer.getTextWidth(SMALL_FONT_ID, label, selected ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
-  const int th = renderer.getTextHeight(SMALL_FONT_ID);
-  renderer.drawText(SMALL_FONT_ID, x + (w - tw) / 2, y + (h - th) / 2, label, !selected,
-                    selected ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+  renderer.drawText(SMALL_FONT_ID, x + (w - tw) / 2, renderer.getTextYForCentering(y, h, SMALL_FONT_ID), label,
+                    !selected, selected ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
 }
 
 std::string truncatedLine(const GfxRenderer& renderer, int fontId, const std::string& text, int maxWidth,

@@ -29,11 +29,12 @@ void ClearCacheActivity::render(RenderLock&&) {
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_CLEAR_READING_CACHE));
 
   if (state == WARNING) {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 60, tr(STR_CLEAR_CACHE_WARNING_1), true);
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 30, tr(STR_CLEAR_CACHE_WARNING_2), true,
-                              EpdFontFamily::BOLD);
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, tr(STR_CLEAR_CACHE_WARNING_3), true);
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 30, tr(STR_CLEAR_CACHE_WARNING_4), true);
+    const int h = renderer.getLineHeight(UI_10_FONT_ID);
+    const int centerY = renderer.getTextYForCentering(0, pageHeight, UI_10_FONT_ID);
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY - h * 2, tr(STR_CLEAR_CACHE_WARNING_1), true);
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY - h, tr(STR_CLEAR_CACHE_WARNING_2), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + h, tr(STR_CLEAR_CACHE_WARNING_3), true);
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + h * 2, tr(STR_CLEAR_CACHE_WARNING_4), true);
 
     const auto labels = mappedInput.mapLabels(tr(STR_CANCEL), tr(STR_CLEAR_BUTTON), "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
@@ -42,18 +43,21 @@ void ClearCacheActivity::render(RenderLock&&) {
   }
 
   if (state == CLEARING) {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2, tr(STR_CLEARING_CACHE));
+    renderer.drawCenteredText(UI_10_FONT_ID, renderer.getTextYForCentering(0, pageHeight, UI_10_FONT_ID),
+                              tr(STR_CLEARING_CACHE));
     renderer.displayBuffer();
     return;
   }
 
   if (state == SUCCESS) {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 20, tr(STR_CACHE_CLEARED), true, EpdFontFamily::BOLD);
+    const int h = renderer.getLineHeight(UI_10_FONT_ID);
+    const int centerY = renderer.getTextYForCentering(0, pageHeight, UI_10_FONT_ID);
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY - h, tr(STR_CACHE_CLEARED), true, EpdFontFamily::BOLD);
     std::string resultText = std::to_string(clearedCount) + " " + std::string(tr(STR_ITEMS_REMOVED));
     if (failedCount > 0) {
       resultText += ", " + std::to_string(failedCount) + " " + std::string(tr(STR_FAILED_LOWER));
     }
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, resultText.c_str());
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + h, resultText.c_str());
 
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
@@ -62,9 +66,10 @@ void ClearCacheActivity::render(RenderLock&&) {
   }
 
   if (state == FAILED) {
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 - 20, tr(STR_CLEAR_CACHE_FAILED), true,
-                              EpdFontFamily::BOLD);
-    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 10, tr(STR_CHECK_SERIAL_OUTPUT));
+    const int h = renderer.getLineHeight(UI_10_FONT_ID);
+    const int centerY = renderer.getTextYForCentering(0, pageHeight, UI_10_FONT_ID);
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY - h, tr(STR_CLEAR_CACHE_FAILED), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + h, tr(STR_CHECK_SERIAL_OUTPUT));
 
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);

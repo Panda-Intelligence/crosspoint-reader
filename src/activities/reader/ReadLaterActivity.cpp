@@ -111,11 +111,12 @@ void ReadLaterActivity::render(RenderLock&&) {
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_READ_LATER));
 
   if (items.empty()) {
-    const int centerY = pageHeight / 2;
-    renderer.drawCenteredText(UI_10_FONT_ID, centerY - 42, tr(STR_READ_LATER_EMPTY_TITLE));
-    renderer.drawCenteredText(UI_10_FONT_ID, centerY - 8, tr(STR_READ_LATER_EMPTY_HINT));
-    renderer.drawCenteredText(UI_10_FONT_ID, centerY + 26, tr(STR_READ_LATER_TARGET_PATH));
-    renderer.drawCenteredText(SMALL_FONT_ID, centerY + 58, tr(STR_READ_LATER_REFRESH_HINT));
+    const int h = renderer.getLineHeight(UI_10_FONT_ID);
+    const int centerY = renderer.getTextYForCentering(0, pageHeight, UI_10_FONT_ID);
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY - h * 1.5, tr(STR_READ_LATER_EMPTY_TITLE));
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY - h * 0.5, tr(STR_READ_LATER_EMPTY_HINT));
+    renderer.drawCenteredText(UI_10_FONT_ID, centerY + h * 0.5, tr(STR_READ_LATER_TARGET_PATH));
+    renderer.drawCenteredText(SMALL_FONT_ID, centerY + h * 1.5, tr(STR_READ_LATER_REFRESH_HINT));
   } else {
     GUI.drawList(
         renderer,

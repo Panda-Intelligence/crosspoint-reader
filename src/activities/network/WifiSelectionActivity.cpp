@@ -690,20 +690,27 @@ void WifiSelectionActivity::renderConnecting() const {
 }
 
 void WifiSelectionActivity::renderConnected() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageHeight = renderer.getScreenHeight();
-  const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-  const auto top = (pageHeight - height * 4) / 2;
+  const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing;
+  const int contentBottom = pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing;
+  const int titleHeight = renderer.getTextHeight(UI_12_FONT_ID);
+  const int bodyHeight = renderer.getTextHeight(UI_10_FONT_ID);
+  constexpr int titleGap = 16;
+  constexpr int bodyGap = 12;
+  const int blockHeight = titleHeight + titleGap + bodyHeight + bodyGap + bodyHeight;
+  const int startY = contentTop + (contentBottom - contentTop - blockHeight) / 2;
 
-  renderer.drawCenteredText(UI_12_FONT_ID, top - 30, tr(STR_CONNECTED), true, EpdFontFamily::BOLD);
+  renderer.drawCenteredText(UI_12_FONT_ID, startY, tr(STR_CONNECTED), true, EpdFontFamily::BOLD);
 
   std::string ssidInfo = std::string(tr(STR_NETWORK_PREFIX)) + selectedSSID;
   if (ssidInfo.length() > 28) {
     ssidInfo.replace(25, ssidInfo.length() - 25, "...");
   }
-  renderer.drawCenteredText(UI_10_FONT_ID, top + 10, ssidInfo.c_str());
+  renderer.drawCenteredText(UI_10_FONT_ID, startY + titleHeight + titleGap, ssidInfo.c_str());
 
   const std::string ipInfo = std::string(tr(STR_IP_ADDRESS_PREFIX)) + connectedIP;
-  renderer.drawCenteredText(UI_10_FONT_ID, top + 40, ipInfo.c_str());
+  renderer.drawCenteredText(UI_10_FONT_ID, startY + titleHeight + titleGap + bodyHeight + bodyGap, ipInfo.c_str());
 
   // Use centralized button hints
   const auto labels = mappedInput.mapLabels("", tr(STR_DONE), "", "");

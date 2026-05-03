@@ -52,12 +52,7 @@ void SleepActivity::onEnter() {
   }
 }
 
-void SleepActivity::onExit() {
-  Activity::onExit();
-  if (previewMode) {
-    renderer.setOrientation(GfxRenderer::Orientation::Portrait);
-  }
-}
+void SleepActivity::onExit() { Activity::onExit(); }
 
 void SleepActivity::loop() {
   if (!previewMode) {
