@@ -644,9 +644,9 @@ void WifiSelectionActivity::renderNetworkList() const {
   if (networks.empty()) {
     // No networks found or scan failed
     const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-    const auto top = (pageHeight - height) / 2;
-    renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_NO_NETWORKS));
-    renderer.drawCenteredText(SMALL_FONT_ID, top + height + 10, tr(STR_PRESS_OK_SCAN));
+    const auto top = renderer.getTextYForCentering(0, pageHeight, UI_10_FONT_ID);
+    renderer.drawCenteredText(UI_10_FONT_ID, top - height / 2, tr(STR_NO_NETWORKS));
+    renderer.drawCenteredText(SMALL_FONT_ID, top + height / 2 + 10, tr(STR_PRESS_OK_SCAN));
   } else {
     int contentTop = metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing;
     int contentHeight = pageHeight - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
@@ -673,8 +673,7 @@ void WifiSelectionActivity::renderNetworkList() const {
 
 void WifiSelectionActivity::renderConnecting() const {
   const auto pageHeight = renderer.getScreenHeight();
-  const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-  const auto top = (pageHeight - height) / 2;
+  const auto top = renderer.getTextYForCentering(0, pageHeight, UI_10_FONT_ID);
 
   if (state == WifiSelectionState::SCANNING) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_SCANNING));
@@ -720,8 +719,7 @@ void WifiSelectionActivity::renderConnected() const {
 void WifiSelectionActivity::renderSavePrompt() const {
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
-  const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-  const auto top = (pageHeight - height * 3) / 2;
+  const auto top = renderer.getTextYForCentering(0, pageHeight, UI_10_FONT_ID);
 
   renderer.drawCenteredText(UI_12_FONT_ID, top - 40, tr(STR_CONNECTED), true, EpdFontFamily::BOLD);
 
@@ -763,8 +761,7 @@ void WifiSelectionActivity::renderSavePrompt() const {
 
 void WifiSelectionActivity::renderConnectionFailed() const {
   const auto pageHeight = renderer.getScreenHeight();
-  const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-  const auto top = (pageHeight - height * 2) / 2;
+  const auto top = renderer.getTextYForCentering(0, pageHeight, UI_10_FONT_ID);
 
   renderer.drawCenteredText(UI_12_FONT_ID, top - 20, tr(STR_CONNECTION_FAILED), true, EpdFontFamily::BOLD);
   renderer.drawCenteredText(UI_10_FONT_ID, top + 20, connectionError.c_str());
@@ -777,8 +774,7 @@ void WifiSelectionActivity::renderConnectionFailed() const {
 void WifiSelectionActivity::renderForgetPrompt() const {
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
-  const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-  const auto top = (pageHeight - height * 3) / 2;
+  const auto top = renderer.getTextYForCentering(0, pageHeight, UI_10_FONT_ID);
 
   renderer.drawCenteredText(UI_12_FONT_ID, top - 40, tr(STR_FORGET_NETWORK), true, EpdFontFamily::BOLD);
 

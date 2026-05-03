@@ -370,8 +370,7 @@ void CrossPointWebServerActivity::render(RenderLock&&) {
                         connectedSSID.c_str());
       renderServerRunning();
     } else {
-      const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-      const auto top = (pageHeight - height) / 2;
+      const auto top = renderer.getTextYForCentering(0, pageHeight, UI_10_FONT_ID);
       renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_STARTING_HOTSPOT));
     }
     renderer.displayBuffer();
