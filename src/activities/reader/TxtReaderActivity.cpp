@@ -21,6 +21,43 @@ constexpr size_t CHUNK_SIZE = 8 * 1024;  // 8KB chunk for reading
 // Cache file magic and version
 constexpr uint32_t CACHE_MAGIC = 0x54585449;  // "TXTI"
 constexpr uint8_t CACHE_VERSION = 2;          // Increment when cache format changes
+
+constexpr size_t cacheHeaderSize() {
+  return sizeof(CACHE_MAGIC) + sizeof(CACHE_VERSION) + sizeof(uint32_t) * 2 + sizeof(int32_t) * 4 + sizeof(uint8_t);
+}
+
+constexpr const char* kIndexCacheFileName = "/index.bin";
+constexpr const char* kIndexCacheTempFileName = "/index.bin.tmp";
+constexpr const char* kIndexCacheBackupFileName = "/index.bin.bak";
+
+bool removeIfExists(const std::string& path) { return !Storage.exists(path.c_str()) || Storage.remove(path.c_str()); }
+
+bool promoteIndexCacheFile(const std::string& tempPath, const std::string& finalPath, const std::string& backupPath) {
+  const bool hadExistingCache = Storage.exists(finalPath.c_str());
+  if (hadExistingCache) {
+    if (!removeIfExists(backupPath)) {
+      LOG_ERR("TRS", "Failed to clear old page index backup");
+      return false;
+    }
+    if (!Storage.rename(finalPath.c_str(), backupPath.c_str())) {
+      LOG_ERR("TRS", "Failed to back up existing page index cache");
+      return false;
+    }
+  }
+
+  if (Storage.rename(tempPath.c_str(), finalPath.c_str())) {
+    if (hadExistingCache && !removeIfExists(backupPath)) {
+      LOG_ERR("TRS", "Failed to remove page index backup after promote");
+    }
+    return true;
+  }
+
+  LOG_ERR("TRS", "Failed to promote temp page index cache");
+  if (hadExistingCache && !Storage.rename(backupPath.c_str(), finalPath.c_str())) {
+    LOG_ERR("TRS", "Failed to restore previous page index cache after promote failure");
+  }
+  return false;
+}
 }  // namespace
 
 void TxtReaderActivity::onEnter() {
@@ -48,7 +85,6 @@ void TxtReaderActivity::onEnter() {
 void TxtReaderActivity::onExit() {
   Activity::onExit();
 
-  pageOffsets.clear();
   currentPageLines.clear();
   APP_STATE.readerActivityLoadCount = 0;
   APP_STATE.saveToFile();
@@ -146,8 +182,6 @@ void TxtReaderActivity::initializeReader() {
   if (!loadPageIndexCache()) {
     // Cache not found, build page index
     buildPageIndex();
-    // Save to cache for next time
-    savePageIndexCache();
   }
 
   // Load saved progress
@@ -157,11 +191,33 @@ void TxtReaderActivity::initializeReader() {
 }
 
 void TxtReaderActivity::buildPageIndex() {
-  pageOffsets.clear();
-  pageOffsets.push_back(0);  // First page starts at offset 0
+  totalPages = 0;
+
+  const std::string cachePath = txt->getCachePath() + kIndexCacheFileName;
+  const std::string tempCachePath = txt->getCachePath() + kIndexCacheTempFileName;
+  const std::string backupCachePath = txt->getCachePath() + kIndexCacheBackupFileName;
+  removeIfExists(tempCachePath);
+
+  FsFile f;
+  if (!Storage.openFileForWrite("TRS", tempCachePath, f)) {
+    LOG_ERR("TRS", "Failed to open page index cache for writing");
+    return;
+  }
+
+  // 先写入 header，占位页数，分页结束后再回写 numPages。
+  serialization::writePod(f, CACHE_MAGIC);
+  serialization::writePod(f, CACHE_VERSION);
+  serialization::writePod(f, static_cast<uint32_t>(txt->getFileSize()));
+  serialization::writePod(f, static_cast<int32_t>(viewportWidth));
+  serialization::writePod(f, static_cast<int32_t>(linesPerPage));
+  serialization::writePod(f, static_cast<int32_t>(cachedFontId));
+  serialization::writePod(f, static_cast<int32_t>(cachedScreenMargin));
+  serialization::writePod(f, cachedParagraphAlignment);
+  serialization::writePod(f, static_cast<uint32_t>(0));
 
   size_t offset = 0;
   const size_t fileSize = txt->getFileSize();
+  bool buildOk = true;
 
   LOG_DBG("TRS", "Building page index for %zu bytes...", fileSize);
 
@@ -172,8 +228,18 @@ void TxtReaderActivity::buildPageIndex() {
     size_t nextOffset = offset;
 
     if (!loadPageAtOffset(offset, tempLines, nextOffset)) {
+      buildOk = false;
       break;
     }
+
+    const uint32_t pageOffsetValue = static_cast<uint32_t>(offset);
+    if (f.write(reinterpret_cast<const uint8_t*>(&pageOffsetValue), sizeof(pageOffsetValue)) !=
+        sizeof(pageOffsetValue)) {
+      LOG_ERR("TRS", "Failed to write page index entry %d", totalPages);
+      buildOk = false;
+      break;
+    }
+    totalPages++;
 
     if (nextOffset <= offset) {
       // No progress made, avoid infinite loop
@@ -181,17 +247,47 @@ void TxtReaderActivity::buildPageIndex() {
     }
 
     offset = nextOffset;
-    if (offset < fileSize) {
-      pageOffsets.push_back(offset);
-    }
 
     // Yield to other tasks periodically
-    if (pageOffsets.size() % 20 == 0) {
+    if (totalPages % 20 == 0) {
       vTaskDelay(1);
     }
   }
 
-  totalPages = pageOffsets.size();
+  if (!buildOk || totalPages <= 0) {
+    totalPages = 0;
+    f.close();
+    removeIfExists(tempCachePath);
+    return;
+  }
+
+  if (!f.seek(cacheHeaderSize() - sizeof(uint32_t))) {
+    LOG_ERR("TRS", "Failed to seek page count placeholder for cache patch");
+    totalPages = 0;
+    f.close();
+    removeIfExists(tempCachePath);
+    return;
+  }
+
+  const uint32_t totalPagesValue = static_cast<uint32_t>(totalPages);
+  if (f.write(reinterpret_cast<const uint8_t*>(&totalPagesValue), sizeof(totalPagesValue)) != sizeof(totalPagesValue)) {
+    LOG_ERR("TRS", "Failed to patch page count in cache header");
+    totalPages = 0;
+    f.close();
+    removeIfExists(tempCachePath);
+    return;
+  }
+
+  f.flush();
+  f.close();
+
+  // 通过 backup 回滚避免“旧 cache 已删但新 cache promote 失败”的窗口。
+  if (!promoteIndexCacheFile(tempCachePath, cachePath, backupCachePath)) {
+    totalPages = 0;
+    removeIfExists(tempCachePath);
+    return;
+  }
+
   LOG_DBG("TRS", "Built page index: %d pages", totalPages);
 }
 
@@ -331,7 +427,7 @@ void TxtReaderActivity::render(RenderLock&&) {
     initializeReader();
   }
 
-  if (pageOffsets.empty()) {
+  if (totalPages <= 0) {
     renderer.clearScreen();
     renderer.drawCenteredText(UI_12_FONT_ID,
                               renderer.getTextYForCentering(0, renderer.getScreenHeight(), UI_12_FONT_ID),
@@ -345,10 +441,25 @@ void TxtReaderActivity::render(RenderLock&&) {
   if (currentPage >= totalPages) currentPage = totalPages - 1;
 
   // Load current page content
-  size_t offset = pageOffsets[currentPage];
+  size_t offset = 0;
+  if (!loadPageOffset(currentPage, offset)) {
+    renderer.clearScreen();
+    renderer.drawCenteredText(UI_12_FONT_ID,
+                              renderer.getTextYForCentering(0, renderer.getScreenHeight(), UI_12_FONT_ID),
+                              tr(STR_EMPTY_FILE), true, EpdFontFamily::BOLD);
+    renderer.displayBuffer();
+    return;
+  }
   size_t nextOffset;
   currentPageLines.clear();
-  loadPageAtOffset(offset, currentPageLines, nextOffset);
+  if (!loadPageAtOffset(offset, currentPageLines, nextOffset)) {
+    renderer.clearScreen();
+    renderer.drawCenteredText(UI_12_FONT_ID,
+                              renderer.getTextYForCentering(0, renderer.getScreenHeight(), UI_12_FONT_ID),
+                              tr(STR_EMPTY_FILE), true, EpdFontFamily::BOLD);
+    renderer.displayBuffer();
+    return;
+  }
 
   renderer.clearScreen();
   renderPage();
@@ -433,6 +544,11 @@ void TxtReaderActivity::saveProgress() const {
 }
 
 void TxtReaderActivity::loadProgress() {
+  if (totalPages <= 0) {
+    currentPage = 0;
+    return;
+  }
+
   FsFile f;
   if (Storage.openFileForRead("TRS", txt->getCachePath() + "/progress.bin", f)) {
     uint8_t data[4];
@@ -462,10 +578,16 @@ bool TxtReaderActivity::loadPageIndexCache() {
   // - uint32_t: total pages count
   // - N * uint32_t: page offsets
 
-  std::string cachePath = txt->getCachePath() + "/index.bin";
+  std::string cachePath = txt->getCachePath() + kIndexCacheFileName;
   FsFile f;
   if (!Storage.openFileForRead("TRS", cachePath, f)) {
     LOG_DBG("TRS", "No page index cache found");
+    return false;
+  }
+
+  const size_t cacheSize = static_cast<size_t>(f.size());
+  if (cacheSize < cacheHeaderSize()) {
+    LOG_DBG("TRS", "Page index cache is too small (%zu < %zu), rebuilding", cacheSize, cacheHeaderSize());
     return false;
   }
 
@@ -529,44 +651,44 @@ bool TxtReaderActivity::loadPageIndexCache() {
   uint32_t numPages;
   serialization::readPod(f, numPages);
 
-  // Read page offsets
-  pageOffsets.clear();
-  pageOffsets.reserve(numPages);
-
-  for (uint32_t i = 0; i < numPages; i++) {
-    uint32_t offset;
-    serialization::readPod(f, offset);
-    pageOffsets.push_back(offset);
+  const size_t expectedSize = cacheHeaderSize() + static_cast<size_t>(numPages) * sizeof(uint32_t);
+  if (numPages == 0 || cacheSize != expectedSize) {
+    LOG_DBG("TRS", "Cache size mismatch for %u pages (%zu != %zu), rebuilding", numPages, cacheSize, expectedSize);
+    return false;
   }
 
-  totalPages = pageOffsets.size();
+  totalPages = static_cast<int>(numPages);
   LOG_DBG("TRS", "Loaded page index cache: %d pages", totalPages);
   return true;
 }
 
-void TxtReaderActivity::savePageIndexCache() const {
-  std::string cachePath = txt->getCachePath() + "/index.bin";
+bool TxtReaderActivity::loadPageOffset(uint32_t pageIndex, size_t& outOffset) const {
+  if (!txt || pageIndex >= static_cast<uint32_t>(totalPages)) {
+    return false;
+  }
+
+  std::string cachePath = txt->getCachePath() + kIndexCacheFileName;
   FsFile f;
-  if (!Storage.openFileForWrite("TRS", cachePath, f)) {
-    LOG_ERR("TRS", "Failed to save page index cache");
-    return;
+  if (!Storage.openFileForRead("TRS", cachePath, f)) {
+    LOG_ERR("TRS", "Failed to open page index cache for page %u", pageIndex);
+    return false;
   }
 
-  // Write header using serialization module
-  serialization::writePod(f, CACHE_MAGIC);
-  serialization::writePod(f, CACHE_VERSION);
-  serialization::writePod(f, static_cast<uint32_t>(txt->getFileSize()));
-  serialization::writePod(f, static_cast<int32_t>(viewportWidth));
-  serialization::writePod(f, static_cast<int32_t>(linesPerPage));
-  serialization::writePod(f, static_cast<int32_t>(cachedFontId));
-  serialization::writePod(f, static_cast<int32_t>(cachedScreenMargin));
-  serialization::writePod(f, cachedParagraphAlignment);
-  serialization::writePod(f, static_cast<uint32_t>(pageOffsets.size()));
-
-  // Write page offsets
-  for (size_t offset : pageOffsets) {
-    serialization::writePod(f, static_cast<uint32_t>(offset));
+  const size_t entryPos = cacheHeaderSize() + sizeof(uint32_t) * pageIndex;
+  if (entryPos + sizeof(uint32_t) > static_cast<size_t>(f.size())) {
+    LOG_ERR("TRS", "Page index entry %u is out of range", pageIndex);
+    return false;
+  }
+  if (!f.seek(entryPos)) {
+    LOG_ERR("TRS", "Failed to seek page index entry %u", pageIndex);
+    return false;
   }
 
-  LOG_DBG("TRS", "Saved page index cache: %d pages", totalPages);
+  uint32_t offset = 0;
+  if (f.read(reinterpret_cast<uint8_t*>(&offset), sizeof(offset)) != sizeof(offset)) {
+    LOG_ERR("TRS", "Failed to read page index entry %u", pageIndex);
+    return false;
+  }
+  outOffset = offset;
+  return true;
 }
