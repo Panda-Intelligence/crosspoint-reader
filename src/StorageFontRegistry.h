@@ -49,8 +49,8 @@ struct TraditionalChineseFontFaceInfo {
   EpdFontFamily::Style style;
 };
 
-using TraditionalChineseFontPacks = std::array<TraditionalChineseFontPackInfo, 5>;
-using TraditionalChineseFontFaces = std::array<TraditionalChineseFontFaceInfo, 20>;
+using TraditionalChineseFontPacks = std::array<TraditionalChineseFontPackInfo, 6>;
+using TraditionalChineseFontFaces = std::array<TraditionalChineseFontFaceInfo, 24>;
 
 namespace StorageFontRegistry {
 

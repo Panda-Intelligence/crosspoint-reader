@@ -65,10 +65,14 @@ struct PackedGroup {
 #pragma pack(pop)
 
 StorageFontPack tc12Pack;
+StorageFontPack tc8Pack;
 StorageFontPack tc10Pack;
 StorageFontPack tc14Pack;
 StorageFontPack tc16Pack;
 StorageFontPack tc18Pack;
+StorageFontPack tc8BoldPack;
+StorageFontPack tc8ItalicPack;
+StorageFontPack tc8BoldItalicPack;
 StorageFontPack tc10BoldPack;
 StorageFontPack tc10ItalicPack;
 StorageFontPack tc10BoldItalicPack;
@@ -103,6 +107,7 @@ struct StorageFontFamilySlot {
   }
 };
 
+StorageFontFamilySlot tc8Family{&tc8Pack, &tc8BoldPack, &tc8ItalicPack, &tc8BoldItalicPack};
 StorageFontFamilySlot tc10Family{&tc10Pack, &tc10BoldPack, &tc10ItalicPack, &tc10BoldItalicPack};
 StorageFontFamilySlot tc12Family{&tc12Pack, &tc12BoldPack, &tc12ItalicPack, &tc12BoldItalicPack};
 StorageFontFamilySlot tc14Family{&tc14Pack, &tc14BoldPack, &tc14ItalicPack, &tc14BoldItalicPack};
@@ -110,6 +115,7 @@ StorageFontFamilySlot tc16Family{&tc16Pack, &tc16BoldPack, &tc16ItalicPack, &tc1
 StorageFontFamilySlot tc18Family{&tc18Pack, &tc18BoldPack, &tc18ItalicPack, &tc18BoldItalicPack};
 
 constexpr TraditionalChineseFontPacks kTraditionalChineseFontPacks = {{
+    {"Noto Sans CJK 8", "/.mofei/fonts/notosans_tc_8.epf", CrossPointSettings::EXTRA_SMALL, 8, NOTOSANS_TC_8_FONT_ID},
     {"Noto Sans CJK 10", "/.mofei/fonts/notosans_tc_10.epf", CrossPointSettings::SMALL, 10, NOTOSANS_TC_10_FONT_ID},
     {"Noto Sans CJK 12", "/.mofei/fonts/notosans_tc_12.epf", CrossPointSettings::SMALL, 12, NOTOSANS_TC_12_FONT_ID},
     {"Noto Sans CJK 14", "/.mofei/fonts/notosans_tc_14.epf", CrossPointSettings::MEDIUM, 14, NOTOSANS_TC_14_FONT_ID},
@@ -119,6 +125,13 @@ constexpr TraditionalChineseFontPacks kTraditionalChineseFontPacks = {{
 }};
 
 constexpr TraditionalChineseFontFaces kTraditionalChineseFontFaces = {{
+    {"Noto Sans CJK 8", "/.mofei/fonts/notosans_tc_8.epf", CrossPointSettings::EXTRA_SMALL, 8, EpdFontFamily::REGULAR},
+    {"Noto Sans CJK 8 Bold", "/.mofei/fonts/notosans_tc_8_bold.epf", CrossPointSettings::EXTRA_SMALL, 8,
+     EpdFontFamily::BOLD},
+    {"Noto Sans CJK 8 Italic", "/.mofei/fonts/notosans_tc_8_italic.epf", CrossPointSettings::EXTRA_SMALL, 8,
+     EpdFontFamily::ITALIC},
+    {"Noto Sans CJK 8 Bold Italic", "/.mofei/fonts/notosans_tc_8_bolditalic.epf", CrossPointSettings::EXTRA_SMALL, 8,
+     EpdFontFamily::BOLD_ITALIC},
     {"Noto Sans CJK 10", "/.mofei/fonts/notosans_tc_10.epf", CrossPointSettings::SMALL, 10, EpdFontFamily::REGULAR},
     {"Noto Sans CJK 10 Bold", "/.mofei/fonts/notosans_tc_10_bold.epf", CrossPointSettings::SMALL, 10,
      EpdFontFamily::BOLD},
@@ -162,12 +175,13 @@ struct PackRuntime {
   StorageFontFamilySlot* family;
 };
 
-const std::array<PackRuntime, 5> kPackRuntimes = {{
-    {&kTraditionalChineseFontPacks[0], &tc10Family},
-    {&kTraditionalChineseFontPacks[1], &tc12Family},
-    {&kTraditionalChineseFontPacks[2], &tc14Family},
-    {&kTraditionalChineseFontPacks[3], &tc16Family},
-    {&kTraditionalChineseFontPacks[4], &tc18Family},
+const std::array<PackRuntime, 6> kPackRuntimes = {{
+    {&kTraditionalChineseFontPacks[0], &tc8Family},
+    {&kTraditionalChineseFontPacks[1], &tc10Family},
+    {&kTraditionalChineseFontPacks[2], &tc12Family},
+    {&kTraditionalChineseFontPacks[3], &tc14Family},
+    {&kTraditionalChineseFontPacks[4], &tc16Family},
+    {&kTraditionalChineseFontPacks[5], &tc18Family},
 }};
 
 template <typename T>
@@ -374,16 +388,18 @@ bool loadTraditionalChineseFonts(GfxRenderer& renderer) {
   bool anyLoaded = false;
 
   // Strategy: PSRAM-conservative load.
-  //   Load TC_10, TC_12 and TC_14.
+  //   Load TC_8, TC_10, TC_12 and TC_14.
+  //   - TC_8 is the extra small reader pack.
   //   - TC_10 is the preferred compact Mofei CJK UI pack.
   //   - TC_12 is the UI fallback and reader SMALL pack.
   //   - TC_14 remains available for reader MEDIUM settings.
   const int ui10FontId = NOTOSANS_TC_10_FONT_ID;
+  const uint8_t size8 = CrossPointSettings::EXTRA_SMALL;
   const uint8_t size12 = CrossPointSettings::SMALL;
   const uint8_t size14 = CrossPointSettings::MEDIUM;
 
-  auto isTargetPack = [ui10FontId, size12, size14](const TraditionalChineseFontPackInfo& pack) {
-    return pack.fontId == ui10FontId || pack.size == size12 || pack.size == size14;
+  auto isTargetPack = [ui10FontId, size8, size12, size14](const TraditionalChineseFontPackInfo& pack) {
+    return pack.fontId == ui10FontId || pack.size == size8 || pack.size == size12 || pack.size == size14;
   };
 
   for (const auto& runtime : kPackRuntimes) {

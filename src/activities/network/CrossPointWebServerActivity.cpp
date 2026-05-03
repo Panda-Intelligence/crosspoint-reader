@@ -15,6 +15,7 @@
 #include "activities/network/CalibreConnectActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "network/CryptoUtils.h"
 #include "util/QrUtils.h"
 #include "util/TouchHitTest.h"
 
@@ -443,7 +444,7 @@ void CrossPointWebServerActivity::renderServerRunning() const {
     startY += height10 + metrics.verticalSpacing * 2;
 
     // Show QR code for URL
-    std::string webInfo = getUrlWithToken("http://" + connectedIP + "/").c_str();
+    std::string webInfo = getUrlWithToken(String("http://") + connectedIP.c_str() + "/").c_str();
     const Rect qrBounds((pageWidth - QR_CODE_WIDTH) / 2, startY, QR_CODE_WIDTH, QR_CODE_HEIGHT);
     QrUtils::drawQrCode(renderer, qrBounds, webInfo);
     startY += QR_CODE_HEIGHT + metrics.verticalSpacing * 2;

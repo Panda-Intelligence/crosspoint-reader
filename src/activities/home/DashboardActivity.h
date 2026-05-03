@@ -33,6 +33,8 @@ class DashboardActivity final : public Activity {
   std::string subtitleForShortcut(DashboardShortcutId id) const;
   void openCurrentSelection();
   void layoutCells();
+  void layoutGridCells();
+  void layoutListCells();
   void moveSelectionHorizontally(int delta);
   void moveSelectionVertically(int delta);
 };

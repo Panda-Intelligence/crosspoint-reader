@@ -203,9 +203,10 @@ void updateUiFontMapping() {
   LOG_INF("UIFONT", "updateUiFontMapping() called. Language: %d", static_cast<int>(lang));
 
   if (lang == Language::ZH_CN || lang == Language::ZH_TW) {
+    const bool tc8Loaded = StorageFontRegistry::isTraditionalChineseFontLoadedById(NOTOSANS_TC_8_FONT_ID);
     const bool tc10Loaded = StorageFontRegistry::isTraditionalChineseFontLoadedById(NOTOSANS_TC_10_FONT_ID);
     const bool tc12Loaded = StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::SMALL);
-    LOG_INF("UIFONT", "TC UI fonts loaded: 10pt=%d, 12pt=%d", tc10Loaded, tc12Loaded);
+    LOG_INF("UIFONT", "TC UI fonts loaded: 8pt=%d, 10pt=%d, 12pt=%d", tc8Loaded, tc10Loaded, tc12Loaded);
 
     const auto& fontMap = renderer.getFontMap();
     auto uiFont = tc10Loaded ? fontMap.find(NOTOSANS_TC_10_FONT_ID) : fontMap.end();
@@ -217,10 +218,11 @@ void updateUiFontMapping() {
     }
 
     if (uiFont != fontMap.end()) {
+      auto smallUiFont = tc8Loaded ? fontMap.find(NOTOSANS_TC_8_FONT_ID) : uiFont;
       renderer.insertFont(UI_12_FONT_ID, uiFont->second);
       renderer.insertFont(UI_10_FONT_ID, uiFont->second);
-      renderer.insertFont(SMALL_FONT_ID, uiFont->second);
-      LOG_INF("UIFONT", "UI strip remapped to %s for all UI slots.", uiFontLabel);
+      renderer.insertFont(SMALL_FONT_ID, smallUiFont->second);
+      LOG_INF("UIFONT", "UI strip remapped. UI: %s, Small: %s", uiFontLabel, tc8Loaded ? "TC 8pt" : uiFontLabel);
       UITheme::getInstance().reload();
       return;
     }
