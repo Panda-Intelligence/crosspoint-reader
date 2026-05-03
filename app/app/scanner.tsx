@@ -35,7 +35,7 @@ export default function ScannerScreen() {
     // Validate if it's a URL or IP
     if (data.startsWith('http://') || data.startsWith('https://')) {
       try {
-        await DeviceStorage.setIP(data);
+        await DeviceStorage.setIPAndToken(data);
         const isResponsive = await DeviceApi.ping();
         if (isResponsive) {
           alert('Connected to Crosspoint Reader!');

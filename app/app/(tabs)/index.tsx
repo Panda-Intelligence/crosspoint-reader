@@ -1,5 +1,9 @@
-import { Image, StyleSheet, Platform, View, TouchableOpacity, Text } from 'react-native';
+import { Image, StyleSheet, Platform, View, TouchableOpacity, Text, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useState, useEffect } from 'react';
+import { useIsFocused } from '@react-navigation/native';
+import { DeviceStorage } from '../../src/utils/storage';
+import { useAuth } from '../../src/contexts/AuthContext';
 
 import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
@@ -8,6 +12,30 @@ import { ThemedView } from '@/components/themed-view';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const [deviceIp, setDeviceIp] = useState<string | null>(null);
+  const isFocused = useIsFocused();
+  const { logout, user } = useAuth();
+
+  useEffect(() => {
+    if (isFocused) {
+      DeviceStorage.getIP().then(setDeviceIp);
+    }
+  }, [isFocused]);
+
+  const handleDisconnect = async () => {
+    Alert.alert('Disconnect Device', 'Are you sure you want to unbind from the current reader?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Unbind', style: 'destructive', onPress: async () => {
+          await DeviceStorage.clearDevice();
+          setDeviceIp(null);
+        }
+      }
+    ]);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+  };
 
   return (
     <ParallaxScrollView
@@ -22,18 +50,30 @@ export default function HomeScreen() {
         <ThemedText type="title">Murphy Mate</ThemedText>
         <HelloWave />
       </ThemedView>
+      <ThemedText>Hi, {user?.name || 'User'}!</ThemedText>
       
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Step 1: Connect</ThemedText>
-        <ThemedText>
-          Scan the QR code on your Crosspoint Reader to establish a secure local connection.
-        </ThemedText>
-        <TouchableOpacity 
-          style={styles.connectButton} 
-          onPress={() => router.push('/scanner')}
-        >
-          <Text style={styles.buttonText}>Scan QR Code</Text>
-        </TouchableOpacity>
+        {deviceIp ? (
+          <View style={styles.statusBox}>
+            <Text style={styles.statusText}>Connected to: {deviceIp}</Text>
+            <TouchableOpacity style={styles.disconnectButton} onPress={handleDisconnect}>
+              <Text style={styles.disconnectText}>Unbind</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <ThemedText>
+              Scan the QR code on your Crosspoint Reader to establish a secure local connection.
+            </ThemedText>
+            <TouchableOpacity 
+              style={styles.connectButton} 
+              onPress={() => router.push('/scanner')}
+            >
+              <Text style={styles.buttonText}>Scan QR Code</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </ThemedView>
 
       <ThemedView style={styles.stepContainer}>
@@ -42,7 +82,8 @@ export default function HomeScreen() {
           Send books (EPUB, TXT) or images directly to your device.
         </ThemedText>
         <TouchableOpacity 
-          style={styles.transferButton} 
+          style={[styles.transferButton, !deviceIp && styles.disabledButton]} 
+          disabled={!deviceIp}
           onPress={() => router.push('/transfer')}
         >
           <Text style={styles.buttonText}>Send Files</Text>
@@ -55,7 +96,8 @@ export default function HomeScreen() {
           Manage device settings and reading preferences from your phone.
         </ThemedText>
         <TouchableOpacity 
-          style={styles.settingsButton} 
+          style={[styles.settingsButton, !deviceIp && styles.disabledButton]} 
+          disabled={!deviceIp}
           onPress={() => router.push('/settings')}
         >
           <Text style={styles.buttonText}>Edit Settings</Text>
@@ -68,12 +110,17 @@ export default function HomeScreen() {
           Set a custom wallpaper or sleep screen for your Reader.
         </ThemedText>
         <TouchableOpacity 
-          style={styles.wallpaperButton} 
+          style={[styles.wallpaperButton, !deviceIp && styles.disabledButton]} 
+          disabled={!deviceIp}
           onPress={() => router.push('/wallpaper')}
         >
           <Text style={styles.buttonText}>Send Wallpaper</Text>
         </TouchableOpacity>
       </ThemedView>
+
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.logoutText}>Logout</Text>
+      </TouchableOpacity>
     </ParallaxScrollView>
   );
 }
@@ -123,9 +170,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+  disabledButton: {
+    opacity: 0.5,
+  },
   buttonText: {
     color: '#fff',
     fontWeight: '600',
     fontSize: 16,
   },
+  statusBox: {
+    backgroundColor: '#e6f4fe',
+    padding: 15,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  statusText: {
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  disconnectButton: {
+    padding: 8,
+    backgroundColor: '#ff3b30',
+    borderRadius: 6,
+  },
+  disconnectText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  logoutButton: {
+    marginTop: 20,
+    padding: 15,
+    alignItems: 'center',
+  },
+  logoutText: {
+    color: '#ff3b30',
+    fontWeight: '600',
+  }
 });

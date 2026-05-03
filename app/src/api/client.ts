@@ -10,12 +10,18 @@ export const getApiClient = async () => {
     throw new Error('Device not connected. Please scan QR code first.');
   }
 
-  // Ensure protocol is present
+  const token = await DeviceStorage.getToken();
   const baseURL = ip.startsWith('http') ? ip : `http://${ip}`;
+
+  const headers: any = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   return axios.create({
     baseURL,
     timeout: 10000, // 10s timeout for discovery/settings
+    headers,
   });
 };
 
@@ -28,13 +34,19 @@ export const getTransferClient = async () => {
     throw new Error('Device not connected.');
   }
 
+  const token = await DeviceStorage.getToken();
   const baseURL = ip.startsWith('http') ? ip : `http://${ip}`;
+
+  const headers: any = {
+    'Content-Type': 'multipart/form-data',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   return axios.create({
     baseURL,
     timeout: 300000, // 5 minutes for large books
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+    headers,
   });
 };
