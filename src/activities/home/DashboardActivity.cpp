@@ -670,7 +670,8 @@ void DashboardActivity::render(RenderLock&& lock) {
       const int iconRegionHeight = std::max(iconRegionBottom - iconRegionTop, kDashboardIconSizePx);
       const int iconX = contentX + std::max((contentWidth - kDashboardIconSizePx) / 2, 0);
       const int iconY = iconRegionTop + std::max((iconRegionHeight - kDashboardIconSizePx) / 2, 0);
-      if (const uint8_t* iconBitmap = iconBitmapForName(iconForShortcut(id)); iconBitmap != nullptr) {
+      UIIcon iconId = definition != nullptr ? definition->icon : UIIcon::Settings;
+      if (const uint8_t* iconBitmap = iconBitmapForName(iconId); iconBitmap != nullptr) {
         renderer.drawIcon(iconBitmap, iconX, iconY, kDashboardIconSizePx, kDashboardIconSizePx);
       }
     } else {
@@ -709,11 +710,35 @@ void DashboardActivity::render(RenderLock&& lock) {
 
     const char* customizeLabel = tr(STR_DASHBOARD_CUSTOMIZE);
     const int custTextW = std::max(cust.width - 2 * kCellInnerPadPx, 0);
-    std::string truncCust = renderer.truncatedText(UI_10_FONT_ID, customizeLabel, custTextW, EpdFontFamily::BOLD);
-    const int textY = renderer.getTextYForCentering(cust.y, cust.height, UI_10_FONT_ID);
-    const int textWidth = renderer.getTextWidth(UI_10_FONT_ID, truncCust.c_str(), EpdFontFamily::BOLD);
-    const int textX = cust.x + std::max((cust.width - textWidth) / 2, kCellInnerPadPx);
-    renderer.drawText(UI_10_FONT_ID, textX, textY, truncCust.c_str(), true, EpdFontFamily::BOLD);
+    if (iosGrid) {
+      const int contentX = cust.x + kDashboardCellBorderInsetPx;
+      const int contentY = cust.y + kDashboardCellBorderInsetPx;
+      const int contentWidth = std::max(cust.width - 2 * kDashboardCellBorderInsetPx, 0);
+      const int contentHeight = std::max(cust.height - 2 * kDashboardCellBorderInsetPx, 0);
+      const int labelLineH = renderer.getLineHeight(UI_10_FONT_ID);
+      const int labelBlockHeight = labelLineH + kDashboardCellBottomInsetPx;
+      const int labelTextW = std::max(contentWidth - 2 * kCellInnerPadPx, 0);
+      const int labelBlockTop = contentY + std::max(contentHeight - labelBlockHeight, 0);
+      std::string truncLabel = renderer.truncatedText(UI_10_FONT_ID, customizeLabel, labelTextW, EpdFontFamily::BOLD);
+      const int labelWidth = renderer.getTextWidth(UI_10_FONT_ID, truncLabel.c_str(), EpdFontFamily::BOLD);
+      const int labelDrawX = contentX + std::max((labelTextW - labelWidth) / 2, 0);
+      renderer.drawText(UI_10_FONT_ID, labelDrawX, labelBlockTop, truncLabel.c_str(), true, EpdFontFamily::BOLD);
+
+      const int iconRegionTop = contentY;
+      const int iconRegionBottom = labelBlockTop - kDashboardLabelSpacingPx;
+      const int iconRegionHeight = std::max(iconRegionBottom - iconRegionTop, kDashboardIconSizePx);
+      const int iconX = contentX + std::max((contentWidth - kDashboardIconSizePx) / 2, 0);
+      const int iconY = iconRegionTop + std::max((iconRegionHeight - kDashboardIconSizePx) / 2, 0);
+      if (const uint8_t* iconBitmap = iconBitmapForName(UIIcon::Settings); iconBitmap != nullptr) {
+        renderer.drawIcon(iconBitmap, iconX, iconY, kDashboardIconSizePx, kDashboardIconSizePx);
+      }
+    } else {
+      std::string truncCust = renderer.truncatedText(UI_10_FONT_ID, customizeLabel, custTextW, EpdFontFamily::BOLD);
+      const int textY = renderer.getTextYForCentering(cust.y, cust.height, UI_10_FONT_ID);
+      const int textWidth = renderer.getTextWidth(UI_10_FONT_ID, truncCust.c_str(), EpdFontFamily::BOLD);
+      const int textX = cust.x + std::max((cust.width - textWidth) / 2, kCellInnerPadPx);
+      renderer.drawText(UI_10_FONT_ID, textX, textY, truncCust.c_str(), true, EpdFontFamily::BOLD);
+    }
   }
 
   const auto labels = mappedInput.mapLabels("", tr(STR_OPEN), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));

@@ -6,6 +6,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "components/themes/BaseTheme.h"
+
 enum class DashboardShortcutId : uint8_t {
   RecentReading = 0,
   ReadingHub = 1,
@@ -25,6 +27,7 @@ struct DashboardShortcutDefinition {
   DashboardShortcutId id;
   StrId labelId;
   StrId subtitleId;
+  UIIcon icon;
 };
 
 class DashboardShortcutStore {

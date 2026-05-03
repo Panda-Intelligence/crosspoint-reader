@@ -607,7 +607,7 @@ void EpubReaderActivity::toggleAutoPageTurn(const uint8_t selectedPageTurnOption
 
 void EpubReaderActivity::changeFontSize(const int delta) {
   const int nextFontSize = static_cast<int>(SETTINGS.fontSize) + delta;
-  if (nextFontSize < CrossPointSettings::FONT_SIZE::SMALL ||
+  if (nextFontSize < CrossPointSettings::FONT_SIZE::EXTRA_SMALL ||
       nextFontSize >= CrossPointSettings::FONT_SIZE::FONT_SIZE_COUNT ||
       nextFontSize == static_cast<int>(SETTINGS.fontSize)) {
     requestUpdate();

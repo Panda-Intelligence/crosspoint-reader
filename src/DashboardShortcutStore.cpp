@@ -13,17 +13,17 @@ constexpr char kDashboardShortcutDir[] = "/.mofei/dashboard";
 constexpr char kDashboardShortcutFile[] = "/.mofei/dashboard/shortcuts.json";
 
 constexpr std::array<DashboardShortcutDefinition, static_cast<size_t>(DashboardShortcutId::Count)> kDefinitions = {{
-    {DashboardShortcutId::RecentReading, StrId::STR_CONTINUE_READING, StrId::STR_DASHBOARD_SUBTITLE_RECENT_READING},
-    {DashboardShortcutId::ReadingHub, StrId::STR_DASHBOARD_READING, StrId::STR_DASHBOARD_SUBTITLE_READING},
-    {DashboardShortcutId::StudyHub, StrId::STR_DASHBOARD_STUDY, StrId::STR_DASHBOARD_SUBTITLE_STUDY},
-    {DashboardShortcutId::DesktopHub, StrId::STR_DASHBOARD_DESKTOP, StrId::STR_DASHBOARD_SUBTITLE_DESKTOP},
-    {DashboardShortcutId::ArcadeHub, StrId::STR_DASHBOARD_ARCADE, StrId::STR_DASHBOARD_SUBTITLE_ARCADE},
-    {DashboardShortcutId::ImportSync, StrId::STR_DASHBOARD_IMPORT, StrId::STR_DASHBOARD_SUBTITLE_IMPORT},
-    {DashboardShortcutId::FileBrowser, StrId::STR_DASHBOARD_FILES, StrId::STR_DASHBOARD_SUBTITLE_FILES},
-    {DashboardShortcutId::Settings, StrId::STR_SETTINGS_TITLE, StrId::STR_DASHBOARD_SUBTITLE_SETTINGS},
-    {DashboardShortcutId::WeatherClock, StrId::STR_DASHBOARD_WEATHER, StrId::STR_DASHBOARD_SUBTITLE_WEATHER},
-    {DashboardShortcutId::Today, StrId::STR_DASHBOARD_TODAY, StrId::STR_DASHBOARD_SUBTITLE_TODAY},
-    {DashboardShortcutId::StudyToday, StrId::STR_DASHBOARD_STUDY_TODAY, StrId::STR_DASHBOARD_SUBTITLE_STUDY_TODAY},
+    {DashboardShortcutId::RecentReading, StrId::STR_CONTINUE_READING, StrId::STR_DASHBOARD_SUBTITLE_RECENT_READING, UIIcon::Recent},
+    {DashboardShortcutId::ReadingHub, StrId::STR_DASHBOARD_READING, StrId::STR_DASHBOARD_SUBTITLE_READING, UIIcon::Library},
+    {DashboardShortcutId::StudyHub, StrId::STR_DASHBOARD_STUDY, StrId::STR_DASHBOARD_SUBTITLE_STUDY, UIIcon::Book},
+    {DashboardShortcutId::DesktopHub, StrId::STR_DASHBOARD_DESKTOP, StrId::STR_DASHBOARD_SUBTITLE_DESKTOP, UIIcon::Folder},
+    {DashboardShortcutId::ArcadeHub, StrId::STR_DASHBOARD_ARCADE, StrId::STR_DASHBOARD_SUBTITLE_ARCADE, UIIcon::File},
+    {DashboardShortcutId::ImportSync, StrId::STR_DASHBOARD_IMPORT, StrId::STR_DASHBOARD_SUBTITLE_IMPORT, UIIcon::Transfer},
+    {DashboardShortcutId::FileBrowser, StrId::STR_DASHBOARD_FILES, StrId::STR_DASHBOARD_SUBTITLE_FILES, UIIcon::Folder},
+    {DashboardShortcutId::Settings, StrId::STR_SETTINGS_TITLE, StrId::STR_DASHBOARD_SUBTITLE_SETTINGS, UIIcon::Settings},
+    {DashboardShortcutId::WeatherClock, StrId::STR_DASHBOARD_WEATHER, StrId::STR_DASHBOARD_SUBTITLE_WEATHER, UIIcon::Recent},
+    {DashboardShortcutId::Today, StrId::STR_DASHBOARD_TODAY, StrId::STR_DASHBOARD_SUBTITLE_TODAY, UIIcon::Recent},
+    {DashboardShortcutId::StudyToday, StrId::STR_DASHBOARD_STUDY_TODAY, StrId::STR_DASHBOARD_SUBTITLE_STUDY_TODAY, UIIcon::Book},
 }};
 
 constexpr std::array<const char*, static_cast<size_t>(DashboardShortcutId::Count)> kShortcutKeys = {

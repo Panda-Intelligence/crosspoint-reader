@@ -2,10 +2,12 @@
 #include <Epub.h>
 #include <I18n.h>
 
+#include <array>
 #include <string>
 #include <vector>
 
 #include "../Activity.h"
+#include "CrossPointSettings.h"
 #include "util/ButtonNavigator.h"
 
 class EpubReaderMenuActivity final : public Activity {
@@ -65,7 +67,8 @@ class EpubReaderMenuActivity final : public Activity {
   bool currentPageBookmarked = false;
   const std::vector<StrId> orientationLabels = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_INVERTED,
                                                 StrId::STR_LANDSCAPE_CCW};
-  const std::vector<StrId> fontSizeLabels = {StrId::STR_SMALL, StrId::STR_MEDIUM, StrId::STR_LARGE, StrId::STR_X_LARGE};
+  const std::array<StrId, CrossPointSettings::FONT_SIZE_COUNT> fontSizeLabels = {
+      StrId::STR_EXTRA_SMALL, StrId::STR_SMALL, StrId::STR_MEDIUM, StrId::STR_LARGE, StrId::STR_X_LARGE};
   const std::vector<const char*> pageTurnLabels = {I18N.get(StrId::STR_STATE_OFF), "1", "3", "6", "12"};
   int currentPage = 0;
   int totalPages = 0;
