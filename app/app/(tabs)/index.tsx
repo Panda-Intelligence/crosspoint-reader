@@ -50,10 +50,29 @@ export default function HomeScreen() {
       </ThemedView>
 
       <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Sync</ThemedText>
+        <ThemedText type="subtitle">Step 3: Sync Settings</ThemedText>
         <ThemedText>
           Manage device settings and reading preferences from your phone.
         </ThemedText>
+        <TouchableOpacity 
+          style={styles.settingsButton} 
+          onPress={() => router.push('/settings')}
+        >
+          <Text style={styles.buttonText}>Edit Settings</Text>
+        </TouchableOpacity>
+      </ThemedView>
+
+      <ThemedView style={styles.stepContainer}>
+        <ThemedText type="subtitle">Step 4: Personalize</ThemedText>
+        <ThemedText>
+          Set a custom wallpaper or sleep screen for your Reader.
+        </ThemedText>
+        <TouchableOpacity 
+          style={styles.wallpaperButton} 
+          onPress={() => router.push('/wallpaper')}
+        >
+          <Text style={styles.buttonText}>Send Wallpaper</Text>
+        </TouchableOpacity>
       </ThemedView>
     </ParallaxScrollView>
   );
@@ -85,6 +104,20 @@ const styles = StyleSheet.create({
   },
   transferButton: {
     backgroundColor: '#34C759',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  settingsButton: {
+    backgroundColor: '#FF9500',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  wallpaperButton: {
+    backgroundColor: '#AF52DE',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
