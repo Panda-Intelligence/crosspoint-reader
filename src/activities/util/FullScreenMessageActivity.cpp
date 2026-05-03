@@ -7,8 +7,7 @@
 void FullScreenMessageActivity::onEnter() {
   Activity::onEnter();
 
-  const auto height = renderer.getLineHeight(UI_10_FONT_ID);
-  const auto top = (renderer.getScreenHeight() - height) / 2;
+  const auto top = renderer.getTextYForCentering(0, renderer.getScreenHeight(), UI_10_FONT_ID);
 
   renderer.clearScreen();
   renderer.drawCenteredText(UI_10_FONT_ID, top, text.c_str(), true, style);

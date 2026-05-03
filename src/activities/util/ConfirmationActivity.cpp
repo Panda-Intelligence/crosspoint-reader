@@ -13,7 +13,6 @@ ConfirmationActivity::ConfirmationActivity(GfxRenderer& renderer, MappedInputMan
 void ConfirmationActivity::onEnter() {
   Activity::onEnter();
 
-  lineHeight = renderer.getLineHeight(fontId);
   const int maxWidth = renderer.getScreenWidth() - (margin * 2);
 
   if (!heading.empty()) {
@@ -24,11 +23,11 @@ void ConfirmationActivity::onEnter() {
   }
 
   int totalHeight = 0;
-  if (!safeHeading.empty()) totalHeight += lineHeight;
-  if (!safeBody.empty()) totalHeight += lineHeight;
+  if (!safeHeading.empty()) totalHeight += renderer.getLineHeight(fontId);
+  if (!safeBody.empty()) totalHeight += renderer.getLineHeight(fontId);
   if (!safeHeading.empty() && !safeBody.empty()) totalHeight += spacing;
 
-  startY = (renderer.getScreenHeight() - totalHeight) / 2;
+  startY = renderer.getTextYForCentering(0, renderer.getScreenHeight(), fontId) - totalHeight / 2 + renderer.getLineHeight(fontId) / 2;
 
   requestUpdate(true);
 }
@@ -41,7 +40,7 @@ void ConfirmationActivity::render(RenderLock&& lock) {
   // Draw Heading
   if (!safeHeading.empty()) {
     renderer.drawCenteredText(fontId, currentY, safeHeading.c_str(), true, EpdFontFamily::BOLD);
-    currentY += lineHeight + spacing;
+    currentY += renderer.getLineHeight(fontId) + spacing;
   }
 
   // Draw Body

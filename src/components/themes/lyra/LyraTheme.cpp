@@ -527,10 +527,14 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
 
 void LyraTheme::drawEmptyRecents(const GfxRenderer& renderer, const Rect rect) const {
   constexpr int padding = 48;
+  const int titleH = renderer.getLineHeight(UI_12_FONT_ID);
+  const int hintH = renderer.getLineHeight(UI_10_FONT_ID);
+  const int blockH = titleH + 4 + hintH;
+  const int startY = rect.y + (rect.height - blockH) / 2;
   renderer.drawText(UI_12_FONT_ID, rect.x + padding,
-                    rect.y + rect.height / 2 - renderer.getLineHeight(UI_12_FONT_ID) - 2, tr(STR_NO_OPEN_BOOK), true,
+                    startY, tr(STR_NO_OPEN_BOOK), true,
                     EpdFontFamily::BOLD);
-  renderer.drawText(UI_10_FONT_ID, rect.x + padding, rect.y + rect.height / 2 + 2, tr(STR_START_READING), true);
+  renderer.drawText(UI_10_FONT_ID, rect.x + padding, startY + titleH + 4, tr(STR_START_READING), true);
 }
 
 void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
