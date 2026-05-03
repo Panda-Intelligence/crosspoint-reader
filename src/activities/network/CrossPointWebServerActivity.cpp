@@ -36,6 +36,11 @@ constexpr uint16_t DNS_PORT = 53;
 void CrossPointWebServerActivity::onEnter() {
   Activity::onEnter();
 
+  if (strlen(SETTINGS.apiToken) == 0) {
+    CryptoUtils::generateRandomToken(SETTINGS.apiToken, sizeof(SETTINGS.apiToken));
+    SETTINGS.saveToFile();
+  }
+
   LOG_DBG("WEBACT", "Free heap at onEnter: %d bytes", ESP.getFreeHeap());
 
   // Reset state
@@ -377,6 +382,11 @@ void CrossPointWebServerActivity::render(RenderLock&&) {
   }
 }
 
+String getUrlWithToken(const String& baseUrl) {
+  if (strlen(SETTINGS.apiToken) == 0) return baseUrl;
+  return baseUrl + "?t=" + SETTINGS.apiToken;
+}
+
 void CrossPointWebServerActivity::renderServerRunning() const {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
@@ -410,7 +420,7 @@ void CrossPointWebServerActivity::renderServerRunning() const {
                       EpdFontFamily::BOLD);
     startY += height10 + metrics.verticalSpacing * 2;
 
-    std::string hostnameUrl = std::string("http://") + AP_HOSTNAME + ".local/";
+    std::string hostnameUrl = getUrlWithToken(String("http://") + AP_HOSTNAME + ".local/").c_str();
     std::string ipUrl = tr(STR_OR_HTTP_PREFIX) + connectedIP + "/";
 
     // Show QR code for URL
@@ -433,7 +443,7 @@ void CrossPointWebServerActivity::renderServerRunning() const {
     startY += height10 + metrics.verticalSpacing * 2;
 
     // Show QR code for URL
-    std::string webInfo = "http://" + connectedIP + "/";
+    std::string webInfo = getUrlWithToken("http://" + connectedIP + "/").c_str();
     const Rect qrBounds((pageWidth - QR_CODE_WIDTH) / 2, startY, QR_CODE_WIDTH, QR_CODE_HEIGHT);
     QrUtils::drawQrCode(renderer, qrBounds, webInfo);
     startY += QR_CODE_HEIGHT + metrics.verticalSpacing * 2;

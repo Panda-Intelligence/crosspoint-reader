@@ -75,6 +75,15 @@ String normalizeWebPath(const String& inputPath) {
   return result;
 }
 
+bool checkAuth(WebServer* server) {
+  if (strlen(SETTINGS.apiToken) == 0) return true;
+  if (!server->hasHeader("Authorization")) return false;
+  String header = server->header("Authorization");
+  if (!header.startsWith("Bearer ")) return false;
+  String token = header.substring(7);
+  return token.equals(SETTINGS.apiToken);
+}
+
 bool isProtectedItemName(const String& name) {
   if (name.startsWith(".")) {
     return true;
@@ -218,8 +227,8 @@ void CrossPointWebServer::begin() {
   LOG_DBG("WEB", "[MEM] Free heap after route setup: %d bytes", ESP.getFreeHeap());
 
   // Collect WebDAV headers and register handler
-  const char* davHeaders[] = {"Depth", "Destination", "Overwrite", "If", "Lock-Token", "Timeout"};
-  server->collectHeaders(davHeaders, 6);
+  const char* davHeaders[] = {"Depth", "Destination", "Overwrite", "If", "Lock-Token", "Timeout", "Authorization"};
+  server->collectHeaders(davHeaders, 7);
   server->addHandler(new WebDAVHandler());  // Note: WebDAVHandler will be deleted by WebServer when server is stopped
   LOG_DBG("WEB", "WebDAV handler initialized");
 
@@ -700,6 +709,7 @@ static bool flushUploadBuffer(CrossPointWebServer::UploadState& state) {
 }
 
 void CrossPointWebServer::handleUpload(UploadState& state) const {
+  if (!checkAuth(server.get())) return;
   static size_t lastLoggedSize = 0;
 
   // Reset watchdog at start of every upload callback - HTTP parsing can be slow
@@ -882,6 +892,10 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
 }
 
 void CrossPointWebServer::handleUploadPost(UploadState& state) const {
+  if (!checkAuth(server.get())) {
+    server->send(401, "text/plain", "Unauthorized");
+    return;
+  }
   if (state.success) {
     server->send(200, "text/plain", "File uploaded successfully: " + state.finalFileName);
   } else {
@@ -1248,6 +1262,10 @@ void CrossPointWebServer::handleFontsPage() const {
 }
 
 void CrossPointWebServer::handleGetSettings() const {
+  if (!checkAuth(server.get())) {
+    server->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
+    return;
+  }
   const auto& settings = getSettingsList();
 
   server->setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -1331,6 +1349,10 @@ void CrossPointWebServer::handleGetSettings() const {
 }
 
 void CrossPointWebServer::handlePostSettings() {
+  if (!checkAuth(server.get())) {
+    server->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
+    return;
+  }
   if (!server->hasArg("plain")) {
     server->send(400, "text/plain", "Missing JSON body");
     return;

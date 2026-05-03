@@ -8,6 +8,11 @@
 #include "KOReaderCredentialStore.h"
 #include "activities/settings/SettingsActivity.h"
 
+namespace SettingsKeys {
+inline constexpr const char* kDashboardLayout = "dashboardLayout";
+inline constexpr const char* kApiToken = "apiToken";
+}  // namespace SettingsKeys
+
 // Shared settings list used by both the device settings UI and the web settings API.
 // Each entry has a key (for JSON API) and category (for grouping).
 // ACTION-type entries and entries without a key are device-only.
@@ -35,6 +40,10 @@ inline const std::vector<SettingInfo>& getSettingsList() {
       SettingInfo::Enum(StrId::STR_UI_THEME, &CrossPointSettings::uiTheme,
                         {StrId::STR_THEME_CLASSIC, StrId::STR_THEME_LYRA, StrId::STR_THEME_LYRA_EXTENDED}, "uiTheme",
                         StrId::STR_CAT_DISPLAY),
+      SettingInfo::Enum(
+          StrId::STR_DASHBOARD_LAYOUT, &CrossPointSettings::dashboardLayout,
+          {StrId::STR_DASHBOARD_LAYOUT_LIST, StrId::STR_DASHBOARD_LAYOUT_GRID, StrId::STR_DASHBOARD_LAYOUT_IOS_GRID},
+          SettingsKeys::kDashboardLayout, StrId::STR_CAT_DISPLAY),
       SettingInfo::Toggle(StrId::STR_SUNLIGHT_FADING_FIX, &CrossPointSettings::fadingFix, "fadingFix",
                           StrId::STR_CAT_DISPLAY),
 
@@ -43,9 +52,10 @@ inline const std::vector<SettingInfo>& getSettingsList() {
           StrId::STR_FONT_FAMILY, &CrossPointSettings::fontFamily,
           {StrId::STR_NOTO_SERIF, StrId::STR_NOTO_SANS, StrId::STR_OPEN_DYSLEXIC, StrId::STR_NOTO_SANS_TC},
           "fontFamily", StrId::STR_CAT_READER),
-      SettingInfo::Enum(StrId::STR_FONT_SIZE, &CrossPointSettings::fontSize,
-                        {StrId::STR_SMALL, StrId::STR_MEDIUM, StrId::STR_LARGE, StrId::STR_X_LARGE}, "fontSize",
-                        StrId::STR_CAT_READER),
+      SettingInfo::Enum(
+          StrId::STR_FONT_SIZE, &CrossPointSettings::fontSize,
+          {StrId::STR_EXTRA_SMALL, StrId::STR_SMALL, StrId::STR_MEDIUM, StrId::STR_LARGE, StrId::STR_X_LARGE},
+          "fontSize", StrId::STR_CAT_READER),
       SettingInfo::Enum(StrId::STR_LINE_SPACING, &CrossPointSettings::lineSpacing,
                         {StrId::STR_TIGHT, StrId::STR_NORMAL, StrId::STR_WIDE}, "lineSpacing", StrId::STR_CAT_READER),
       SettingInfo::Value(StrId::STR_SCREEN_MARGIN, &CrossPointSettings::screenMargin, {5, 40, 5}, "screenMargin",
@@ -83,6 +93,10 @@ inline const std::vector<SettingInfo>& getSettingsList() {
                         "sleepTimeout", StrId::STR_CAT_SYSTEM),
       SettingInfo::Toggle(StrId::STR_SHOW_HIDDEN_FILES, &CrossPointSettings::showHiddenFiles, "showHiddenFiles",
                           StrId::STR_CAT_SYSTEM),
+
+      SettingInfo::String(StrId::STR_API_TOKEN, SETTINGS.apiToken, sizeof(SETTINGS.apiToken), SettingsKeys::kApiToken,
+                          StrId::STR_CAT_SYSTEM)
+          .withObfuscated(),
 
       // --- KOReader Sync (web-only, uses KOReaderCredentialStore) ---
       SettingInfo::DynamicString(
