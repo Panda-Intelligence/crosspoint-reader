@@ -129,6 +129,15 @@ class GfxRenderer {
   int getTextAdvanceX(int fontId, const char* text, EpdFontFamily::Style style) const;
   int getFontAscenderSize(int fontId) const;
   int getLineHeight(int fontId) const;
+  int getTextHeight(int fontId) const;
+  
+  /// Helper to calculate the correct Y coordinate to perfectly center text vertically within a rectangle.
+  /// Note: drawText expects the top coordinate and internally adds the ascender.
+  /// We use getTextHeight (ascender size) instead of getLineHeight (advanceY) to visually center the glyphs.
+  inline int getTextYForCentering(int rectY, int rectHeight, int fontId) const {
+    return rectY + (rectHeight - getTextHeight(fontId)) / 2;
+  }
+  
   std::string truncatedText(int fontId, const char* text, int maxWidth,
                             EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   /// Word-wrap \p text into at most \p maxLines lines, each no wider than
@@ -140,7 +149,6 @@ class GfxRenderer {
   // Helper for drawing rotated text (90 degrees clockwise, for side buttons)
   void drawTextRotated90CW(int fontId, int x, int y, const char* text, bool black = true,
                            EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
-  int getTextHeight(int fontId) const;
 
   // Grayscale functions
   void setRenderMode(const RenderMode mode) { this->renderMode = mode; }

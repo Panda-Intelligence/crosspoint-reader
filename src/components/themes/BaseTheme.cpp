@@ -158,11 +158,13 @@ void BaseTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
     // Only draw if the label is non-empty
     if (labels[i] != nullptr && labels[i][0] != '\0') {
       const int x = buttonPositions[i];
-      renderer.fillRect(x, pageHeight - buttonY, buttonWidth, buttonHeight, false);
-      renderer.drawRect(x, pageHeight - buttonY, buttonWidth, buttonHeight);
+      const int y = pageHeight - buttonY;
+      renderer.fillRect(x, y, buttonWidth, buttonHeight, false);
+      renderer.drawRect(x, y, buttonWidth, buttonHeight);
       const int textWidth = renderer.getTextWidth(UI_10_FONT_ID, labels[i]);
       const int textX = x + (buttonWidth - 1 - textWidth) / 2;
-      renderer.drawText(UI_10_FONT_ID, textX, pageHeight - buttonY + textYOffset, labels[i]);
+      const int textY = renderer.getTextYForCentering(y, buttonHeight, UI_10_FONT_ID);
+      renderer.drawText(UI_10_FONT_ID, textX, textY, labels[i]);
     }
   }
 
@@ -859,7 +861,7 @@ void BaseTheme::drawKeyboardKey(const GfxRenderer& renderer, Rect rect, const ch
   const bool hasSecondary = secondaryLabel != nullptr && secondaryLabel[0] != '\0';
   const int itemWidth = renderer.getTextWidth(UI_12_FONT_ID, label);
   const int textX = rect.x + (rect.width - itemWidth) / 2;
-  const int textY = rect.y + (rect.height - renderer.getLineHeight(UI_12_FONT_ID)) / 2;
+  const int textY = renderer.getTextYForCentering(rect.y, rect.height, UI_12_FONT_ID);
 
   renderer.drawText(UI_12_FONT_ID, textX, textY, label, !invert);
 
