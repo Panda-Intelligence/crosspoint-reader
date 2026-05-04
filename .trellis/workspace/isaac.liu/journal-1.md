@@ -112,3 +112,41 @@ P1 dashboard icon semantics task closed. 5 shortcut icons remapped to new Bootst
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: P1 lockscreen passcode — 4-digit numeric, configurable timeout
+
+**Date**: 2026-05-05
+**Task**: P1 lockscreen passcode — 4-digit numeric, configurable timeout
+**Package**: open-x4-sdk
+**Branch**: `feat/murphy`
+
+### Summary
+
+P1 lockscreen passcode task closed (implemented in parallel by codex runtime per the PRD I drove via brainstorm). Locked decisions: 4-digit numeric, SHA-256+16B-salt hash via mbedtls, 3-attempts-then-30s lockout, configurable timeout enum (EveryWake/1m/5m/15m/1h/Disabled, default 5min), opt-in Settings flow with Set/Change/Disable + auto-lock-after enum. Files added: src/activities/lockscreen/{LockScreenActivity,PasscodeEnrollActivity}.{cpp,h}, src/components/{PasscodeKeypad,PasscodeHash}.{cpp,h}, 6 new SETTINGS fields (lockScreenEnabled/Salt/Hash/TimeoutMinutes/WrongCount/LockoutUntilEpoch). Build clean. Task archived.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `05f9f8c` | (see git log) |
+| `41ba426` | (see git log) |
+| `6ddff38` | (see git log) |
+| `243ee6a` | (see git log) |
+| `6614a61` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
