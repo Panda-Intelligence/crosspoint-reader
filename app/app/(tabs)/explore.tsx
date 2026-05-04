@@ -15,6 +15,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DeviceApi, DeviceSetting } from '../../src/api/device';
+import { DeviceStatus, StatusApi } from '../../src/api/status';
 import { DeviceStorage } from '../../src/utils/storage';
 
 type ConnStatus = 'idle' | 'loading' | 'reachable' | 'unreachable' | 'error';
@@ -26,6 +27,7 @@ export default function DeviceScreen() {
   const [ip, setIp] = useState<string | null>(null);
   const [status, setStatus] = useState<ConnStatus>('idle');
   const [settings, setSettings] = useState<DeviceSetting[] | null>(null);
+  const [deviceStatus, setDeviceStatus] = useState<DeviceStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,21 +40,34 @@ export default function DeviceScreen() {
       if (!storedIp) {
         setStatus('idle');
         setSettings(null);
+        setDeviceStatus(null);
         return;
       }
       setStatus('loading');
       const reachable = await DeviceApi.ping();
       setStatus(reachable ? 'reachable' : 'unreachable');
       if (reachable) {
-        try {
-          const data = await DeviceApi.getSettings();
-          setSettings(data);
-        } catch (e: any) {
+        // Fetch status + settings in parallel.
+        const [statusResult, settingsResult] = await Promise.allSettled([
+          StatusApi.get(),
+          DeviceApi.getSettings(),
+        ]);
+        if (statusResult.status === 'fulfilled') {
+          setDeviceStatus(statusResult.value);
+        } else {
+          setDeviceStatus(null);
+        }
+        if (settingsResult.status === 'fulfilled') {
+          setSettings(settingsResult.value);
+        } else {
           setSettings(null);
-          setError(e?.message ?? 'Could not fetch settings.');
+          setError(
+            settingsResult.reason?.message ?? 'Could not fetch settings.',
+          );
         }
       } else {
         setSettings(null);
+        setDeviceStatus(null);
       }
     } catch (e: any) {
       setStatus('error');
@@ -145,6 +160,33 @@ export default function DeviceScreen() {
         )}
       </ThemedView>
 
+      {/* Live device status */}
+      {ip && status === 'reachable' && deviceStatus && (
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle">Status</ThemedText>
+          <View style={styles.statusGrid}>
+            <StatusCell label="Firmware" value={deviceStatus.version} />
+            <StatusCell label="Mode" value={deviceStatus.mode} />
+            <StatusCell
+              label="RSSI"
+              value={
+                deviceStatus.mode === 'AP' || deviceStatus.rssi === 0
+                  ? '—'
+                  : `${deviceStatus.rssi} dBm`
+              }
+            />
+            <StatusCell
+              label="Free heap"
+              value={`${(deviceStatus.freeHeap / 1024).toFixed(0)} KB`}
+            />
+            <StatusCell
+              label="Uptime"
+              value={formatUptime(deviceStatus.uptime)}
+            />
+          </View>
+        </ThemedView>
+      )}
+
       {/* Settings summary (only when reachable) */}
       {ip && status === 'reachable' && (
         <ThemedView style={styles.section}>
@@ -184,10 +226,17 @@ export default function DeviceScreen() {
         </ThemedView>
       )}
 
-      {/* Library — fonts and OPDS catalogs (only when reachable) */}
+      {/* Library — fonts, OPDS catalogs, files (only when reachable) */}
       {ip && status === 'reachable' && (
         <ThemedView style={styles.section}>
           <ThemedText type="subtitle">Library</ThemedText>
+          <TouchableOpacity
+            style={styles.summaryRow}
+            onPress={() => router.push('/files')}>
+            <Text style={styles.summaryName}>Files</Text>
+            <Text style={styles.summaryValue}>Browse SD</Text>
+            <IconSymbol name="chevron.right" size={16} color="#888" />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.summaryRow}
             onPress={() => router.push('/fonts')}>
@@ -243,6 +292,26 @@ function formatValue(s: DeviceSetting): string {
     case 'value':  return String(s.value);
     case 'string': return s.value || '(empty)';
   }
+}
+
+function formatUptime(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m ${s}s`;
+}
+
+function StatusCell({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.statusCell}>
+      <Text style={styles.statusCellValue} numberOfLines={1}>
+        {value}
+      </Text>
+      <Text style={styles.statusCellLabel}>{label}</Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -311,4 +380,27 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   unbindButtonText: { color: '#FF3B30', fontWeight: '600', fontSize: 16 },
+  statusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  statusCell: {
+    flexBasis: '31%',
+    flexGrow: 1,
+    backgroundColor: '#f0f4f8',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    minWidth: 90,
+  },
+  statusCellValue: { fontSize: 15, fontWeight: '600', color: '#333' },
+  statusCellLabel: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
 });
