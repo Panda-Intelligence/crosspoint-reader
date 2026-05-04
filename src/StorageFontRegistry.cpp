@@ -184,9 +184,11 @@ const std::array<PackRuntime, 6> kPackRuntimes = {{
     {&kTraditionalChineseFontPacks[5], &tc18Family},
 }};
 
-// Mofei 的 PSRAM 很紧张，启动只加载 TC_8；Reader 需要更大的字号时再热切换到
-// TC_10，并且切换前必须卸载旧 pack，避免同时常驻多个 CJK 字体。
-constexpr int kStartupTraditionalChineseFontId = NOTOSANS_TC_8_FONT_ID;
+// Mofei 的 PSRAM 很紧张，但 UI 字号过小（8pt）的中文几乎不可读，所以启动后默认
+// 加载 TC_10 作为整个 UI 的基线字体。Reader 进入 EXTRA_SMALL 字号时会热切换到
+// TC_8，并在切换前卸载旧 pack；切换回更大字号时同样热切换并卸载，避免同时常驻
+// 多个 CJK 字体造成 PSRAM 碎片。
+constexpr int kStartupTraditionalChineseFontId = NOTOSANS_TC_10_FONT_ID;
 constexpr int kSmallTraditionalChineseFontId = NOTOSANS_TC_10_FONT_ID;
 constexpr int kReaderExtraSmallTraditionalChineseFontId = NOTOSANS_TC_8_FONT_ID;
 

@@ -3,3 +3,7 @@
 {"file": ".trellis/spec/open-x4-sdk/backend/quality-guidelines.md", "reason": "Mofei build and flash verification rule"}
 {"file": ".trellis/spec/guides/index.md", "reason": "Shared code reuse and cross-layer thinking guides"}
 {"file": ".trellis/tasks/04-29-mofei-touch-support/research/touch-event-architecture.md", "reason": "Generic touch event ownership and fallback suppression architecture"}
+{"file": "src/StorageFontRegistry.cpp", "reason": "P0 startup CJK font: TC_8 -> TC_10 (UI baseline readable); EXTRA_SMALL reader still hot-swaps to TC_8"}
+{"file": ".trellis/tasks/05-01-05-01-mofei-activity-wishlist/research/touch-diagnostics-debug-plan.md", "reason": "Touch debug repro matrix + symptom-to-layer decision table"}
+{"file": ".trellis/spec/open-x4-sdk/backend/quality-guidelines.md", "reason": "Restrict Mofei TC Font Hot-Swap To TC_8 And TC_10 — PSRAM whitelist, hot-swap chokepoint, EXTRA_SMALL routing"}
+{"file": ".trellis/spec/open-x4-sdk/frontend/quality-guidelines.md", "reason": "Keep One Owner Per Touch Coordinate Stage — five-stage pipeline contract, no activity-level orientation compensation"}
