@@ -3,7 +3,7 @@
   "name": "05-05-lockscreen-passcode",
   "title": "Lock screen 4-digit passcode",
   "description": "",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": "open-x4-sdk",
