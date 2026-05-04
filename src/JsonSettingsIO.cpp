@@ -141,6 +141,14 @@ bool JsonSettingsIO::saveSettings(const CrossPointSettings& s, const char* path)
   doc["frontButtonLeft"] = s.frontButtonLeft;
   doc["frontButtonRight"] = s.frontButtonRight;
 
+  // Lock screen passcode — hash + salt + lockout counters are internal state,
+  // persisted directly. The enable toggle and timeout enum are auto-saved
+  // via the SettingsList loop above.
+  doc["lockScreenSalt"] = s.lockScreenSalt;
+  doc["lockScreenHash"] = s.lockScreenHash;
+  doc["lockScreenWrongCount"] = s.lockScreenWrongCount;
+  doc["lockScreenLockoutUntilEpoch"] = s.lockScreenLockoutUntilEpoch;
+
   String json;
   serializeJson(doc, json);
   return Storage.writeFile(path, json);
@@ -219,6 +227,20 @@ bool JsonSettingsIO::loadSettings(CrossPointSettings& s, const char* json, bool*
   s.frontButtonRight =
       clamp(doc["frontButtonRight"] | (uint8_t)S::FRONT_HW_RIGHT, S::FRONT_BUTTON_HARDWARE_COUNT, S::FRONT_HW_RIGHT);
   CrossPointSettings::validateFrontButtonMapping(s);
+
+  // Lock screen passcode internal state (hash, salt, lockout counters).
+  {
+    const std::string saltVal = doc["lockScreenSalt"] | std::string("");
+    strncpy(s.lockScreenSalt, saltVal.c_str(), sizeof(s.lockScreenSalt) - 1);
+    s.lockScreenSalt[sizeof(s.lockScreenSalt) - 1] = '\0';
+
+    const std::string hashVal = doc["lockScreenHash"] | std::string("");
+    strncpy(s.lockScreenHash, hashVal.c_str(), sizeof(s.lockScreenHash) - 1);
+    s.lockScreenHash[sizeof(s.lockScreenHash) - 1] = '\0';
+
+    s.lockScreenWrongCount = doc["lockScreenWrongCount"] | static_cast<uint8_t>(0);
+    s.lockScreenLockoutUntilEpoch = doc["lockScreenLockoutUntilEpoch"] | static_cast<uint32_t>(0);
+  }
 
   LOG_DBG("CPS", "Settings loaded from file");
 

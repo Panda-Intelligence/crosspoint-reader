@@ -20,6 +20,8 @@
 #include "TraditionalChineseFontsActivity.h"
 #include "activities/boot_sleep/SleepActivity.h"
 #include "activities/home/DashboardCustomizeActivity.h"
+#include "activities/lockscreen/LockScreenActivity.h"
+#include "activities/lockscreen/PasscodeEnrollActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -277,6 +279,30 @@ void SettingsActivity::toggleCurrentSetting() {
   if (setting.type == SettingType::TOGGLE && setting.valuePtr != nullptr) {
     // Toggle the boolean value using the member pointer
     const bool currentValue = SETTINGS.*(setting.valuePtr);
+
+    // Special case: disabling lockScreenEnabled while a passcode is set
+    // requires entering that passcode first. Enabling without a passcode
+    // is a no-op (the user must Set passcode separately).
+    if (setting.valuePtr == &CrossPointSettings::lockScreenEnabled) {
+      if (currentValue && SETTINGS.lockScreenHash[0] != '\0') {
+        // Disabling: chain VERIFY_AND_CLEAR which on success wipes the
+        // hash + salt and flips the toggle off itself.
+        auto resultHandler = [this](const ActivityResult&) { SETTINGS.saveToFile(); };
+        startActivityForResult(std::make_unique<LockScreenActivity>(renderer, mappedInput,
+                                                                    LockScreenActivity::Mode::VERIFY_AND_CLEAR),
+                               resultHandler);
+        return;
+      }
+      if (!currentValue && SETTINGS.lockScreenHash[0] == '\0') {
+        // Enabling without a passcode set: open enrolment instead.
+        auto resultHandler = [this](const ActivityResult&) { SETTINGS.saveToFile(); };
+        startActivityForResult(std::make_unique<PasscodeEnrollActivity>(renderer, mappedInput), resultHandler);
+        return;
+      }
+      // Enabling with passcode already set, or disabling with no passcode:
+      // fall through to plain toggle.
+    }
+
     SETTINGS.*(setting.valuePtr) = !currentValue;
   } else if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
     const uint8_t currentValue = SETTINGS.*(setting.valuePtr);
@@ -328,6 +354,24 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::DashboardCustomize:
         startActivityForResult(std::make_unique<DashboardCustomizeActivity>(renderer, mappedInput), resultHandler);
         break;
+      case SettingAction::LockScreenPasscode: {
+        // If a passcode is already set, require entering it before enrolment.
+        if (SETTINGS.lockScreenHash[0] != '\0') {
+          startActivityForResult(
+              std::make_unique<LockScreenActivity>(renderer, mappedInput, LockScreenActivity::Mode::VERIFY),
+              [this, resultHandler](const ActivityResult& verifyResult) {
+                if (verifyResult.isCancelled) {
+                  resultHandler(verifyResult);
+                  return;
+                }
+                this->startActivityForResult(
+                    std::make_unique<PasscodeEnrollActivity>(renderer, mappedInput), resultHandler);
+              });
+        } else {
+          startActivityForResult(std::make_unique<PasscodeEnrollActivity>(renderer, mappedInput), resultHandler);
+        }
+        break;
+      }
       case SettingAction::None:
         // Do nothing
         break;

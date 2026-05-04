@@ -25,6 +25,7 @@ enum class SettingAction {
   PreviewSleepScreen,
   SleepWallpaper,
   DashboardCustomize,
+  LockScreenPasscode,
 };
 
 struct SettingInfo {

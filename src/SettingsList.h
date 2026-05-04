@@ -94,6 +94,19 @@ inline const std::vector<SettingInfo>& getSettingsList() {
       SettingInfo::Toggle(StrId::STR_SHOW_HIDDEN_FILES, &CrossPointSettings::showHiddenFiles, "showHiddenFiles",
                           StrId::STR_CAT_SYSTEM),
 
+      // --- Lock screen passcode ---
+      // Toggle gates the entire feature. The Action opens PasscodeEnrollActivity
+      // (which prompts for the current code first when one is already set).
+      // The timeout enum controls how often the lock screen appears on wake.
+      SettingInfo::Toggle(StrId::STR_LOCKSCREEN_TOGGLE, &CrossPointSettings::lockScreenEnabled, "lockScreenEnabled",
+                          StrId::STR_CAT_SYSTEM),
+      SettingInfo::Action(StrId::STR_LOCKSCREEN_CHANGE, SettingAction::LockScreenPasscode),
+      SettingInfo::Enum(StrId::STR_LOCKSCREEN_TIMEOUT, &CrossPointSettings::lockScreenTimeoutMinutes,
+                        {StrId::STR_LOCKSCREEN_TIMEOUT_EVERY_WAKE, StrId::STR_LOCKSCREEN_TIMEOUT_1MIN,
+                         StrId::STR_LOCKSCREEN_TIMEOUT_5MIN, StrId::STR_LOCKSCREEN_TIMEOUT_15MIN,
+                         StrId::STR_LOCKSCREEN_TIMEOUT_1HOUR, StrId::STR_LOCKSCREEN_TIMEOUT_DISABLED},
+                        "lockScreenTimeoutMinutes", StrId::STR_CAT_SYSTEM),
+
       SettingInfo::String(StrId::STR_API_TOKEN, SETTINGS.apiToken, sizeof(SETTINGS.apiToken), SettingsKeys::kApiToken,
                           StrId::STR_CAT_SYSTEM)
           .withObfuscated(),

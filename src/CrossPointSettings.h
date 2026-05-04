@@ -145,6 +145,18 @@ class CrossPointSettings {
   // Image rendering in EPUB reader
   enum IMAGE_RENDERING { IMAGES_DISPLAY = 0, IMAGES_PLACEHOLDER = 1, IMAGES_SUPPRESS = 2, IMAGE_RENDERING_COUNT };
 
+  // Lock screen auto-lock timeout. Determines when the LockScreenActivity is
+  // shown on wake from sleep. Indexed by `lockScreenTimeout`.
+  enum LOCK_SCREEN_TIMEOUT {
+    LOCK_EVERY_WAKE = 0,
+    LOCK_AFTER_1_MIN = 1,
+    LOCK_AFTER_5_MIN = 2,
+    LOCK_AFTER_15_MIN = 3,
+    LOCK_AFTER_1_HOUR = 4,
+    LOCK_TIMEOUT_DISABLED = 5,
+    LOCK_SCREEN_TIMEOUT_COUNT
+  };
+
   // Sleep screen settings
   uint8_t sleepScreen = DARK;
   // Sleep screen cover mode settings
@@ -212,6 +224,22 @@ class CrossPointSettings {
   uint8_t showHiddenFiles = 0;
   // Image rendering mode in EPUB reader
   uint8_t imageRendering = IMAGES_DISPLAY;
+
+  // --- Lock screen passcode (4-digit, opt-in) ---
+  // Enable bool gates the entire feature. Timeout enum (LOCK_SCREEN_TIMEOUT,
+  // declared in the enum block above) controls how often the lock screen
+  // appears on wake. Hash+salt are populated by PasscodeEnrollActivity and
+  // never exposed in plaintext. wrongCount/lockoutUntilEpoch persist the
+  // lockout state so reboot does not reset the rate-limit.
+  uint8_t lockScreenEnabled = 0;
+  uint8_t lockScreenTimeoutMinutes = LOCK_AFTER_5_MIN;
+  // 32 hex chars (16 bytes salt) + NUL; empty when no passcode enrolled.
+  char lockScreenSalt[33] = "";
+  // 64 hex chars (32 bytes SHA-256 of salt||code) + NUL; empty when no passcode enrolled.
+  char lockScreenHash[65] = "";
+  // Internal lockout state (not in SettingsList, persisted directly).
+  uint8_t lockScreenWrongCount = 0;
+  uint32_t lockScreenLockoutUntilEpoch = 0;
 
   ~CrossPointSettings() = default;
 

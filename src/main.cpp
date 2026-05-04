@@ -28,6 +28,7 @@
 #include "StorageFontRegistry.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
+#include "activities/lockscreen/LockScreenActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/ButtonNavigator.h"
@@ -160,6 +161,53 @@ EpdFontFamily ui12FontFamily(&ui12RegularFont, &ui12BoldFont);
 unsigned long t1 = 0;
 unsigned long t2 = 0;
 
+// Lock-screen wake gating: capture the wall-clock when we entered deep sleep
+// so the wake handler can decide whether enough time has elapsed to require
+// re-entering the passcode. RTC_DATA_ATTR keeps the value alive across
+// deep sleep (but not across power loss / cold boot, where it resets to 0).
+RTC_DATA_ATTR uint32_t g_lastSleepEpoch = 0;
+
+// Returns true if, given the current SETTINGS and how long we slept, the
+// device should boot directly into the lock screen.
+//   wokeFromSleep: true when esp_sleep wake (power button), false on cold boot.
+static bool shouldRouteToLockScreen(bool wokeFromSleep) {
+  if (!SETTINGS.lockScreenEnabled) return false;
+  if (SETTINGS.lockScreenHash[0] == '\0' || SETTINGS.lockScreenSalt[0] == '\0') return false;
+
+  // Cold boot: always lock when feature is on (conservative).
+  if (!wokeFromSleep) return true;
+
+  // Wake-from-sleep: respect the timeout policy.
+  switch (SETTINGS.lockScreenTimeoutMinutes) {
+    case CrossPointSettings::LOCK_TIMEOUT_DISABLED:
+      return false;
+    case CrossPointSettings::LOCK_EVERY_WAKE:
+      return true;
+    default:
+      break;
+  }
+
+  static constexpr uint32_t kThresholds[] = {
+      0,     // LOCK_EVERY_WAKE — handled above
+      60,    // LOCK_AFTER_1_MIN
+      300,   // LOCK_AFTER_5_MIN
+      900,   // LOCK_AFTER_15_MIN
+      3600,  // LOCK_AFTER_1_HOUR
+      0,     // LOCK_TIMEOUT_DISABLED — handled above
+  };
+  const uint8_t idx = SETTINGS.lockScreenTimeoutMinutes < CrossPointSettings::LOCK_SCREEN_TIMEOUT_COUNT
+                          ? SETTINGS.lockScreenTimeoutMinutes
+                          : CrossPointSettings::LOCK_AFTER_5_MIN;
+  const uint32_t threshold = kThresholds[idx];
+
+  const auto now = static_cast<uint32_t>(time(nullptr));
+  // If g_lastSleepEpoch is 0 we never recorded a sleep entry — treat as "long ago".
+  // If now < lastSleep (clock skew) likewise be conservative and lock.
+  if (g_lastSleepEpoch == 0 || now < g_lastSleepEpoch) return true;
+  const uint32_t elapsed = now - g_lastSleepEpoch;
+  return elapsed >= threshold;
+}
+
 // Verify power button press duration on wake-up from deep sleep
 // Pre-condition: isWakeupByPowerButton() == true
 void verifyPowerButtonDuration() {
@@ -220,6 +268,9 @@ void enterDeepSleep() {
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
   APP_STATE.lastSleepFromReader = activityManager.isReaderActivity();
   APP_STATE.saveToFile();
+
+  // Capture sleep entry timestamp for the lock-screen timeout policy.
+  g_lastSleepEpoch = static_cast<uint32_t>(time(nullptr));
 
   activityManager.goToSleep();
 
@@ -363,6 +414,12 @@ void setup() {
   if (HalSystem::isRebootFromPanic()) {
     // If we rebooted from a panic, go to crash report screen to show the panic info
     activityManager.goToCrashReport();
+  } else if (shouldRouteToLockScreen(/*wokeFromSleep=*/wakeupReason == HalGPIO::WakeupReason::PowerButton)) {
+    // Lock-screen passcode is enabled and the policy says lock now.
+    // The lock screen, on success, routes directly to the dashboard.
+    LOG_DBG("MAIN", "Routing to lock screen (wakeReason=%d)", static_cast<int>(wakeupReason));
+    activityManager.replaceActivity(
+        std::make_unique<LockScreenActivity>(renderer, mappedInputManager, LockScreenActivity::Mode::WAKE_GUARD));
   }
 #if MOFEI_APP
   else {
