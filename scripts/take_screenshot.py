@@ -39,11 +39,17 @@ def take_screenshot(port="/dev/cu.usbmodem1101", output="screenshot.bmp"):
                                  
                          print(f"Got {len(screenshot_data)} bytes. Parsing...")
                          try:
-                             # Mofei X3/X4 logical orientation is 800x480
-                             # 1 bit per pixel = 48000 bytes.
-                             img = Image.frombytes("1", (800, 480), screenshot_data)
+                             # SSD1677 panel native is 800x480 (landscape).
+                             # Mofei firmware drives the panel in 480x800
+                             # logical-portrait by applying rotation in
+                             # GfxRenderer::rotateCoordinates(). The raw
+                             # framebuffer dump is in the panel's physical
+                             # orientation, so rotate 90 deg clockwise to
+                             # match what the user actually sees on screen.
+                             raw = Image.frombytes("1", (800, 480), screenshot_data)
+                             img = raw.transpose(Image.ROTATE_270)
                              img.save(output)
-                             print(f"Success! Screenshot saved to {output}")
+                             print(f"Success! Screenshot saved to {output} (480x800 portrait)")
                          except Exception as e:
                              print(f"Failed to process image with PIL: {e}")
                              with open("screenshot.raw", "wb") as f:
