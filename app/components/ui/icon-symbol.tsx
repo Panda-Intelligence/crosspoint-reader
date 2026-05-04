@@ -18,6 +18,8 @@ const MAPPING = {
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
+  // Device tab: gear suggests configurable hardware
+  'gearshape.fill': 'settings',
 } as IconMapping;
 
 /**

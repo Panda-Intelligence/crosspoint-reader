@@ -1,15 +1,102 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import { DeviceApi, DeviceSetting } from '../../src/api/device';
+import { DeviceStorage } from '../../src/utils/storage';
 
-export default function TabTwoScreen() {
+type ConnStatus = 'idle' | 'loading' | 'reachable' | 'unreachable' | 'error';
+
+export default function DeviceScreen() {
+  const router = useRouter();
+  const isFocused = useIsFocused();
+
+  const [ip, setIp] = useState<string | null>(null);
+  const [status, setStatus] = useState<ConnStatus>('idle');
+  const [settings, setSettings] = useState<DeviceSetting[] | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    setError(null);
+    try {
+      const storedIp = await DeviceStorage.getIP();
+      setIp(storedIp);
+      if (!storedIp) {
+        setStatus('idle');
+        setSettings(null);
+        return;
+      }
+      setStatus('loading');
+      const reachable = await DeviceApi.ping();
+      setStatus(reachable ? 'reachable' : 'unreachable');
+      if (reachable) {
+        try {
+          const data = await DeviceApi.getSettings();
+          setSettings(data);
+        } catch (e: any) {
+          setSettings(null);
+          setError(e?.message ?? 'Could not fetch settings.');
+        }
+      } else {
+        setSettings(null);
+      }
+    } catch (e: any) {
+      setStatus('error');
+      setError(e?.message ?? 'Failed to refresh.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isFocused) {
+      void refresh();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFocused]);
+
+  const summary = useMemo(() => {
+    if (!settings) return [] as Array<[string, DeviceSetting[]]>;
+    const groups: Record<string, DeviceSetting[]> = {};
+    for (const s of settings) {
+      if (!groups[s.category]) groups[s.category] = [];
+      groups[s.category].push(s);
+    }
+    return Object.entries(groups);
+  }, [settings]);
+
+  const handleUnbind = () => {
+    Alert.alert(
+      'Disconnect Device',
+      'Are you sure you want to unbind from the current reader?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Unbind',
+          style: 'destructive',
+          onPress: async () => {
+            await DeviceStorage.clearDevice();
+            await refresh();
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
@@ -17,85 +104,124 @@ export default function TabTwoScreen() {
         <IconSymbol
           size={310}
           color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
+          name="gearshape.fill"
           style={styles.headerImage}
         />
       }>
       <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
+        <ThemedText type="title">Device</ThemedText>
       </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
+
+      {/* Connection */}
+      <ThemedView style={styles.section}>
+        <ThemedText type="subtitle">Connection</ThemedText>
+        {ip ? (
+          <View style={styles.statusBox}>
+            <View style={[styles.statusDot, statusDotStyle(status)]} />
+            <View style={styles.statusTextWrap}>
+              <Text style={styles.statusIp}>{ip}</Text>
+              <Text style={styles.statusLabel}>{statusLabel(status)}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.linkAction}
+              onPress={refresh}
+              disabled={refreshing}>
+              {refreshing ? (
+                <ActivityIndicator color="#007AFF" size="small" />
+              ) : (
+                <Text style={styles.linkActionText}>Refresh</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <ThemedText>No device paired yet.</ThemedText>
+            <TouchableOpacity
+              style={styles.connectButton}
+              onPress={() => router.push('/scanner')}>
+              <Text style={styles.buttonText}>Scan QR Code</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </ThemedView>
+
+      {/* Settings summary (only when reachable) */}
+      {ip && status === 'reachable' && (
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle">Current Settings</ThemedText>
+          {settings ? (
+            summary.length === 0 ? (
+              <ThemedText>(empty)</ThemedText>
+            ) : (
+              summary.map(([category, rows]) => (
+                <View key={category} style={styles.summaryGroup}>
+                  <Text style={styles.summaryCategory}>{category}</Text>
+                  {rows.map((s) => (
+                    <TouchableOpacity
+                      key={s.key}
+                      style={styles.summaryRow}
+                      onPress={() => router.push('/settings')}>
+                      <Text style={styles.summaryName} numberOfLines={1}>
+                        {s.name}
+                      </Text>
+                      <Text style={styles.summaryValue} numberOfLines={1}>
+                        {formatValue(s)}
+                      </Text>
+                      <IconSymbol name="chevron.right" size={16} color="#888" />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ))
+            )
+          ) : (
+            <ThemedText>{error ?? 'Loading settings…'}</ThemedText>
+          )}
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => router.push('/settings')}>
+            <Text style={styles.buttonText}>Edit Settings</Text>
+          </TouchableOpacity>
+        </ThemedView>
+      )}
+
+      {/* Unbind */}
+      {ip && (
+        <ThemedView style={styles.section}>
+          <TouchableOpacity style={styles.unbindButton} onPress={handleUnbind}>
+            <Text style={styles.unbindButtonText}>Unbind Device</Text>
+          </TouchableOpacity>
+        </ThemedView>
+      )}
     </ParallaxScrollView>
   );
+}
+
+function statusLabel(status: ConnStatus): string {
+  switch (status) {
+    case 'idle': return '—';
+    case 'loading': return 'Checking…';
+    case 'reachable': return 'Reachable';
+    case 'unreachable': return 'Unreachable';
+    case 'error': return 'Error';
+  }
+}
+
+function statusDotStyle(status: ConnStatus) {
+  switch (status) {
+    case 'reachable':   return { backgroundColor: '#34C759' };
+    case 'unreachable': return { backgroundColor: '#FF3B30' };
+    case 'loading':     return { backgroundColor: '#FF9500' };
+    default:            return { backgroundColor: '#A0A0A0' };
+  }
+}
+
+function formatValue(s: DeviceSetting): string {
+  switch (s.type) {
+    case 'toggle': return s.value ? 'On' : 'Off';
+    case 'enum':   return s.options[s.value] ?? `#${s.value}`;
+    case 'value':  return String(s.value);
+    case 'string': return s.value || '(empty)';
+  }
 }
 
 const styles = StyleSheet.create({
@@ -105,8 +231,63 @@ const styles = StyleSheet.create({
     left: -35,
     position: 'absolute',
   },
-  titleContainer: {
+  titleContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  section: { gap: 8, marginBottom: 16 },
+  statusBox: {
     flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f4f8',
+    padding: 12,
+    borderRadius: 8,
+    gap: 12,
+  },
+  statusDot: { width: 12, height: 12, borderRadius: 6 },
+  statusTextWrap: { flex: 1 },
+  statusIp: { fontSize: 15, fontWeight: '600', color: '#333' },
+  statusLabel: { fontSize: 12, color: '#666', marginTop: 2 },
+  linkAction: { paddingHorizontal: 8, paddingVertical: 4 },
+  linkActionText: { color: '#007AFF', fontWeight: '600' },
+  connectButton: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  editButton: {
+    backgroundColor: '#FF9500',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  summaryGroup: { marginTop: 8 },
+  summaryCategory: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#888',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eee',
     gap: 8,
   },
+  summaryName: { flex: 1, fontSize: 14, color: '#333' },
+  summaryValue: { fontSize: 14, color: '#888', maxWidth: 140 },
+  unbindButton: {
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  unbindButtonText: { color: '#FF3B30', fontWeight: '600', fontSize: 16 },
 });
