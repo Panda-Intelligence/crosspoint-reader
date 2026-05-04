@@ -16,3 +16,4 @@ build
 /.venv
 *.local*
 firmware_V618_E426_TOUCH.bin
+screenshot.bmp
