@@ -5,8 +5,8 @@
 # in the cache. Re-clones only if the cache is missing.
 #
 # Required dependencies:
-#   macOS:  brew install ninja glib pixman libgcrypt pkg-config
-#   Linux:  apt install ninja-build libglib2.0-dev libpixman-1-dev libgcrypt20-dev pkg-config
+#   macOS:  brew install ninja glib pixman libgcrypt pkg-config gnutls
+#   Linux:  apt install ninja-build libglib2.0-dev libpixman-1-dev libgcrypt20-dev pkg-config libgnutls28-dev
 #
 # Usage:
 #   simulator/scripts/build-qemu.sh           # build if missing
@@ -63,6 +63,8 @@ if [[ ! -f "${QEMU_BUILD_DIR}/build.ninja" || ${FORCE} -eq 1 ]]; then
     --target-list=xtensa-softmmu \
     --enable-gcrypt \
     --enable-slirp \
+    --disable-gnutls \
+    --disable-docs \
     --disable-werror
 else
   cd "${QEMU_BUILD_DIR}"
@@ -72,6 +74,30 @@ JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null |
 echo "[build-qemu] make -j${JOBS}"
 make "-j${JOBS}"
 
+# macOS post-build: the espressif fork emits qemu-system-xtensa-unsigned and
+# expects a downstream codesign step. Apply an ad-hoc signature with JIT
+# entitlements so QEMU's TCG can map executable pages on hardened runtime.
+if [[ "$(uname -s)" == "Darwin" && -f "${QEMU_BUILD_DIR}/qemu-system-xtensa-unsigned" ]]; then
+  ENTITLEMENTS="${QEMU_BUILD_DIR}/qemu-jit.entitlements"
+  cat > "${ENTITLEMENTS}" <<'PLIST_EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.disable-executable-page-protection</key>
+    <true/>
+</dict>
+</plist>
+PLIST_EOF
+  echo "[build-qemu] codesigning with JIT entitlements"
+  cp -f "${QEMU_BUILD_DIR}/qemu-system-xtensa-unsigned" "${QEMU_BIN}"
+  codesign --entitlements "${ENTITLEMENTS}" --force -s - "${QEMU_BIN}"
+fi
+
 if [[ ! -x "${QEMU_BIN}" ]]; then
   echo "[build-qemu] ERROR: build completed but ${QEMU_BIN} not found" >&2
   echo "[build-qemu] check the actual output binary name in ${QEMU_BUILD_DIR}" >&2
@@ -80,3 +106,5 @@ fi
 
 echo "[build-qemu] success: ${QEMU_BIN}"
 "${QEMU_BIN}" --version || true
+echo "[build-qemu] supported ESP32-class machines:"
+"${QEMU_BIN}" -machine help 2>/dev/null | grep -iE "esp32" || true

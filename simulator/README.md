@@ -19,10 +19,10 @@ display, mouse/keyboard input, and SD-card-as-local-directory.
 
 ```bash
 # macOS (Apple Silicon and Intel both work)
-brew install ninja glib pixman libgcrypt pkg-config
+brew install ninja glib pixman libgcrypt pkg-config gnutls
 
 # Linux (Debian/Ubuntu)
-sudo apt install ninja-build libglib2.0-dev libpixman-1-dev libgcrypt20-dev pkg-config
+sudo apt install ninja-build libglib2.0-dev libpixman-1-dev libgcrypt20-dev pkg-config libgnutls28-dev
 ```
 
 ### 2. Build the QEMU runtime

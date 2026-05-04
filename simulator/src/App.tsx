@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { PanelCanvas } from "./components/PanelCanvas";
 import "./App.css";
 
 const MAX_LOG_LINES = 1000;
@@ -81,7 +82,7 @@ function App() {
     <main className="container">
       <h1>Mofei Simulator</h1>
       <p style={{ marginTop: 0, color: "#888" }}>
-        ESP32-S3 + GDEQ0426T82 + FT6336U — PR1 (M1: serial console only)
+        ESP32-S3 + GDEQ0426T82 + FT6336U — PR2 (M2: e-ink canvas + serial)
       </p>
 
       <div className="card" style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -116,6 +117,10 @@ function App() {
         </pre>
       )}
 
+      <div style={{ display: "flex", justifyContent: "center", margin: "12px 0" }}>
+        <PanelCanvas />
+      </div>
+
       <div
         style={{
           background: "#111",
@@ -124,7 +129,7 @@ function App() {
           fontSize: 12,
           padding: 8,
           borderRadius: 4,
-          height: 360,
+          height: 240,
           overflowY: "auto",
           whiteSpace: "pre-wrap",
           wordBreak: "break-all",

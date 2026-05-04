@@ -22,6 +22,7 @@
 // PR1 only wires channel 0x02 → Tauri event "serial-log".
 
 use std::path::Path;
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use tauri::{AppHandle, Emitter};
 use tokio::io::AsyncReadExt;
 use tokio::net::UnixStream;
@@ -133,10 +134,26 @@ fn dispatch(app: &AppHandle, frame: Frame) {
             let text = String::from_utf8_lossy(&frame.payload).into_owned();
             let _ = app.emit("serial-log", text);
         }
-        // PR2/PR3 channels are not wired in PR1. Drop them silently to keep
-        // the parser usable when those peripherals are added.
-        CHANNEL_FRAMEBUFFER
-        | CHANNEL_GPIO_STATE
+        CHANNEL_FRAMEBUFFER => {
+            // 1bpp 800×480 = 48000 bytes; row-major, MSB-first within byte.
+            // Pre-compose a host-side RGBA buffer here and emit it as a
+            // base64 string so the React Canvas2D side can blit without
+            // rebuilding the bit-twiddling loop.
+            //
+            // Layout-aware: bit==1 means white (0xFF), bit==0 means black
+            // (0x00). Alpha always 0xFF.
+            let rgba = framebuffer_1bpp_to_rgba(&frame.payload);
+            let encoded = BASE64_STANDARD.encode(&rgba);
+            let payload = serde_json::json!({
+                "kind": if frame.flags & FB_FLAG_PARTIAL != 0 { "partial" } else { "full" },
+                "width": EPD_WIDTH,
+                "height": EPD_HEIGHT,
+                "rgba_b64": encoded,
+            });
+            let _ = app.emit("framebuffer", payload);
+        }
+        // PR3 channels not wired yet.
+        CHANNEL_GPIO_STATE
         | CHANNEL_TOUCH_EVENT
         | CHANNEL_BUTTON_EVENT
         | CHANNEL_CONTROL
@@ -148,4 +165,30 @@ fn dispatch(app: &AppHandle, frame: Frame) {
             );
         }
     }
+}
+
+const EPD_WIDTH: u32 = 800;
+const EPD_HEIGHT: u32 = 480;
+const EPD_FB_BYTES: usize = (EPD_WIDTH as usize * EPD_HEIGHT as usize) / 8;
+const FB_FLAG_PARTIAL: u8 = 0x01;
+
+/// Decode an 800×480 1bpp framebuffer (row-major, MSB-first) to RGBA8888.
+/// White pixel (bit=1) → (255,255,255,255); black pixel (bit=0) → (0,0,0,255).
+fn framebuffer_1bpp_to_rgba(fb: &[u8]) -> Vec<u8> {
+    let mut out = vec![0u8; (EPD_WIDTH as usize) * (EPD_HEIGHT as usize) * 4];
+    let n = fb.len().min(EPD_FB_BYTES);
+    for byte_idx in 0..n {
+        let b = fb[byte_idx];
+        let base_pixel = byte_idx * 8;
+        for bit in 0..8 {
+            let pixel_idx = base_pixel + bit;
+            let value = if (b >> (7 - bit)) & 1 != 0 { 0xFFu8 } else { 0x00u8 };
+            let off = pixel_idx * 4;
+            out[off] = value;
+            out[off + 1] = value;
+            out[off + 2] = value;
+            out[off + 3] = 0xFF;
+        }
+    }
+    out
 }

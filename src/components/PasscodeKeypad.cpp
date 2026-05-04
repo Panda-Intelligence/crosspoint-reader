@@ -63,7 +63,7 @@ PasscodeKeypadView::KeyAction PasscodeKeypadView::decode(int keyIdx, char* outDi
   return KeyAction::AppendDigit;
 }
 
-void PasscodeKeypadView::render(GfxRenderer& renderer, int focusedKey) const {
+void PasscodeKeypadView::render(const GfxRenderer& renderer, int focusedKey) const {
   for (int i = 0; i < kKeyCount; i++) {
     const KeyRect& r = keys[i];
     const bool focused = (i == focusedKey);
@@ -110,7 +110,7 @@ bool PasscodeKeypadView::moveFocus(int& focusedKey, MappedInputManager::Button b
   }
 }
 
-void PasscodeKeypadView::drawDots(GfxRenderer& renderer, int x, int y, int filled) {
+void PasscodeKeypadView::drawDots(const GfxRenderer& renderer, int x, int y, int filled) {
   for (int i = 0; i < kPasscodeLen; i++) {
     const int dx = x + i * 18;
     if (i < filled) {

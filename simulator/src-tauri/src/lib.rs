@@ -82,18 +82,18 @@ fn start_sim(app: AppHandle, state: State<'_, SimState>) -> Result<String, Strin
     let socket = ipc_socket_path();
     cleanup_stale_socket(&socket);
 
-    // Args based on training-knowledge of espressif/qemu fork; see
+    // Args based on verified espressif/qemu fork (QEMU 9.2.2). `-machine
+    // esp32s3` is the correct flag (no `-cpu esp32s3` — that is rejected).
+    // PSRAM (octal) and qio_opi flash mode boot are still unverified — see
     // .trellis/tasks/05-04-mofei-simulator-bringup/research/verification-pending.md
-    // for what to verify against the live README before PR1 merges.
     let mut cmd = Command::new(&qemu);
     cmd.arg("-machine").arg("esp32s3")
-        .arg("-cpu").arg("esp32s3")
         .arg("-kernel").arg(&firmware)
         .arg("-nographic")
         // serial UART → host stdout (separate from our binary IPC)
         .arg("-serial").arg("stdio")
         // binary IPC chardev — virtual peripherals (PR2+) write framebuffer
-        // / GPIO frames here; PR1 just opens it but no peripheral writes yet.
+        // / GPIO frames here.
         .arg("-chardev").arg(format!(
             "socket,id=mofei,path={},server=on,wait=off",
             socket.display()

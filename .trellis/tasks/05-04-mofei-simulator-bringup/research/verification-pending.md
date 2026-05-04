@@ -21,17 +21,22 @@ subagent path recovers, **before PR1 lands on `feat/murphy`** or PR2 starts.
 
 ### From `research/qemu-esp32s3-options.md`
 
-- [ ] Espressif `qemu` fork (https://github.com/espressif/qemu) actually
-  supports `esp32s3` target as of 2026-05-04. Confirm branch name (was
-  `xtensa-softmmu` target the right naming?).
-- [ ] Build dependencies on macOS Apple Silicon: `brew install ninja glib
-  pixman libgcrypt` is sufficient. Confirm against current README.
-- [ ] Octal PSRAM (`R8`) and `qio_opi` flash mode emulation status. The
-  research file flags this as a risk; need to read open issues to confirm
-  whether our `[env:mofei]` `firmware.bin` actually boots, or whether we
-  need `[env:mofei_sim]` with `qio_dio` flash mode as fallback.
-- [ ] `-machine esp32s3 -cpu esp32s3` is the correct invocation. The fork
-  may use different flag names (`-machine esp32s3 -m 8M` or similar).
+- [x] **VERIFIED 2026-05-04**: Espressif `qemu` fork supports `esp32s3`
+  target (`qemu-system-xtensa -machine help` lists both `esp32` and
+  `esp32s3` after a clean build). Built version: QEMU 9.2.2.
+- [x] **VERIFIED 2026-05-04**: Build dependencies on macOS Apple Silicon
+  are: `brew install ninja glib pixman libgcrypt pkg-config gnutls`.
+  (`gnutls` was added during PR2 — needed even with `--disable-gnutls`
+  was actually optional; we now pass `--disable-gnutls` for a leaner
+  build, but the system header is detected by configure on some hosts.)
+- [x] **VERIFIED 2026-05-04**: macOS Apple Silicon build works. Post-
+  build codesign with JIT entitlements is required to map TCG exec
+  pages — `simulator/scripts/build-qemu.sh` now does this automatically.
+- [x] **VERIFIED 2026-05-04**: `-machine esp32s3` is the correct
+  invocation flag (not `-cpu esp32s3` — that is rejected; the fork uses
+  the ESP32-S3-specific CPU implicitly).
+- [ ] Octal PSRAM (`R8`) and `qio_opi` flash mode emulation status — to
+  verify in PR2 by attempting to boot a hello_world ESP32-S3 ELF.
 - [ ] Wokwi licensing for OSS / non-cloud usage (only relevant if we ever
   fall back to Approach 2).
 

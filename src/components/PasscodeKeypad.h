@@ -45,13 +45,13 @@ class PasscodeKeypadView {
 
   // Render the keypad. Caller has already cleared the screen and drawn its
   // own header. focusedKey may be -1 to render with no focus.
-  void render(GfxRenderer& renderer, int focusedKey) const;
+  void render(const GfxRenderer& renderer, int focusedKey) const;
 
   // D-pad navigation. Updates focusedKey in place; returns true if it moved.
   bool moveFocus(int& focusedKey, MappedInputManager::Button button) const;
 
   // Draw kPasscodeLen progress dots at (x,y); filled count = filled.
-  static void drawDots(GfxRenderer& renderer, int x, int y, int filled);
+  static void drawDots(const GfxRenderer& renderer, int x, int y, int filled);
 
  private:
   struct KeyRect {
