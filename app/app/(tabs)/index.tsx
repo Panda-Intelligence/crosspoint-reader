@@ -66,11 +66,17 @@ export default function HomeScreen() {
             <ThemedText>
               Scan the QR code on your Crosspoint Reader to establish a secure local connection.
             </ThemedText>
-            <TouchableOpacity 
-              style={styles.connectButton} 
+            <TouchableOpacity
+              style={styles.connectButton}
               onPress={() => router.push('/scanner')}
             >
               <Text style={styles.buttonText}>Scan QR Code</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.discoverButton}
+              onPress={() => router.push('/discover')}
+            >
+              <Text style={styles.discoverButtonText}>Discover on Wi-Fi</Text>
             </TouchableOpacity>
           </>
         )}
@@ -148,6 +154,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 8,
+  },
+  discoverButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  discoverButtonText: {
+    color: '#007AFF',
+    fontWeight: '600',
+    fontSize: 16,
   },
   transferButton: {
     backgroundColor: '#34C759',
