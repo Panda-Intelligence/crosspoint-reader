@@ -13,14 +13,14 @@
 #include "DesktopSummaryStore.h"
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
-#include "components/icons/book.h"
-#include "components/icons/folder.h"
-#include "components/icons/hotspot.h"
-#include "components/icons/library.h"
-#include "components/icons/recent.h"
-#include "components/icons/settings2.h"
-#include "components/icons/transfer.h"
-#include "components/icons/wifi.h"
+#include "components/icons/book64.h"
+#include "components/icons/folder64.h"
+#include "components/icons/hotspot64.h"
+#include "components/icons/library64.h"
+#include "components/icons/recent64.h"
+#include "components/icons/settings2_64.h"
+#include "components/icons/transfer64.h"
+#include "components/icons/wifi64.h"
 #include "fontIds.h"
 #include "util/ButtonNavigator.h"
 #include "util/TouchHitTest.h"
@@ -30,7 +30,7 @@ constexpr int kGridGapPx = 0;
 constexpr int kCellInnerPadPx = 0;
 constexpr int kCellCornerRadiusPx = 0;
 constexpr int kCustomizeCornerRadiusPx = 4;
-constexpr int kDashboardIconSizePx = 32;
+constexpr int kDashboardIosGridIconSizePx = 64;
 constexpr int kDashboardLabelSpacingPx = 3;
 constexpr int kDashboardCellBorderInsetPx = 3;
 constexpr int kDashboardCellBottomInsetPx = 5;
@@ -61,53 +61,24 @@ std::string formatDashboardValue(const StrId id, const int firstValue, const int
   return buffer;
 }
 
-UIIcon iconForShortcut(const DashboardShortcutId id) {
-  switch (id) {
-    case DashboardShortcutId::RecentReading:
-      return UIIcon::Recent;
-    case DashboardShortcutId::ReadingHub:
-      return UIIcon::Book;
-    case DashboardShortcutId::StudyHub:
-    case DashboardShortcutId::StudyToday:
-      return UIIcon::Library;
-    case DashboardShortcutId::DesktopHub:
-    case DashboardShortcutId::ArcadeHub:
-      return UIIcon::Hotspot;
-    case DashboardShortcutId::ImportSync:
-      return UIIcon::Transfer;
-    case DashboardShortcutId::FileBrowser:
-      return UIIcon::Folder;
-    case DashboardShortcutId::Settings:
-      return UIIcon::Settings;
-    case DashboardShortcutId::WeatherClock:
-      return UIIcon::Wifi;
-    case DashboardShortcutId::Today:
-      return UIIcon::Recent;
-    case DashboardShortcutId::Count:
-      return UIIcon::Book;
-  }
-
-  return UIIcon::Book;
-}
-
-const uint8_t* iconBitmapForName(const UIIcon icon) {
+const uint8_t* iconBitmap64ForName(const UIIcon icon) {
   switch (icon) {
     case UIIcon::Folder:
-      return FolderIcon;
+      return Folder64Icon;
     case UIIcon::Book:
-      return BookIcon;
+      return Book64Icon;
     case UIIcon::Recent:
-      return RecentIcon;
+      return Recent64Icon;
     case UIIcon::Settings:
-      return Settings2Icon;
+      return Settings2_64Icon;
     case UIIcon::Transfer:
-      return TransferIcon;
+      return Transfer64Icon;
     case UIIcon::Library:
-      return LibraryIcon;
+      return Library64Icon;
     case UIIcon::Wifi:
-      return WifiIcon;
+      return Wifi64Icon;
     case UIIcon::Hotspot:
-      return HotspotIcon;
+      return Hotspot64Icon;
     case UIIcon::Text:
     case UIIcon::Image:
     case UIIcon::File:
@@ -594,9 +565,9 @@ void DashboardActivity::render(RenderLock&& lock) {
       }
     }
     allText += tr(STR_DASHBOARD_CUSTOMIZE);
-    const auto labels = dashboardUsesListLayout() ? mappedInput.mapLabels("", tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN))
-                                                  : mappedInput.mapLabels("", tr(STR_OPEN), tr(STR_DIR_LEFT),
-                                                                          tr(STR_DIR_RIGHT));
+    const auto labels = dashboardUsesListLayout()
+                            ? mappedInput.mapLabels("", tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN))
+                            : mappedInput.mapLabels("", tr(STR_OPEN), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
     allText += std::string(labels.btn1) + labels.btn2 + labels.btn3 + labels.btn4;
 
     fcm->prewarmCache(UI_10_FONT_ID, allText.c_str(), (1 << EpdFontFamily::REGULAR) | (1 << EpdFontFamily::BOLD));
@@ -649,7 +620,6 @@ void DashboardActivity::render(RenderLock&& lock) {
     const auto id = DASHBOARD_SHORTCUTS.getShortcut(static_cast<size_t>(idx));
     const auto* definition = DashboardShortcutStore::definitionFor(id);
     const char* label = definition != nullptr ? I18N.get(definition->labelId) : "";
-    const std::string subtitle = subtitleForShortcut(id);
 
     if (iosGrid) {
       const int contentX = cell.x + kDashboardCellBorderInsetPx;
@@ -667,14 +637,15 @@ void DashboardActivity::render(RenderLock&& lock) {
 
       const int iconRegionTop = contentY;
       const int iconRegionBottom = labelBlockTop - kDashboardLabelSpacingPx;
-      const int iconRegionHeight = std::max(iconRegionBottom - iconRegionTop, kDashboardIconSizePx);
-      const int iconX = contentX + std::max((contentWidth - kDashboardIconSizePx) / 2, 0);
-      const int iconY = iconRegionTop + std::max((iconRegionHeight - kDashboardIconSizePx) / 2, 0);
+      const int iconRegionHeight = std::max(iconRegionBottom - iconRegionTop, kDashboardIosGridIconSizePx);
+      const int iconX = contentX + std::max((contentWidth - kDashboardIosGridIconSizePx) / 2, 0);
+      const int iconY = iconRegionTop + std::max((iconRegionHeight - kDashboardIosGridIconSizePx) / 2, 0);
       UIIcon iconId = definition != nullptr ? definition->icon : UIIcon::Settings;
-      if (const uint8_t* iconBitmap = iconBitmapForName(iconId); iconBitmap != nullptr) {
-        renderer.drawIcon(iconBitmap, iconX, iconY, kDashboardIconSizePx, kDashboardIconSizePx);
+      if (const uint8_t* iconBitmap = iconBitmap64ForName(iconId); iconBitmap != nullptr) {
+        renderer.drawIcon(iconBitmap, iconX, iconY, kDashboardIosGridIconSizePx, kDashboardIosGridIconSizePx);
       }
     } else {
+      const std::string subtitle = subtitleForShortcut(id);
       const int labelTextW = std::max(cell.width - 2 * kCellInnerPadPx, 0);
       const int labelLineH = renderer.getLineHeight(UI_10_FONT_ID);
       const int gap = subtitle.empty() ? 0 : kDashboardLabelSpacingPx;
@@ -726,11 +697,11 @@ void DashboardActivity::render(RenderLock&& lock) {
 
       const int iconRegionTop = contentY;
       const int iconRegionBottom = labelBlockTop - kDashboardLabelSpacingPx;
-      const int iconRegionHeight = std::max(iconRegionBottom - iconRegionTop, kDashboardIconSizePx);
-      const int iconX = contentX + std::max((contentWidth - kDashboardIconSizePx) / 2, 0);
-      const int iconY = iconRegionTop + std::max((iconRegionHeight - kDashboardIconSizePx) / 2, 0);
-      if (const uint8_t* iconBitmap = iconBitmapForName(UIIcon::Settings); iconBitmap != nullptr) {
-        renderer.drawIcon(iconBitmap, iconX, iconY, kDashboardIconSizePx, kDashboardIconSizePx);
+      const int iconRegionHeight = std::max(iconRegionBottom - iconRegionTop, kDashboardIosGridIconSizePx);
+      const int iconX = contentX + std::max((contentWidth - kDashboardIosGridIconSizePx) / 2, 0);
+      const int iconY = iconRegionTop + std::max((iconRegionHeight - kDashboardIosGridIconSizePx) / 2, 0);
+      if (const uint8_t* iconBitmap = iconBitmap64ForName(UIIcon::Settings); iconBitmap != nullptr) {
+        renderer.drawIcon(iconBitmap, iconX, iconY, kDashboardIosGridIconSizePx, kDashboardIosGridIconSizePx);
       }
     } else {
       std::string truncCust = renderer.truncatedText(UI_10_FONT_ID, customizeLabel, custTextW, EpdFontFamily::BOLD);

@@ -184,6 +184,25 @@ const std::array<PackRuntime, 6> kPackRuntimes = {{
     {&kTraditionalChineseFontPacks[5], &tc18Family},
 }};
 
+// Mofei 的 PSRAM 很紧张，启动只加载 TC_8；Reader 需要更大的字号时再热切换到
+// TC_10，并且切换前必须卸载旧 pack，避免同时常驻多个 CJK 字体。
+constexpr int kStartupTraditionalChineseFontId = NOTOSANS_TC_8_FONT_ID;
+constexpr int kSmallTraditionalChineseFontId = NOTOSANS_TC_10_FONT_ID;
+constexpr int kReaderExtraSmallTraditionalChineseFontId = NOTOSANS_TC_8_FONT_ID;
+
+// Memory pressure mitigation: only TC_8 and TC_10 may live in PSRAM. Other
+// sizes are explicitly rejected so a misroute never silently loads a 2-3 MB
+// pack that fragments the heap.
+constexpr bool isAllowedTraditionalChineseFontId(int fontId) {
+  return fontId == NOTOSANS_TC_8_FONT_ID || fontId == NOTOSANS_TC_10_FONT_ID;
+}
+
+void logTcMemory(const char* event, const char* path) {
+  LOG_INF("TCFONT_MEM", "%s path=%s heap_free=%u heap_max=%u psram_free=%u psram_max=%u", event,
+          path != nullptr ? path : "-", ESP.getFreeHeap(), ESP.getMaxAllocHeap(), ESP.getFreePsram(),
+          ESP.getMaxAllocPsram());
+}
+
 template <typename T>
 bool readArray(FsFile& file, std::vector<T>& out, size_t count) {
   out.resize(count);
@@ -195,6 +214,125 @@ bool readArray(FsFile& file, std::vector<T>& out, size_t count) {
     return false;
   }
   return true;
+}
+
+const PackRuntime* getRuntimeByFontId(const int fontId) {
+  const auto it = std::find_if(kPackRuntimes.begin(), kPackRuntimes.end(),
+                               [fontId](const PackRuntime& runtime) { return runtime.info->fontId == fontId; });
+  return it == kPackRuntimes.end() ? nullptr : &*it;
+}
+
+const PackRuntime* getRuntimeByFontSize(const uint8_t fontSize) {
+  // PSRAM-tight policy: only TC_8 and TC_10 are loadable. EXTRA_SMALL routes to
+  // TC_8; every larger reader font size maps to TC_10. Reader text will render
+  // smaller than its nominal size, but fits memory and avoids fragmentation.
+  const int targetFontId = (fontSize == CrossPointSettings::EXTRA_SMALL) ? kReaderExtraSmallTraditionalChineseFontId
+                                                                         : kSmallTraditionalChineseFontId;
+  const auto* preferred = getRuntimeByFontId(targetFontId);
+  if (preferred != nullptr && Storage.exists(preferred->info->path)) {
+    return preferred;
+  }
+  // Fallback to the other allowed pack so something still renders if the
+  // primary EPF file is missing on the SD card.
+  const int alternateFontId = (targetFontId == kReaderExtraSmallTraditionalChineseFontId)
+                                  ? kSmallTraditionalChineseFontId
+                                  : kReaderExtraSmallTraditionalChineseFontId;
+  const auto* alternate = getRuntimeByFontId(alternateFontId);
+  return alternate != nullptr ? alternate : preferred;
+}
+
+const PackRuntime* getCurrentLoadedRuntime() {
+  const auto it = std::find_if(kPackRuntimes.begin(), kPackRuntimes.end(),
+                               [](const PackRuntime& runtime) { return runtime.family->loaded; });
+  return it == kPackRuntimes.end() ? nullptr : &*it;
+}
+
+const PackRuntime* getLoadableRuntimeByFontId(const int fontId) {
+  const auto* runtime = getRuntimeByFontId(fontId);
+  if (runtime == nullptr) {
+    return nullptr;
+  }
+  if (isAllowedTraditionalChineseFontId(runtime->info->fontId)) {
+    return runtime;
+  }
+
+  LOG_ERR("TCFONT", "Refused unsupported TC pack fontId=%d pointSize=%u; only 8pt and 10pt are loadable", fontId,
+          runtime->info->pointSize);
+  return nullptr;
+}
+
+void unloadTraditionalChineseFont(GfxRenderer& renderer, const PackRuntime& runtime) {
+  logTcMemory("unload_begin", runtime.info->path);
+  renderer.removeFont(runtime.info->fontId);
+  runtime.family->reset();
+  logTcMemory("unload_end", runtime.info->path);
+}
+
+bool loadTraditionalChineseRuntime(GfxRenderer& renderer, const PackRuntime& target, const bool forceReload = false) {
+  if (!isAllowedTraditionalChineseFontId(target.info->fontId)) {
+    LOG_ERR("TCFONT", "Refused to load disallowed TC pack %s (fontId=%d). PSRAM-restricted whitelist is {TC_8, TC_10}.",
+            target.info->path, target.info->fontId);
+    return false;
+  }
+
+  Storage.mkdir("/.mofei");
+  Storage.mkdir("/.mofei/fonts");
+
+  bool unloadedAny = false;
+  for (const auto& runtime : kPackRuntimes) {
+    if ((forceReload || runtime.info->fontId != target.info->fontId) && runtime.family->loaded) {
+      unloadTraditionalChineseFont(renderer, runtime);
+      unloadedAny = true;
+    }
+  }
+
+  if (target.family->loaded) {
+    if (unloadedAny) {
+      if (auto* cacheManager = renderer.getFontCacheManager()) {
+        cacheManager->clearCache();
+      }
+    }
+    return true;
+  }
+
+  target.family->reset();
+
+  const auto* regular =
+      StorageFontRegistry::getTraditionalChineseFontFaceById(target.info->fontId, EpdFontFamily::REGULAR);
+  const auto* bold = StorageFontRegistry::getTraditionalChineseFontFaceById(target.info->fontId, EpdFontFamily::BOLD);
+  const auto* italic =
+      StorageFontRegistry::getTraditionalChineseFontFaceById(target.info->fontId, EpdFontFamily::ITALIC);
+  const auto* boldItalic =
+      StorageFontRegistry::getTraditionalChineseFontFaceById(target.info->fontId, EpdFontFamily::BOLD_ITALIC);
+
+  logTcMemory("load_begin", target.info->path);
+
+  if (regular != nullptr && target.family->regular->load(regular->path)) {
+    if (bold != nullptr) target.family->bold->load(bold->path);
+    if (italic != nullptr) target.family->italic->load(italic->path);
+    if (boldItalic != nullptr) target.family->boldItalic->load(boldItalic->path);
+
+    target.family->family = std::make_unique<EpdFontFamily>(
+        &target.family->regular->font(), target.family->bold->loaded() ? &target.family->bold->font() : nullptr,
+        target.family->italic->loaded() ? &target.family->italic->font() : nullptr,
+        target.family->boldItalic->loaded() ? &target.family->boldItalic->font() : nullptr);
+    target.family->loaded = true;
+    renderer.insertFont(target.info->fontId, *target.family->family);
+    logTcMemory("load_end", target.info->path);
+    if (auto* cacheManager = renderer.getFontCacheManager()) {
+      cacheManager->clearCache();
+    }
+    return true;
+  }
+
+  renderer.removeFont(target.info->fontId);
+  logTcMemory("load_failed", target.info->path);
+  LOG_ERR("TCFONT", "Multilingual font family not found or load failed: %s", target.info->path);
+  target.family->reset();
+  if (auto* cacheManager = renderer.getFontCacheManager()) {
+    cacheManager->clearCache();
+  }
+  return false;
 }
 }  // namespace
 
@@ -348,11 +486,8 @@ const TraditionalChineseFontPacks& getTraditionalChineseFontPacks() { return kTr
 const TraditionalChineseFontFaces& getTraditionalChineseFontFaces() { return kTraditionalChineseFontFaces; }
 
 const TraditionalChineseFontPackInfo* getTraditionalChineseFontPack(uint8_t fontSize) {
-  const auto it = std::find_if(kTraditionalChineseFontPacks.begin(), kTraditionalChineseFontPacks.end(),
-                               [fontSize](const TraditionalChineseFontPackInfo& pack) {
-                                 return pack.size == fontSize && pack.fontId != NOTOSANS_TC_10_FONT_ID;
-                               });
-  return it == kTraditionalChineseFontPacks.end() ? nullptr : &*it;
+  const auto* runtime = getRuntimeByFontSize(fontSize);
+  return runtime == nullptr ? nullptr : runtime->info;
 }
 
 const TraditionalChineseFontFaceInfo* getTraditionalChineseFontFace(uint8_t fontSize, EpdFontFamily::Style style) {
@@ -382,73 +517,50 @@ const TraditionalChineseFontFaceInfo* getTraditionalChineseFontFaceById(int font
 }
 
 bool loadTraditionalChineseFonts(GfxRenderer& renderer) {
-  Storage.mkdir("/.mofei");
-  Storage.mkdir("/.mofei/fonts");
-
-  bool anyLoaded = false;
-
-  // Strategy: PSRAM-conservative load.
-  //   Load TC_8, TC_10, TC_12 and TC_14.
-  //   - TC_8 is the extra small reader pack.
-  //   - TC_10 is the preferred compact Mofei CJK UI pack.
-  //   - TC_12 is the UI fallback and reader SMALL pack.
-  //   - TC_14 remains available for reader MEDIUM settings.
-  const int ui10FontId = NOTOSANS_TC_10_FONT_ID;
-  const uint8_t size8 = CrossPointSettings::EXTRA_SMALL;
-  const uint8_t size12 = CrossPointSettings::SMALL;
-  const uint8_t size14 = CrossPointSettings::MEDIUM;
-
-  auto isTargetPack = [ui10FontId, size8, size12, size14](const TraditionalChineseFontPackInfo& pack) {
-    return pack.fontId == ui10FontId || pack.size == size8 || pack.size == size12 || pack.size == size14;
-  };
-
-  for (const auto& runtime : kPackRuntimes) {
-    if (!isTargetPack(*runtime.info)) {
-      // Unload non-target sizes that may have been loaded by an earlier call.
-      if (runtime.family->loaded) {
-        renderer.removeFont(runtime.info->fontId);
-        runtime.family->reset();
-        LOG_INF("TCFONT", "Unloaded non-target TC pack: %s", runtime.info->path);
-      }
-      continue;
-    }
-
-    if (runtime.family->loaded) {
-      anyLoaded = true;
-      continue;  // Already loaded
-    }
-
-    runtime.family->reset();
-
-    const auto* regular = getTraditionalChineseFontFaceById(runtime.info->fontId, EpdFontFamily::REGULAR);
-    const auto* bold = getTraditionalChineseFontFaceById(runtime.info->fontId, EpdFontFamily::BOLD);
-    const auto* italic = getTraditionalChineseFontFaceById(runtime.info->fontId, EpdFontFamily::ITALIC);
-    const auto* boldItalic = getTraditionalChineseFontFaceById(runtime.info->fontId, EpdFontFamily::BOLD_ITALIC);
-
-    if (regular != nullptr && runtime.family->regular->load(regular->path)) {
-      if (bold != nullptr) runtime.family->bold->load(bold->path);
-      if (italic != nullptr) runtime.family->italic->load(italic->path);
-      if (boldItalic != nullptr) runtime.family->boldItalic->load(boldItalic->path);
-
-      runtime.family->family = std::make_unique<EpdFontFamily>(
-          &runtime.family->regular->font(), runtime.family->bold->loaded() ? &runtime.family->bold->font() : nullptr,
-          runtime.family->italic->loaded() ? &runtime.family->italic->font() : nullptr,
-          runtime.family->boldItalic->loaded() ? &runtime.family->boldItalic->font() : nullptr);
-      runtime.family->loaded = true;
-      renderer.insertFont(runtime.info->fontId, *runtime.family->family);
-      LOG_INF("TCFONT", "Loaded multilingual font family: %s", runtime.info->path);
-      anyLoaded = true;
-    } else {
-      renderer.removeFont(runtime.info->fontId);
-      LOG_ERR("TCFONT", "Multilingual font family not found or load failed: %s", runtime.info->path);
-      runtime.family->reset();
-    }
-  }
-  if (auto* cacheManager = renderer.getFontCacheManager()) {
-    cacheManager->clearCache();
-  }
-  return anyLoaded;
+  const auto* runtime = getRuntimeByFontId(kStartupTraditionalChineseFontId);
+  return runtime != nullptr && loadTraditionalChineseRuntime(renderer, *runtime, true);
 }
+
+bool loadTraditionalChineseFont(GfxRenderer& renderer, uint8_t fontSize) {
+  const auto* runtime = getRuntimeByFontSize(fontSize);
+  return runtime != nullptr && loadTraditionalChineseFontById(renderer, runtime->info->fontId);
+}
+
+bool loadTraditionalChineseFontById(GfxRenderer& renderer, int fontId) {
+  const auto* runtime = getLoadableRuntimeByFontId(fontId);
+  if (runtime == nullptr) {
+    return false;
+  }
+  if (loadTraditionalChineseRuntime(renderer, *runtime)) {
+    return true;
+  }
+  const int fallbackFontId = runtime->info->fontId == kReaderExtraSmallTraditionalChineseFontId
+                                 ? kSmallTraditionalChineseFontId
+                                 : kReaderExtraSmallTraditionalChineseFontId;
+  const auto* fallback = getRuntimeByFontId(fallbackFontId);
+  if (fallback != nullptr) {
+    if (Storage.exists(fallback->info->path)) {
+      return loadTraditionalChineseRuntime(renderer, *fallback);
+    }
+    if (runtime->info->fontId != kStartupTraditionalChineseFontId) {
+      fallback = getRuntimeByFontId(kStartupTraditionalChineseFontId);
+      return fallback != nullptr && loadTraditionalChineseRuntime(renderer, *fallback);
+    }
+  } else if (runtime->info->fontId != kStartupTraditionalChineseFontId) {
+    fallback = getRuntimeByFontId(kStartupTraditionalChineseFontId);
+    if (fallback != nullptr) {
+      return loadTraditionalChineseRuntime(renderer, *fallback);
+    }
+  }
+  return false;
+}
+
+int getCurrentTraditionalChineseFontId() {
+  const auto* runtime = getCurrentLoadedRuntime();
+  return runtime == nullptr ? 0 : runtime->info->fontId;
+}
+
+bool isTraditionalChineseFontLoadSupportedById(int fontId) { return isAllowedTraditionalChineseFontId(fontId); }
 
 bool isTraditionalChineseFontInstalled(uint8_t fontSize) {
   const auto* pack = getTraditionalChineseFontPack(fontSize);
@@ -471,10 +583,8 @@ bool isTraditionalChineseFontFaceInstalledById(int fontId, EpdFontFamily::Style 
 }
 
 bool isTraditionalChineseFontLoaded(uint8_t fontSize) {
-  const auto it = std::find_if(kPackRuntimes.begin(), kPackRuntimes.end(), [fontSize](const PackRuntime& runtime) {
-    return runtime.info->size == fontSize && runtime.info->fontId != NOTOSANS_TC_10_FONT_ID;
-  });
-  return it != kPackRuntimes.end() && (*it).family->loaded;
+  const auto* runtime = getRuntimeByFontSize(fontSize);
+  return runtime != nullptr && runtime->family->loaded;
 }
 
 bool isTraditionalChineseFontFaceLoaded(uint8_t fontSize, EpdFontFamily::Style style) {
@@ -486,9 +596,8 @@ bool isTraditionalChineseFontFaceLoaded(uint8_t fontSize, EpdFontFamily::Style s
 }
 
 bool isTraditionalChineseFontLoadedById(int fontId) {
-  const auto it = std::find_if(kPackRuntimes.begin(), kPackRuntimes.end(),
-                               [fontId](const PackRuntime& runtime) { return runtime.info->fontId == fontId; });
-  return it != kPackRuntimes.end() && (*it).family->loaded;
+  const auto* runtime = getRuntimeByFontId(fontId);
+  return runtime != nullptr && runtime->family->loaded;
 }
 
 bool isTraditionalChineseFontFaceLoadedById(int fontId, EpdFontFamily::Style style) {

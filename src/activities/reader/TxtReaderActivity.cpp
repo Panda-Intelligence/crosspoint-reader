@@ -7,20 +7,27 @@
 #include <Serialization.h>
 #include <Utf8.h>
 
+#include <algorithm>
+#include <cstdlib>
+#include <string>
+#include <vector>
+
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
+#include "StorageFontRegistry.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "ui_font_manager.h"
 #include "util/TouchHitTest.h"
 
 namespace {
 constexpr size_t CHUNK_SIZE = 8 * 1024;  // 8KB chunk for reading
 // Cache file magic and version
 constexpr uint32_t CACHE_MAGIC = 0x54585449;  // "TXTI"
-constexpr uint8_t CACHE_VERSION = 2;          // Increment when cache format changes
+constexpr uint8_t CACHE_VERSION = 3;          // cache 格式或分页边界变化时递增
 
 constexpr size_t cacheHeaderSize() {
   return sizeof(CACHE_MAGIC) + sizeof(CACHE_VERSION) + sizeof(uint32_t) * 2 + sizeof(int32_t) * 4 + sizeof(uint8_t);
@@ -29,6 +36,8 @@ constexpr size_t cacheHeaderSize() {
 constexpr const char* kIndexCacheFileName = "/index.bin";
 constexpr const char* kIndexCacheTempFileName = "/index.bin.tmp";
 constexpr const char* kIndexCacheBackupFileName = "/index.bin.bak";
+constexpr unsigned long kIndexYieldIntervalMs = 20;
+constexpr size_t kDirectFitCheckMaxBytes = 512;
 
 bool removeIfExists(const std::string& path) { return !Storage.exists(path.c_str()) || Storage.remove(path.c_str()); }
 
@@ -57,6 +66,210 @@ bool promoteIndexCacheFile(const std::string& tempPath, const std::string& final
     LOG_ERR("TRS", "Failed to restore previous page index cache after promote failure");
   }
   return false;
+}
+
+void yieldDuringIndexing(unsigned long& lastYieldMs) {
+  const unsigned long now = millis();
+  if (now - lastYieldMs >= kIndexYieldIntervalMs) {
+    yield();
+    vTaskDelay(1);
+    lastYieldMs = now;
+  }
+}
+
+void logTxtIndexMemory(const char* event, const size_t offset, const int totalPages, const size_t fileSize) {
+  LOG_INF("TXTINDEX_MEM", "%s offset=%zu pages=%d file=%zu heap_free=%u heap_max=%u psram_free=%u psram_max=%u", event,
+          offset, totalPages, fileSize, ESP.getFreeHeap(), ESP.getMaxAllocHeap(), ESP.getFreePsram(),
+          ESP.getMaxAllocPsram());
+}
+
+size_t utf8BoundaryStep(const char* text, const size_t length, const size_t pos) {
+  if (text == nullptr || pos >= length) {
+    return 0;
+  }
+
+  const auto lead = static_cast<uint8_t>(text[pos]);
+  size_t expected = 1;
+  if (lead < 0x80) {
+    expected = 1;
+  } else if ((lead & 0xE0) == 0xC0) {
+    expected = 2;
+  } else if ((lead & 0xF0) == 0xE0) {
+    expected = 3;
+  } else if ((lead & 0xF8) == 0xF0) {
+    expected = 4;
+  } else {
+    return 1;
+  }
+
+  if (pos + expected > length) {
+    return 1;
+  }
+
+  for (size_t i = 1; i < expected; ++i) {
+    if ((static_cast<uint8_t>(text[pos + i]) & 0xC0) != 0x80) {
+      return 1;
+    }
+  }
+  return expected;
+}
+
+size_t completeUtf8PrefixLength(const uint8_t* text, const size_t length) {
+  if (text == nullptr || length == 0) {
+    return 0;
+  }
+
+  size_t pos = 0;
+  size_t lastComplete = 0;
+  while (pos < length) {
+    const uint8_t lead = text[pos];
+    size_t expected = 1;
+    if (lead < 0x80) {
+      expected = 1;
+    } else if ((lead & 0xE0) == 0xC0) {
+      expected = 2;
+    } else if ((lead & 0xF0) == 0xE0) {
+      expected = 3;
+    } else if ((lead & 0xF8) == 0xF0) {
+      expected = 4;
+    } else {
+      pos++;
+      lastComplete = pos;
+      continue;
+    }
+
+    if (pos + expected > length) {
+      break;
+    }
+
+    bool valid = true;
+    for (size_t i = 1; i < expected; ++i) {
+      if ((text[pos + i] & 0xC0) != 0x80) {
+        valid = false;
+        break;
+      }
+    }
+
+    pos += valid ? expected : 1;
+    lastComplete = pos;
+  }
+  return lastComplete;
+}
+
+void collectUtf8Boundaries(const std::string& line, std::vector<uint16_t>& boundaries, unsigned long& lastYieldMs) {
+  boundaries.clear();
+  boundaries.reserve(line.size());
+
+  size_t pos = 0;
+  while (pos < line.size()) {
+    const size_t step = std::max<size_t>(utf8BoundaryStep(line.data(), line.size(), pos), 1);
+    pos = std::min(pos + step, line.size());
+    boundaries.push_back(static_cast<uint16_t>(pos));
+    yieldDuringIndexing(lastYieldMs);
+  }
+}
+
+size_t firstBoundaryAfter(const std::vector<uint16_t>& boundaries, const size_t bytePos) {
+  const auto it = std::upper_bound(boundaries.begin(), boundaries.end(), bytePos);
+  return static_cast<size_t>(it - boundaries.begin());
+}
+
+bool prefixFitsViewport(const GfxRenderer& renderer, const int fontId, const char* text, const size_t length,
+                        const int maxWidth, std::string& scratch) {
+  if (text == nullptr || length == 0) {
+    return true;
+  }
+  if (maxWidth <= 0) {
+    return false;
+  }
+
+  scratch.assign(text, length);
+  return renderer.getTextWidth(fontId, scratch.c_str()) <= maxWidth;
+}
+
+size_t longestFittingPrefixBytes(const GfxRenderer& renderer, const int fontId, const std::string& line,
+                                 const size_t startByte, const std::vector<uint16_t>& boundaries, const int maxWidth,
+                                 std::string& scratch, unsigned long& lastYieldMs) {
+  size_t low = firstBoundaryAfter(boundaries, startByte);
+  size_t high = boundaries.size();
+  size_t best = 0;
+
+  while (low < high) {
+    const size_t mid = low + (high - low) / 2;
+    const size_t prefixBytes = static_cast<size_t>(boundaries[mid]) - startByte;
+    if (prefixFitsViewport(renderer, fontId, line.data() + startByte, prefixBytes, maxWidth, scratch)) {
+      best = prefixBytes;
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+    yieldDuringIndexing(lastYieldMs);
+  }
+
+  return best;
+}
+
+size_t lastSpaceBreakInPrefix(const std::string& line, const size_t startByte, const size_t prefixBytes) {
+  const size_t endByte = std::min(startByte + prefixBytes, line.size());
+  for (size_t pos = endByte; pos > startByte + 1; --pos) {
+    if (line[pos - 1] == ' ') {
+      return pos - 1;
+    }
+  }
+  return std::string::npos;
+}
+
+struct WrapBreak {
+  size_t visibleBytes;
+  size_t consumeBytes;
+};
+
+WrapBreak findWrapBreak(const GfxRenderer& renderer, const int fontId, const std::string& line, const size_t startByte,
+                        const std::vector<uint16_t>& boundaries, const int maxWidth, std::string& scratch,
+                        unsigned long& lastYieldMs) {
+  const size_t boundaryIndex = firstBoundaryAfter(boundaries, startByte);
+  if (boundaryIndex >= boundaries.size()) {
+    return {0, 0};
+  }
+
+  size_t fitBytes =
+      longestFittingPrefixBytes(renderer, fontId, line, startByte, boundaries, maxWidth, scratch, lastYieldMs);
+  if (fitBytes == 0) {
+    fitBytes = static_cast<size_t>(boundaries[boundaryIndex]) - startByte;
+  }
+
+  const size_t remainingBytes = line.size() - startByte;
+  if (fitBytes >= remainingBytes) {
+    return {remainingBytes, remainingBytes};
+  }
+
+  size_t visibleBytes = fitBytes;
+  size_t consumeBytes = fitBytes;
+  const size_t spaceBreak = lastSpaceBreakInPrefix(line, startByte, fitBytes);
+  if (spaceBreak != std::string::npos) {
+    visibleBytes = spaceBreak - startByte;
+    consumeBytes = visibleBytes + 1;
+  } else if (startByte + consumeBytes < line.size() && line[startByte + consumeBytes] == ' ') {
+    consumeBytes++;
+  }
+
+  if (visibleBytes == 0) {
+    visibleBytes = static_cast<size_t>(boundaries[boundaryIndex]) - startByte;
+    consumeBytes = std::max(visibleBytes, consumeBytes);
+  }
+
+  return {visibleBytes, std::max<size_t>(consumeBytes, visibleBytes)};
+}
+
+int currentReaderFontId(GfxRenderer& renderer) {
+  if (SETTINGS.fontFamily == CrossPointSettings::NOTOSANS_TC) {
+    const int previousFontId = StorageFontRegistry::getCurrentTraditionalChineseFontId();
+    StorageFontRegistry::loadTraditionalChineseFont(renderer, SETTINGS.fontSize);
+    if (StorageFontRegistry::getCurrentTraditionalChineseFontId() != previousFontId) {
+      updateUiFontMapping();
+    }
+  }
+  return SETTINGS.getReaderFontId();
 }
 }  // namespace
 
@@ -156,7 +369,7 @@ void TxtReaderActivity::initializeReader() {
   }
 
   // Store current settings for cache validation
-  cachedFontId = SETTINGS.getReaderFontId();
+  cachedFontId = currentReaderFontId(renderer);
   cachedScreenMargin = SETTINGS.screenMargin;
   cachedParagraphAlignment = SETTINGS.paragraphAlignment;
 
@@ -218,14 +431,18 @@ void TxtReaderActivity::buildPageIndex() {
   size_t offset = 0;
   const size_t fileSize = txt->getFileSize();
   bool buildOk = true;
+  unsigned long lastYieldMs = millis();
 
   LOG_DBG("TRS", "Building page index for %zu bytes...", fileSize);
+  logTxtIndexMemory("build_begin", offset, totalPages, fileSize);
 
   GUI.drawPopup(renderer, tr(STR_INDEXING));
 
   while (offset < fileSize) {
     std::vector<std::string> tempLines;
     size_t nextOffset = offset;
+
+    yieldDuringIndexing(lastYieldMs);
 
     if (!loadPageAtOffset(offset, tempLines, nextOffset)) {
       buildOk = false;
@@ -242,7 +459,9 @@ void TxtReaderActivity::buildPageIndex() {
     totalPages++;
 
     if (nextOffset <= offset) {
-      // No progress made, avoid infinite loop
+      // 分页未推进时放弃本轮 cache，避免保存截断或重复 offset。
+      buildOk = false;
+      LOG_ERR("TRS", "Page index made no progress at offset %zu", offset);
       break;
     }
 
@@ -250,11 +469,14 @@ void TxtReaderActivity::buildPageIndex() {
 
     // Yield to other tasks periodically
     if (totalPages % 20 == 0) {
+      logTxtIndexMemory("build_progress", offset, totalPages, fileSize);
       vTaskDelay(1);
+      lastYieldMs = millis();
     }
   }
 
   if (!buildOk || totalPages <= 0) {
+    logTxtIndexMemory("build_failed", offset, totalPages, fileSize);
     totalPages = 0;
     f.close();
     removeIfExists(tempCachePath);
@@ -283,11 +505,13 @@ void TxtReaderActivity::buildPageIndex() {
 
   // 通过 backup 回滚避免“旧 cache 已删但新 cache promote 失败”的窗口。
   if (!promoteIndexCacheFile(tempCachePath, cachePath, backupCachePath)) {
+    logTxtIndexMemory("build_promote_failed", offset, totalPages, fileSize);
     totalPages = 0;
     removeIfExists(tempCachePath);
     return;
   }
 
+  logTxtIndexMemory("build_end", offset, totalPages, fileSize);
   LOG_DBG("TRS", "Built page index: %d pages", totalPages);
 }
 
@@ -315,11 +539,15 @@ bool TxtReaderActivity::loadPageAtOffset(size_t offset, std::vector<std::string>
 
   // Parse lines from buffer
   size_t pos = 0;
+  unsigned long lastYieldMs = millis();
+  std::vector<uint16_t> lineBoundaries;
+  std::string widthScratch;
 
   while (pos < chunkSize && static_cast<int>(outLines.size()) < linesPerPage) {
     // Find end of line
     size_t lineEnd = pos;
     while (lineEnd < chunkSize && buffer[lineEnd] != '\n') {
+      yieldDuringIndexing(lastYieldMs);
       lineEnd++;
     }
 
@@ -337,60 +565,48 @@ bool TxtReaderActivity::loadPageAtOffset(size_t offset, std::vector<std::string>
     // Check for carriage return
     bool hasCR = (lineContentLen > 0 && buffer[pos + lineContentLen - 1] == '\r');
     size_t displayLen = hasCR ? lineContentLen - 1 : lineContentLen;
+    if (!lineComplete) {
+      displayLen = completeUtf8PrefixLength(buffer + pos, displayLen);
+    }
 
     // Extract line content for display (without CR/LF)
     std::string line(reinterpret_cast<char*>(buffer + pos), displayLen);
 
     // Track position within this source line (in bytes from pos)
     size_t lineBytePos = 0;
+    widthScratch.reserve(line.size());
+    collectUtf8Boundaries(line, lineBoundaries, lastYieldMs);
 
     // Word wrap if needed
-    while (!line.empty() && static_cast<int>(outLines.size()) < linesPerPage) {
-      int lineWidth = renderer.getTextWidth(cachedFontId, line.c_str());
+    while (lineBytePos < displayLen && static_cast<int>(outLines.size()) < linesPerPage) {
+      yieldDuringIndexing(lastYieldMs);
+      const char* remainingLine = line.data() + lineBytePos;
+      const size_t remainingBytes = displayLen - lineBytePos;
 
-      if (lineWidth <= viewportWidth) {
-        outLines.push_back(line);
+      if (remainingBytes <= kDirectFitCheckMaxBytes &&
+          prefixFitsViewport(renderer, cachedFontId, remainingLine, remainingBytes, viewportWidth, widthScratch)) {
+        outLines.emplace_back(remainingLine, remainingBytes);
         lineBytePos = displayLen;  // Consumed entire display content
-        line.clear();
         break;
       }
 
-      // Find break point
-      size_t breakPos = line.length();
-      while (breakPos > 0 && renderer.getTextWidth(cachedFontId, line.substr(0, breakPos).c_str()) > viewportWidth) {
-        // Try to break at space
-        size_t spacePos = line.rfind(' ', breakPos - 1);
-        if (spacePos != std::string::npos && spacePos > 0) {
-          breakPos = spacePos;
-        } else {
-          // Break at character boundary for UTF-8
-          breakPos--;
-          // Make sure we don't break in the middle of a UTF-8 sequence
-          while (breakPos > 0 && (line[breakPos] & 0xC0) == 0x80) {
-            breakPos--;
-          }
-        }
+      const WrapBreak wrapBreak = findWrapBreak(renderer, cachedFontId, line, lineBytePos, lineBoundaries,
+                                                viewportWidth, widthScratch, lastYieldMs);
+      const size_t visibleBytes = std::min(wrapBreak.visibleBytes, remainingBytes);
+      const size_t consumeBytes = std::min(std::max(wrapBreak.consumeBytes, visibleBytes), remainingBytes);
+
+      if (visibleBytes == 0 || consumeBytes == 0) {
+        break;
       }
 
-      if (breakPos == 0) {
-        breakPos = 1;
-      }
-
-      outLines.push_back(line.substr(0, breakPos));
-
-      // Skip space at break point
-      size_t skipChars = breakPos;
-      if (breakPos < line.length() && line[breakPos] == ' ') {
-        skipChars++;
-      }
-      lineBytePos += skipChars;
-      line = line.substr(skipChars);
+      outLines.emplace_back(remainingLine, visibleBytes);
+      lineBytePos += consumeBytes;
     }
 
     // Determine how much of the source buffer we consumed
-    if (line.empty()) {
-      // Fully consumed this source line, move past the newline
-      pos = lineEnd + 1;
+    if (lineBytePos >= displayLen) {
+      // 已消耗完整源行；未完整读入的长行只推进到安全 UTF-8 边界。
+      pos = lineComplete ? lineEnd + 1 : pos + lineBytePos;
     } else {
       // Partially consumed - page is full mid-line
       // Move pos to where we stopped in the line (NOT past the line)

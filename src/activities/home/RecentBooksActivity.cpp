@@ -26,7 +26,7 @@ constexpr int kCoverRadius = 3;
 constexpr int kHomeCoverFallbackHeight = 400;
 constexpr int kProgressBarHeight = 5;
 constexpr uint32_t TXT_INDEX_CACHE_MAGIC = 0x54585449;  // "TXTI"
-constexpr uint8_t TXT_INDEX_CACHE_VERSION = 2;
+constexpr uint8_t TXT_INDEX_CACHE_VERSION = 3;
 
 std::string fileNameForPath(const std::string& path) {
   const size_t slash = path.find_last_of('/');
@@ -91,9 +91,8 @@ RecentBookProgress RecentBooksActivity::loadProgressForBook(const RecentBook& bo
 
     const float chapterProgress =
         pageCount > 0 ? std::min(1.0f, static_cast<float>(page + 1) / static_cast<float>(pageCount)) : 0.0f;
-    progress.percent = clampProgressPercent(static_cast<int>(epub.calculateProgress(spineIndex, chapterProgress) *
-                                                             100.0f +
-                                                             0.5f));
+    progress.percent =
+        clampProgressPercent(static_cast<int>(epub.calculateProgress(spineIndex, chapterProgress) * 100.0f + 0.5f));
     progress.currentPage = page + 1;
     progress.totalPages = pageCount;
     progress.available = true;

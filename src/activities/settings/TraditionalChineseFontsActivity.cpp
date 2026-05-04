@@ -4,6 +4,7 @@
 #include <I18n.h>
 
 #include <string>
+#include <vector>
 
 #include "StorageFontRegistry.h"
 #include "components/UITheme.h"
@@ -11,10 +12,22 @@
 #include "util/TouchHitTest.h"
 
 namespace {
-size_t reloadRowIndex() { return StorageFontRegistry::getTraditionalChineseFontPacks().size(); }
+std::vector<const TraditionalChineseFontPackInfo*> loadablePacks() {
+  std::vector<const TraditionalChineseFontPackInfo*> packs;
+  const auto& allPacks = StorageFontRegistry::getTraditionalChineseFontPacks();
+  packs.reserve(allPacks.size());
+  for (const auto& pack : allPacks) {
+    if (StorageFontRegistry::isTraditionalChineseFontLoadSupportedById(pack.fontId)) {
+      packs.push_back(&pack);
+    }
+  }
+  return packs;
+}
+
+size_t reloadRowIndex() { return loadablePacks().size(); }
 
 std::string loadedSummary() {
-  const auto total = StorageFontRegistry::getTraditionalChineseFontPacks().size();
+  const auto total = loadablePacks().size();
   const auto loaded = StorageFontRegistry::countLoadedTraditionalChineseFonts();
   return std::to_string(loaded) + "/" + std::to_string(total);
 }
@@ -107,6 +120,14 @@ void TraditionalChineseFontsActivity::loop() {
 #include "../../ui_font_manager.h"
 
 void TraditionalChineseFontsActivity::handleSelection() {
+  const auto packs = loadablePacks();
+  if (selectedIndex < packs.size()) {
+    StorageFontRegistry::loadTraditionalChineseFontById(renderer, packs[selectedIndex]->fontId);
+    updateUiFontMapping();
+    requestUpdate();
+    return;
+  }
+
   if (selectedIndex != reloadRowIndex()) {
     return;
   }
@@ -122,7 +143,7 @@ void TraditionalChineseFontsActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
-  const auto& packs = StorageFontRegistry::getTraditionalChineseFontPacks();
+  const auto packs = loadablePacks();
   const auto itemCount = static_cast<int>(packs.size() + 1);
   const std::string summary = loadedSummary();
 
@@ -135,20 +156,20 @@ void TraditionalChineseFontsActivity::render(RenderLock&&) {
       renderer, Rect{0, contentTop, pageWidth, contentHeight}, itemCount, static_cast<int>(selectedIndex),
       [&packs](int index) {
         if (index < static_cast<int>(packs.size())) {
-          return std::string(packs[static_cast<size_t>(index)].name);
+          return std::string(packs[static_cast<size_t>(index)]->name);
         }
         return std::string(tr(STR_RELOAD_PACKS));
       },
       [&packs](int index) {
         if (index < static_cast<int>(packs.size())) {
-          return std::string(packs[static_cast<size_t>(index)].path);
+          return std::string(packs[static_cast<size_t>(index)]->path);
         }
         return std::string("/.mofei/fonts");
       },
       nullptr,
       [&packs](int index) {
         if (index < static_cast<int>(packs.size())) {
-          return packStatus(packs[static_cast<size_t>(index)]);
+          return packStatus(*packs[static_cast<size_t>(index)]);
         }
         return loadedSummary();
       },

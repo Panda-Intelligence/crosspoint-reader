@@ -1,5 +1,8 @@
 #include "MappedInputManager.h"
 
+#include <GfxRenderer.h>
+#include <Logging.h>
+
 #include "CrossPointSettings.h"
 #include "util/TouchHitTest.h"
 
@@ -16,6 +19,26 @@ constexpr SideLayoutMap kSideLayouts[] = {
     {HalGPIO::BTN_UP, HalGPIO::BTN_DOWN},
     {HalGPIO::BTN_DOWN, HalGPIO::BTN_UP},
 };
+
+#if MOFEI_TOUCH_DEBUG
+const char* touchTypeName(const InputTouchEvent::Type type) {
+  switch (type) {
+    case InputTouchEvent::Type::Tap:
+      return "tap";
+    case InputTouchEvent::Type::SwipeLeft:
+      return "swipe_left";
+    case InputTouchEvent::Type::SwipeRight:
+      return "swipe_right";
+    case InputTouchEvent::Type::SwipeUp:
+      return "swipe_up";
+    case InputTouchEvent::Type::SwipeDown:
+      return "swipe_down";
+    case InputTouchEvent::Type::None:
+    default:
+      return "none";
+  }
+}
+#endif
 }  // namespace
 
 bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint8_t) const) const {
@@ -74,9 +97,28 @@ bool MappedInputManager::consumeTouchEvent(InputTouchEvent* outEvent, const GfxR
   if (!consumeTouchEvent(&event)) {
     return false;
   }
+  const auto oriented = TouchHitTest::eventForRendererOrientation(event, renderer);
   if (outEvent != nullptr) {
-    *outEvent = TouchHitTest::eventForRendererOrientation(event, renderer);
+    *outEvent = oriented;
   }
+#if MOFEI_TOUCH_DEBUG
+  // Build-flag-gated touch tracer. Enable with `-DMOFEI_TOUCH_DEBUG=1` to dump
+  // raw/oriented coordinates plus gesture mapping for every consumed touch.
+#if MOFEI_DEVICE
+  uint8_t hintButton = 0;
+  const bool hintMapped =
+      oriented.isTap() && gpio.mapMofeiButtonHintTapToButton(oriented.sourceX(), oriented.sourceY(), &hintButton);
+#else
+  const bool hintMapped = false;
+  const uint8_t hintButton = 255;
+#endif
+  LOG_INF(
+      "TOUCHDBG",
+      "raw_type=%s oriented_type=%s raw=(%u,%u) oriented=(%u,%u) screen=%dx%d orient=%d hintMapped=%d hintButton=%u",
+      touchTypeName(event.type), touchTypeName(oriented.type), event.x, event.y, oriented.x, oriented.y,
+      renderer.getScreenWidth(), renderer.getScreenHeight(), static_cast<int>(renderer.getOrientation()),
+      hintMapped ? 1 : 0, hintMapped ? hintButton : 255);
+#endif
   return true;
 }
 

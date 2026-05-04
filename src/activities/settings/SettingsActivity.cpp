@@ -3,6 +3,8 @@
 #include <GfxRenderer.h>
 #include <Logging.h>
 
+#include <algorithm>
+
 #include "ButtonRemapActivity.h"
 #include "ClearCacheActivity.h"
 #include "CrossPointSettings.h"
@@ -27,7 +29,8 @@ const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_DIS
 
 namespace {
 std::string traditionalChineseFontStatus() {
-  if (StorageFontRegistry::isTraditionalChineseFontLoaded(SETTINGS.fontSize)) {
+  const auto* selectedPack = StorageFontRegistry::getTraditionalChineseFontPack(SETTINGS.fontSize);
+  if (selectedPack != nullptr && StorageFontRegistry::getCurrentTraditionalChineseFontId() == selectedPack->fontId) {
     return tr(STR_LOADED);
   }
   if (StorageFontRegistry::isTraditionalChineseFontInstalled(SETTINGS.fontSize)) {
@@ -51,8 +54,11 @@ std::string readerFontValueText(const SettingInfo& setting) {
 }
 
 std::string tcFontPackSummary() {
-  return std::to_string(StorageFontRegistry::countLoadedTraditionalChineseFonts()) + "/" +
-         std::to_string(StorageFontRegistry::getTraditionalChineseFontPacks().size());
+  const auto& packs = StorageFontRegistry::getTraditionalChineseFontPacks();
+  const auto supported = std::count_if(packs.begin(), packs.end(), [](const TraditionalChineseFontPackInfo& pack) {
+    return StorageFontRegistry::isTraditionalChineseFontLoadSupportedById(pack.fontId);
+  });
+  return std::to_string(StorageFontRegistry::countLoadedTraditionalChineseFonts()) + "/" + std::to_string(supported);
 }
 
 int categoryIndexAt(const GfxRenderer& renderer, const Rect& tabRect, uint16_t x, uint16_t y,

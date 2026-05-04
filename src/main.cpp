@@ -10,9 +10,12 @@
 #include <I18n.h>
 #include <Logging.h>
 #include <SPI.h>
+#include <Txt.h>
 #include <builtinFonts/all.h>
 
+#include <array>
 #include <cstring>
+#include <string>
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
@@ -29,6 +32,34 @@
 #include "fontIds.h"
 #include "util/ButtonNavigator.h"
 #include "util/ScreenshotUtil.h"
+
+namespace {
+constexpr char kSerialCommandPrefix[] = "CMD:";
+constexpr char kSerialScreenshotCommand[] = "SCREENSHOT";
+constexpr char kSerialOpenReaderCommandPrefix[] = "OPEN_READER:";
+constexpr char kSerialReindexTxtCommandPrefix[] = "REINDEX_TXT:";
+constexpr size_t kSerialCommandPrefixLength = sizeof(kSerialCommandPrefix) - 1;
+constexpr size_t kSerialOpenReaderCommandPrefixLength = sizeof(kSerialOpenReaderCommandPrefix) - 1;
+constexpr size_t kSerialReindexTxtCommandPrefixLength = sizeof(kSerialReindexTxtCommandPrefix) - 1;
+constexpr char kTxtCacheBasePath[] = "/.crosspoint";
+constexpr char kTxtIndexCacheFileName[] = "/index.bin";
+constexpr char kTxtIndexCacheTempFileName[] = "/index.bin.tmp";
+constexpr char kTxtIndexCacheBackupFileName[] = "/index.bin.bak";
+
+void removeTxtIndexCacheForPath(const char* path) {
+  Txt txt(path != nullptr ? std::string(path) : std::string(), kTxtCacheBasePath);
+  const std::string cachePath = txt.getCachePath();
+  const std::array<const char*, 3> files = {kTxtIndexCacheFileName, kTxtIndexCacheTempFileName,
+                                            kTxtIndexCacheBackupFileName};
+  for (const auto* file : files) {
+    const std::string fullPath = cachePath + file;
+    if (Storage.exists(fullPath.c_str())) {
+      Storage.remove(fullPath.c_str());
+      LOG_INF("MAIN", "Removed TXT index cache: %s", fullPath.c_str());
+    }
+  }
+}
+}  // namespace
 
 MappedInputManager mappedInputManager(gpio);
 GfxRenderer renderer(display);
@@ -203,26 +234,17 @@ void updateUiFontMapping() {
   LOG_INF("UIFONT", "updateUiFontMapping() called. Language: %d", static_cast<int>(lang));
 
   if (lang == Language::ZH_CN || lang == Language::ZH_TW) {
-    const bool tc8Loaded = StorageFontRegistry::isTraditionalChineseFontLoadedById(NOTOSANS_TC_8_FONT_ID);
-    const bool tc10Loaded = StorageFontRegistry::isTraditionalChineseFontLoadedById(NOTOSANS_TC_10_FONT_ID);
-    const bool tc12Loaded = StorageFontRegistry::isTraditionalChineseFontLoaded(CrossPointSettings::SMALL);
-    LOG_INF("UIFONT", "TC UI fonts loaded: 8pt=%d, 10pt=%d, 12pt=%d", tc8Loaded, tc10Loaded, tc12Loaded);
+    const int currentTcFontId = StorageFontRegistry::getCurrentTraditionalChineseFontId();
+    LOG_INF("UIFONT", "Current TC UI font id: %d", currentTcFontId);
 
     const auto& fontMap = renderer.getFontMap();
-    auto uiFont = tc10Loaded ? fontMap.find(NOTOSANS_TC_10_FONT_ID) : fontMap.end();
-    const char* uiFontLabel = "TC 10pt";
-
-    if (uiFont == fontMap.end()) {
-      uiFont = tc12Loaded ? fontMap.find(NOTOSANS_TC_12_FONT_ID) : fontMap.end();
-      uiFontLabel = "TC 12pt fallback";
-    }
+    const auto uiFont = currentTcFontId != 0 ? fontMap.find(currentTcFontId) : fontMap.end();
 
     if (uiFont != fontMap.end()) {
-      auto smallUiFont = tc8Loaded ? fontMap.find(NOTOSANS_TC_8_FONT_ID) : uiFont;
       renderer.insertFont(UI_12_FONT_ID, uiFont->second);
       renderer.insertFont(UI_10_FONT_ID, uiFont->second);
-      renderer.insertFont(SMALL_FONT_ID, smallUiFont->second);
-      LOG_INF("UIFONT", "UI strip remapped. UI: %s, Small: %s", uiFontLabel, tc8Loaded ? "TC 8pt" : uiFontLabel);
+      renderer.insertFont(SMALL_FONT_ID, uiFont->second);
+      LOG_INF("UIFONT", "UI strip remapped to current TC font id %d", currentTcFontId);
       UITheme::getInstance().reload();
       return;
     }
@@ -391,15 +413,30 @@ void loop() {
   // nb: we use logSerial from logging to avoid deprecation warnings
   if (logSerial.available() > 0) {
     String line = logSerial.readStringUntil('\n');
-    if (line.startsWith("CMD:")) {
-      String cmd = line.substring(4);
+    if (line.startsWith(kSerialCommandPrefix)) {
+      String cmd = line.substring(kSerialCommandPrefixLength);
       cmd.trim();
-      if (cmd == "SCREENSHOT") {
+      if (cmd == kSerialScreenshotCommand) {
         const uint32_t bufferSize = display.getBufferSize();
         logSerial.printf("SCREENSHOT_START:%d\n", bufferSize);
         uint8_t* buf = display.getFrameBuffer();
         logSerial.write(buf, bufferSize);
         logSerial.printf("SCREENSHOT_END\n");
+      } else if (cmd.startsWith(kSerialOpenReaderCommandPrefix)) {
+        String path = cmd.substring(kSerialOpenReaderCommandPrefixLength);
+        path.trim();
+        if (!path.isEmpty()) {
+          LOG_INF("MAIN", "Serial command opening reader path: %s", path.c_str());
+          activityManager.goToReader(path.c_str());
+        }
+      } else if (cmd.startsWith(kSerialReindexTxtCommandPrefix)) {
+        String path = cmd.substring(kSerialReindexTxtCommandPrefixLength);
+        path.trim();
+        if (!path.isEmpty()) {
+          removeTxtIndexCacheForPath(path.c_str());
+          LOG_INF("MAIN", "Serial command reindexing TXT path: %s", path.c_str());
+          activityManager.goToReader(path.c_str());
+        }
       }
     }
   }

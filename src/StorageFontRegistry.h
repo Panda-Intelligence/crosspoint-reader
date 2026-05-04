@@ -61,6 +61,10 @@ const TraditionalChineseFontFaceInfo* getTraditionalChineseFontFace(uint8_t font
 const TraditionalChineseFontPackInfo* getTraditionalChineseFontPackById(int fontId);
 const TraditionalChineseFontFaceInfo* getTraditionalChineseFontFaceById(int fontId, EpdFontFamily::Style style);
 bool loadTraditionalChineseFonts(GfxRenderer& renderer);
+bool loadTraditionalChineseFont(GfxRenderer& renderer, uint8_t fontSize);
+bool loadTraditionalChineseFontById(GfxRenderer& renderer, int fontId);
+int getCurrentTraditionalChineseFontId();
+bool isTraditionalChineseFontLoadSupportedById(int fontId);
 bool isTraditionalChineseFontInstalled(uint8_t fontSize);
 bool isTraditionalChineseFontFaceInstalled(uint8_t fontSize, EpdFontFamily::Style style);
 bool isTraditionalChineseFontInstalledById(int fontId);

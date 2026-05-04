@@ -346,20 +346,9 @@ int CrossPointSettings::getReaderFontId() const {
           return OPENDYSLEXIC_14_FONT_ID;
       }
     case NOTOSANS_TC:
-      if (fontSize == EXTRA_SMALL && StorageFontRegistry::isTraditionalChineseFontLoaded(EXTRA_SMALL)) {
-        return NOTOSANS_TC_8_FONT_ID;
+      if (const int currentFontId = StorageFontRegistry::getCurrentTraditionalChineseFontId()) {
+        return currentFontId;
       }
-      if (fontSize == SMALL && StorageFontRegistry::isTraditionalChineseFontLoaded(SMALL))
-        return NOTOSANS_TC_12_FONT_ID;
-      if (fontSize == MEDIUM && StorageFontRegistry::isTraditionalChineseFontLoaded(MEDIUM))
-        return NOTOSANS_TC_14_FONT_ID;
-      if (fontSize == LARGE && StorageFontRegistry::isTraditionalChineseFontLoaded(LARGE))
-        return NOTOSANS_TC_16_FONT_ID;
-      if (fontSize == EXTRA_LARGE && StorageFontRegistry::isTraditionalChineseFontLoaded(EXTRA_LARGE))
-        return NOTOSANS_TC_18_FONT_ID;
-
-      // Fallback: if any TC font is requested but only 12pt is loaded, use 12pt so we don't get blank text.
-      if (StorageFontRegistry::isTraditionalChineseFontLoaded(SMALL)) return NOTOSANS_TC_12_FONT_ID;
 
       // Ultimate fallback to English-only fonts
       switch (fontSize) {
