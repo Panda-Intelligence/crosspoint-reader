@@ -78,3 +78,37 @@ P0 touch-coordinate misalignment task closed without code fix. Captured 4 dashbo
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: P1 dashboard icons — fix 5 misaligned shortcut icons (Bootstrap Icons)
+
+**Date**: 2026-05-04
+**Task**: P1 dashboard icons — fix 5 misaligned shortcut icons (Bootstrap Icons)
+**Package**: open-x4-sdk
+**Branch**: `feat/murphy`
+
+### Summary
+
+P1 dashboard icon semantics task closed. 5 shortcut icons remapped to new Bootstrap Icons SVGs: WeatherClock→cloud-sun (was Recent/clock), Today→calendar3 (was Recent dup), RecentReading→bookmark (was Recent triple-dup), ArcadeHub→controller (was Hotspot wifi-style), DesktopHub→grid-3x3-gap (was Folder dup). New scripts/scratch/build_dashboard_icons.py renders SVG via cairosvg, applies 90° CCW rotation so byte layout matches panel's physical 800x480 landscape orientation (drawIcon writes row-major in panel orient; firmware applies +90° CW to display). 10 generated 1-bit byte-array .h files (5 icons × 32+64 px). Visual verification via screenshot after flash; all 9 active shortcuts show distinct, semantically appropriate icons. Build clean, pio check no high defects.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e71e3bd` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

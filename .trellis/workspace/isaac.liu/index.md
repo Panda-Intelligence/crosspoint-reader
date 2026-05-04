@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 2
+- **Total Sessions**: 3
 - **Last Active**: 2026-05-04
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~80 | Active |
+| `journal-1.md` | ~114 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 3 | 2026-05-04 | P1 dashboard icons — fix 5 misaligned shortcut icons (Bootstrap Icons) | `e71e3bd` | `feat/murphy` |
 | 2 | 2026-05-04 | P0 touch coord debug — no defect found, screenshot tool fixed | `8e45639` | `feat/murphy` |
 | 1 | 2026-05-04 | Mofei wishlist: 9-grid dashboard, TC font hot-swap, touch debug | `08307f4`, `b019261`, `1f82a59`, `faca88d`, `77df5cf`, `270e2b5` | `feat/murphy` |
 <!-- @@@/auto:session-history -->
