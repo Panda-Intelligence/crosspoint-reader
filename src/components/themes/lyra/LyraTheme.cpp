@@ -12,19 +12,24 @@
 
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
+#include "components/icons/appgrid.h"
 #include "components/icons/book.h"
 #include "components/icons/book24.h"
+#include "components/icons/bookmark.h"
+#include "components/icons/calendar.h"
 #include "components/icons/cover.h"
 #include "components/icons/file24.h"
 #include "components/icons/folder.h"
 #include "components/icons/folder24.h"
 #include "components/icons/hotspot.h"
 #include "components/icons/image24.h"
+#include "components/icons/joystick.h"
 #include "components/icons/library.h"
 #include "components/icons/recent.h"
 #include "components/icons/settings2.h"
 #include "components/icons/text24.h"
 #include "components/icons/transfer.h"
+#include "components/icons/weather.h"
 #include "components/icons/wifi.h"
 #include "fontIds.h"
 
@@ -99,6 +104,16 @@ const uint8_t* iconForName(UIIcon icon, int size) {
         return WifiIcon;
       case UIIcon::Hotspot:
         return HotspotIcon;
+      case UIIcon::Weather:
+        return WeatherIcon;
+      case UIIcon::Calendar:
+        return CalendarIcon;
+      case UIIcon::Bookmark:
+        return BookmarkIcon;
+      case UIIcon::Joystick:
+        return JoystickIcon;
+      case UIIcon::AppGrid:
+        return AppGridIcon;
       default:
         return nullptr;
     }

@@ -14,13 +14,18 @@
 #include "DesktopSummaryStore.h"
 #include "StudyStateStore.h"
 #include "components/UITheme.h"
+#include "components/icons/appgrid64.h"
 #include "components/icons/book64.h"
+#include "components/icons/bookmark64.h"
+#include "components/icons/calendar64.h"
 #include "components/icons/folder64.h"
 #include "components/icons/hotspot64.h"
+#include "components/icons/joystick64.h"
 #include "components/icons/library64.h"
 #include "components/icons/recent64.h"
 #include "components/icons/settings2_64.h"
 #include "components/icons/transfer64.h"
+#include "components/icons/weather64.h"
 #include "components/icons/wifi64.h"
 #include "fontIds.h"
 #include "util/ButtonNavigator.h"
@@ -106,6 +111,16 @@ const uint8_t* iconBitmap64ForName(const UIIcon icon) {
       return Wifi64Icon;
     case UIIcon::Hotspot:
       return Hotspot64Icon;
+    case UIIcon::Weather:
+      return Weather64Icon;
+    case UIIcon::Calendar:
+      return Calendar64Icon;
+    case UIIcon::Bookmark:
+      return Bookmark64Icon;
+    case UIIcon::Joystick:
+      return Joystick64Icon;
+    case UIIcon::AppGrid:
+      return AppGrid64Icon;
     case UIIcon::Text:
     case UIIcon::Image:
     case UIIcon::File:

@@ -70,7 +70,26 @@ struct ThemeMetrics {
   int keyboardKeyCornerRadius;
 };
 
-enum UIIcon { Folder, Text, Image, Book, File, Recent, Settings, Transfer, Library, Wifi, Hotspot };
+enum UIIcon {
+  Folder,
+  Text,
+  Image,
+  Book,
+  File,
+  Recent,
+  Settings,
+  Transfer,
+  Library,
+  Wifi,
+  Hotspot,
+  // Dashboard semantic icons (added 2026-05-04 to fix duplicate-clock and
+  // wrong-glyph mappings on Mofei Dashboard).
+  Weather,
+  Calendar,
+  Bookmark,
+  Joystick,
+  AppGrid,
+};
 
 enum class KeyboardKeyType { Normal, Shift, Mode, Space, Del, Ok, Disabled };
 

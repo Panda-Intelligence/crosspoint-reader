@@ -17,3 +17,5 @@ build
 *.local*
 firmware_V618_E426_TOUCH.bin
 screenshot.bmp
+.trellis/tasks/05-04-05-06-dashboard-icon-semantics/research
+scripts/scratch/bootstrap-icons-1.11.3
