@@ -3,6 +3,7 @@
 #include <FontCacheManager.h>
 #include <HalGPIO.h>
 #include <I18n.h>
+#include <Logging.h>
 #include <Utf8.h>
 
 #include <algorithm>
@@ -48,6 +49,34 @@ CrossPointSettings::DASHBOARD_LAYOUT dashboardLayoutMode() {
 bool dashboardUsesListLayout() { return dashboardLayoutMode() == CrossPointSettings::DASHBOARD_LAYOUT_LIST; }
 
 bool dashboardUsesIosGridLayout() { return dashboardLayoutMode() == CrossPointSettings::DASHBOARD_LAYOUT_IOS_GRID; }
+
+#if MOFEI_TOUCH_DEBUG
+const char* dashboardLayoutName() {
+  switch (dashboardLayoutMode()) {
+    case CrossPointSettings::DASHBOARD_LAYOUT_LIST:
+      return "list";
+    case CrossPointSettings::DASHBOARD_LAYOUT_GRID:
+      return "grid";
+    case CrossPointSettings::DASHBOARD_LAYOUT_IOS_GRID:
+      return "ios-grid";
+    case CrossPointSettings::DASHBOARD_LAYOUT_COUNT:
+    default:
+      return "unknown";
+  }
+}
+
+void logDashboardTouchHit(const InputTouchEvent& event, const char* target, const int index, const Rect& rect) {
+  LOG_INF("TOUCHDBG", "dashboard_hit layout=%s target=%s index=%d raw=(%u,%u) oriented=(%u,%u) rect=(%d,%d,%d,%d)",
+          dashboardLayoutName(), target, index, event.sourceX(), event.sourceY(), event.x, event.y, rect.x, rect.y,
+          rect.width, rect.height);
+}
+
+void logDashboardTouchMiss(const InputTouchEvent& event, const int itemCount, const Rect& customizeRect) {
+  LOG_INF("TOUCHDBG", "dashboard_miss layout=%s raw=(%u,%u) oriented=(%u,%u) items=%d customize=(%d,%d,%d,%d)",
+          dashboardLayoutName(), event.sourceX(), event.sourceY(), event.x, event.y, itemCount, customizeRect.x,
+          customizeRect.y, customizeRect.width, customizeRect.height);
+}
+#endif
 
 std::string formatDashboardValue(const StrId id, const int value) {
   char buffer[64];
@@ -423,6 +452,9 @@ void DashboardActivity::loop() {
         if (TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, cellRects[idx])) {
           mappedInput.suppressTouchButtonFallback();
           selectedIndex = idx;
+#if MOFEI_TOUCH_DEBUG
+          logDashboardTouchHit(touchEvent, "shortcut", idx, cellRects[idx]);
+#endif
           openCurrentSelection();
           return;
         }
@@ -430,6 +462,9 @@ void DashboardActivity::loop() {
       if (TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, cellRects[customizeIndex()])) {
         mappedInput.suppressTouchButtonFallback();
         selectedIndex = customizeIndex();
+#if MOFEI_TOUCH_DEBUG
+        logDashboardTouchHit(touchEvent, "customize", customizeIndex(), cellRects[customizeIndex()]);
+#endif
         openCurrentSelection();
         return;
       }
@@ -466,6 +501,9 @@ void DashboardActivity::loop() {
 
       if (!mappedInput.isTouchButtonHintTap(touchEvent)) {
         mappedInput.suppressTouchButtonFallback();
+#if MOFEI_TOUCH_DEBUG
+        logDashboardTouchMiss(touchEvent, itemCount(), cellRects[customizeIndex()]);
+#endif
         return;
       }
     } else {

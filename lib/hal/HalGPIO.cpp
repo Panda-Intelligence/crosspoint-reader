@@ -145,6 +145,47 @@ constexpr TouchButtonHintRect MOFEI_TOUCH_BUTTON_HINT_RECTS[] = {
     {351, 109, HalGPIO::BTN_RIGHT},
 };
 
+#if MOFEI_TOUCH_DEBUG
+const char* mofeiButtonName(const uint8_t buttonIndex) {
+  switch (buttonIndex) {
+    case HalGPIO::BTN_BACK:
+      return "back";
+    case HalGPIO::BTN_CONFIRM:
+      return "confirm";
+    case HalGPIO::BTN_LEFT:
+      return "left";
+    case HalGPIO::BTN_RIGHT:
+      return "right";
+    case HalGPIO::BTN_UP:
+      return "up";
+    case HalGPIO::BTN_DOWN:
+      return "down";
+    case HalGPIO::BTN_POWER:
+      return "power";
+    default:
+      return "unknown";
+  }
+}
+
+const char* touchEventTypeName(const InputTouchEvent::Type type) {
+  switch (type) {
+    case InputTouchEvent::Type::Tap:
+      return "tap";
+    case InputTouchEvent::Type::SwipeLeft:
+      return "swipe-left";
+    case InputTouchEvent::Type::SwipeRight:
+      return "swipe-right";
+    case InputTouchEvent::Type::SwipeUp:
+      return "swipe-up";
+    case InputTouchEvent::Type::SwipeDown:
+      return "swipe-down";
+    case InputTouchEvent::Type::None:
+    default:
+      return "none";
+  }
+}
+#endif
+
 InputTouchEvent toInputTouchEvent(const MofeiTouchDriver::Event& event) {
   InputTouchEvent inputEvent;
   inputEvent.x = event.x;
@@ -315,14 +356,27 @@ bool HalGPIO::mapMofeiButtonHintTapToButton(uint16_t x, uint16_t y, uint8_t* but
     return false;
   }
   if (y < MOFEI_TOUCH_BUTTON_HINT_Y_PX || y >= MOFEI_TOUCH_BUTTON_HINT_Y_PX + MOFEI_TOUCH_BUTTON_HINT_HEIGHT_PX) {
+#if MOFEI_TOUCH_DEBUG
+    LOG_INF("TOUCHDBG", "hint_miss x=%u y=%u hint_y=[%u,%u)", x, y, MOFEI_TOUCH_BUTTON_HINT_Y_PX,
+            MOFEI_TOUCH_BUTTON_HINT_Y_PX + MOFEI_TOUCH_BUTTON_HINT_HEIGHT_PX);
+#endif
     return false;
   }
   for (const auto& rect : MOFEI_TOUCH_BUTTON_HINT_RECTS) {
     if (x >= rect.x && x < rect.x + rect.width) {
       *buttonIndex = rect.button;
+#if MOFEI_TOUCH_DEBUG
+      LOG_INF("TOUCHDBG", "hint_hit x=%u y=%u button=%s rect=[%u,%u)x[%u,%u)", x, y, mofeiButtonName(rect.button),
+              rect.x, rect.x + rect.width, MOFEI_TOUCH_BUTTON_HINT_Y_PX,
+              MOFEI_TOUCH_BUTTON_HINT_Y_PX + MOFEI_TOUCH_BUTTON_HINT_HEIGHT_PX);
+#endif
       return true;
     }
   }
+#if MOFEI_TOUCH_DEBUG
+  LOG_INF("TOUCHDBG", "hint_gap x=%u y=%u hint_y=[%u,%u)", x, y, MOFEI_TOUCH_BUTTON_HINT_Y_PX,
+          MOFEI_TOUCH_BUTTON_HINT_Y_PX + MOFEI_TOUCH_BUTTON_HINT_HEIGHT_PX);
+#endif
   return false;
 }
 
@@ -333,15 +387,31 @@ bool HalGPIO::mapMofeiTouchToButton(const InputTouchEvent& event, uint8_t* butto
   switch (event.type) {
     case InputTouchEvent::Type::SwipeLeft:
       *buttonIndex = BTN_RIGHT;
+#if MOFEI_TOUCH_DEBUG
+      LOG_INF("TOUCHDBG", "fallback event=%s x=%u y=%u button=%s", touchEventTypeName(event.type), event.x, event.y,
+              mofeiButtonName(*buttonIndex));
+#endif
       return true;
     case InputTouchEvent::Type::SwipeRight:
       *buttonIndex = BTN_LEFT;
+#if MOFEI_TOUCH_DEBUG
+      LOG_INF("TOUCHDBG", "fallback event=%s x=%u y=%u button=%s", touchEventTypeName(event.type), event.x, event.y,
+              mofeiButtonName(*buttonIndex));
+#endif
       return true;
     case InputTouchEvent::Type::SwipeUp:
       *buttonIndex = BTN_DOWN;
+#if MOFEI_TOUCH_DEBUG
+      LOG_INF("TOUCHDBG", "fallback event=%s x=%u y=%u button=%s", touchEventTypeName(event.type), event.x, event.y,
+              mofeiButtonName(*buttonIndex));
+#endif
       return true;
     case InputTouchEvent::Type::SwipeDown:
       *buttonIndex = BTN_UP;
+#if MOFEI_TOUCH_DEBUG
+      LOG_INF("TOUCHDBG", "fallback event=%s x=%u y=%u button=%s", touchEventTypeName(event.type), event.x, event.y,
+              mofeiButtonName(*buttonIndex));
+#endif
       return true;
     case InputTouchEvent::Type::Tap:
       break;
@@ -355,6 +425,11 @@ bool HalGPIO::mapMofeiTouchToButton(const InputTouchEvent& event, uint8_t* butto
   }
 
   if (event.y >= MOFEI_TOUCH_LOGICAL_HEIGHT_PX - MOFEI_TOUCH_BOTTOM_ZONE_PX) {
+#if MOFEI_TOUCH_DEBUG
+    LOG_INF("TOUCHDBG", "fallback_bottom_guard event=%s x=%u y=%u bottom_zone_y=[%u,%u)",
+            touchEventTypeName(event.type), event.x, event.y,
+            MOFEI_TOUCH_LOGICAL_HEIGHT_PX - MOFEI_TOUCH_BOTTOM_ZONE_PX, MOFEI_TOUCH_LOGICAL_HEIGHT_PX);
+#endif
     return false;
   }
 
@@ -367,6 +442,11 @@ bool HalGPIO::mapMofeiTouchToButton(const InputTouchEvent& event, uint8_t* butto
   } else {
     *buttonIndex = BTN_CONFIRM;
   }
+#if MOFEI_TOUCH_DEBUG
+  LOG_INF("TOUCHDBG", "fallback_zone event=%s x=%u y=%u button=%s edge=%u thirds=(%u,%u)",
+          touchEventTypeName(event.type), event.x, event.y, mofeiButtonName(*buttonIndex), MOFEI_TOUCH_EDGE_ZONE_PX,
+          MOFEI_TOUCH_LOGICAL_WIDTH_PX / 3, (MOFEI_TOUCH_LOGICAL_WIDTH_PX * 2) / 3);
+#endif
   return true;
 }
 
