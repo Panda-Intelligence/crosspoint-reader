@@ -184,6 +184,27 @@ export default function DeviceScreen() {
         </ThemedView>
       )}
 
+      {/* Library — fonts and OPDS catalogs (only when reachable) */}
+      {ip && status === 'reachable' && (
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle">Library</ThemedText>
+          <TouchableOpacity
+            style={styles.summaryRow}
+            onPress={() => router.push('/fonts')}>
+            <Text style={styles.summaryName}>Font Packs</Text>
+            <Text style={styles.summaryValue}>Manage</Text>
+            <IconSymbol name="chevron.right" size={16} color="#888" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.summaryRow}
+            onPress={() => router.push('/opds')}>
+            <Text style={styles.summaryName}>OPDS Catalogs</Text>
+            <Text style={styles.summaryValue}>Manage</Text>
+            <IconSymbol name="chevron.right" size={16} color="#888" />
+          </TouchableOpacity>
+        </ThemedView>
+      )}
+
       {/* Unbind */}
       {ip && (
         <ThemedView style={styles.section}>
