@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# QEMU build cache (Espressif fork, built by scripts/build-qemu.sh)
+.qemu-cache/
+
+# User-supplied firmware fixtures (binaries are kept out of git)
+firmware-fixtures/*.bin
+firmware-fixtures/*.elf
+!firmware-fixtures/.gitkeep
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -75,9 +75,41 @@ then presented as 2–3 concrete options.
    - M3: FT6336U virtual peripheral, mouse/touch round-trip into firmware.
    - M4: Real `[env:mofei]` `firmware.bin` boots into Dashboard inside simulator.
 
-## Requirements (evolving — will be filled by Q&A)
+## Requirements
 
-* (TBD — populated as Open Questions resolve)
+### Functional
+
+* R1. The simulator runs an unmodified `firmware.bin` produced by `pio run -e mofei`
+  (until M3) and `pio run -e mofei` or a new `[env:mofei_sim]` (M4+, if needed).
+* R2. The simulator binds the FT6336U virtual peripheral to bit-bang I²C on
+  GPIO13 (SDA) / GPIO12 (SCL), responds at 7-bit address `0x2E`, drives INT
+  on GPIO44 active-low, and respects the PWR pin on GPIO45 + RST on GPIO7.
+* R3. The simulator binds the GDEQ0426T82 virtual peripheral (SSD1677 driver)
+  to the SoC's SPI master used by the firmware, with D/C#, CS#, RES#, BUSY,
+  BS1 wired through the GPIO matrix as the firmware drives them.
+* R4. Mouse clicks and arrow-key presses in the Tauri UI inject FT6336U
+  touch frames into the virtual peripheral, indistinguishable to the
+  firmware from a physical FT6336U event.
+* R5. Side-button keypresses (PgUp/PgDn) and Esc inject GPIO level changes
+  through the simulator into the firmware's button input pins.
+* R6. The host directory `simulator/sim_data/` mounts as the SD card; SD
+  reads/writes go to that directory.
+* R7. WiFi traffic from the firmware is bridged through the host's network
+  via QEMU SLIRP / user-net.
+* R8. Battery, OTA, and power-down code paths are stubbed (return canned
+  values; do not actually reset).
+
+### Non-functional
+
+* R9. End-to-end touch latency (mouse-down in UI → firmware receives
+  FT6336U frame) ≤ 32 ms p95 on a 2024-era Apple Silicon Mac.
+* R10. Framebuffer commit (firmware Master Activation → pixel visible on
+  Tauri canvas) ≤ 200 ms p95 for a full update.
+* R11. The simulator runs entirely offline — no cloud dependency.
+* R12. License compatibility: QEMU (GPLv2) is spawned as a child process
+  only; not statically linked into Tauri binary. Bundled QEMU binary, if
+  shipped, is documented with source-availability link.
+* R13. Cross-platform: builds and runs on macOS Apple Silicon and Linux x86_64.
 
 ## Acceptance Criteria (evolving)
 
@@ -125,9 +157,56 @@ Each of these is delegated to a `trellis-research` sub-agent and persisted under
 * `research/qemu-peripheral-ipc.md` — How custom QEMU peripherals expose data to
   external host processes (chardev, vhost-user, QMP, Unix socket conventions).
 
-## Decision (ADR-lite)
+## Decision (ADR-lite, provisional pending user confirmation + post-outage web verification)
 
-(To be filled at end of brainstorm.)
+**Context**: Four high-leverage technical choices were identified during
+brainstorm (QEMU selection, e-ink modeling depth, FT6336U modeling depth,
+QEMU↔Tauri IPC). Web research was unavailable at brainstorm time due to an
+upstream API outage; recommendations rely on training-knowledge for the
+QEMU and IPC topics, and on direct datasheet + on-disk source code reading
+for e-ink and FT6336U topics.
+
+**Decision** (each summarized; full reasoning in `research/*.md`):
+
+1. **QEMU runtime: Espressif `qemu` fork** (target `xtensa-softmmu`,
+   `esp32s3`). Open-source, maintained, native macOS Apple-Silicon build,
+   spawn-as-child-process license posture.
+   *Risk*: octal PSRAM + `qio_opi` flash mode may need a stub or downgraded
+   build. Contingency: `[env:mofei_sim]` with `qio_dio` flash mode if the
+   fork's octal model is incomplete.
+   *See*: [`research/qemu-esp32s3-options.md`](research/qemu-esp32s3-options.md)
+
+2. **GDEQ0426T82 e-ink: Hybrid FSM** (Approach C). Faithful command-and-
+   address-window state machine; skip-and-consume LUT bytes, softstart,
+   border, temperature; one 800×480 1bpp framebuffer; BUSY-high for
+   simulated refresh duration (default 0.5 s full / 0.2 s fast / 0.05 s
+   partial; `MOFEI_SIM_FAST_REFRESH=1` skips the delay).
+   *See*: [`research/eink-spi-modeling.md`](research/eink-spi-modeling.md)
+
+3. **FT6336U touch: Minimal Register Machine** (Option A). Implement only
+   the registers `MofeiTouchDriver` actually reads (`0x00`, `0x01`,
+   `0x02..0x0E`, `0x80`, `0x88`, `0xA6`, `0xA8`); other reads return `0x00`,
+   other writes are no-op. Bit-bang I²C parser on raw GPIO13/12 (no need
+   for ESP32 hardware-Wire emulation, since `MOFEI_TOUCH_SOFT_I2C=1`).
+   INT held low until firmware reads `TD_STATUS`.
+   *See*: [`research/ft6336u-i2c-modeling.md`](research/ft6336u-i2c-modeling.md)
+
+4. **IPC: Single Chardev Unix Socket, Length-Prefixed Binary Multiplex**
+   (Approach A). 8-byte header `(channel:u8, flags:u8, reserved:u16,
+   payload_len:u32) + payload`. Channels: framebuffer, serial-log,
+   gpio-state, touch-event, button-event, control. Tauri reads through
+   `tokio::net::UnixStream`. Stdio reserved for QEMU's own diagnostics.
+   *See*: [`research/qemu-peripheral-ipc.md`](research/qemu-peripheral-ipc.md)
+
+**Consequences**:
+- 70%+ of effort goes into Approach 1 (QEMU fork build + S3 boot) and
+  Approach 3 (FT6336U bit-bang protocol parser on GPIO). Both have well-
+  defined contracts, low semantic risk.
+- E-ink FSM is mid-effort; LUT skip-and-consume keeps it tractable.
+- IPC layer is intentionally simple — moves to shm if profiling demands it.
+- Web-research-deferred items (`[needs verification]` markers in research
+  files) must be verified before PR1 merges; stop-gap acceptable for PR1
+  scaffolding.
 
 ## Technical Notes
 
@@ -139,11 +218,99 @@ Each of these is delegated to a `trellis-research` sub-agent and persisted under
   modify `platformio.ini`.
 - Pin map for the FT6336U virtual peripheral is locked by the touch-support PRD.
 
-## Implementation Plan (small PRs — provisional)
+## Implementation Plan (small PRs — provisional, pending user confirmation)
 
-* PR1: Research lock-in + ADR + scaffold replacement of `bin/mofei-sim` placeholder
-  with QEMU launcher. M1 acceptance.
-* PR2: GDEQ0426T82 virtual peripheral + Tauri canvas renderer. M2 acceptance.
-* PR3: FT6336U virtual peripheral + input injection contract. M3 acceptance.
-* PR4: Boot real Mofei `firmware.bin` to Dashboard. M4 acceptance.
-* PR5 (optional): Headless screenshot CI hook.
+### PR1 — QEMU bringup + scaffold (M1 acceptance)
+
+Goal: `pnpm tauri dev` in `simulator/`, click "Launch", QEMU starts, ESP-IDF
+`hello_world` runs, serial output appears in Tauri UI.
+
+Subtasks:
+1. **Verify research caveats** (post-API-recovery): re-run `WebFetch` on the
+   QEMU and IPC `[needs verification]` items; commit any corrections to
+   `research/*.md` before code lands.
+2. **Build script**: `simulator/scripts/build-qemu.sh` clones
+   `espressif/qemu`, configures, builds `qemu-system-xtensa`. Idempotent.
+   Cached binary in `simulator/.qemu-cache/`.
+3. **Replace `start_sim` body** in `simulator/src-tauri/src/lib.rs`: instead
+   of spawning `bin/mofei-sim`, spawn `qemu-system-xtensa` with the right
+   flags (`-machine esp32s3`, `-cpu esp32s3`, `-kernel <hello_world.elf>`,
+   `-chardev socket,id=mofei,path=…`, `-serial stdio`).
+4. **IPC scaffold**: open the chardev Unix socket on the Tauri side
+   (`tokio::net::UnixStream`), parse the 8-byte header framing, dispatch
+   to per-channel handlers (PR1: only `0x02 serial-log` is wired).
+5. **UI**: replace the keyboard-controls help text in `App.tsx` with a live
+   serial console pane. Keep the existing `start_sim`/`stop_sim` buttons.
+6. **Smoke test**: ESP-IDF `examples/get-started/hello_world` boots,
+   `Hello world!` appears in the Tauri console pane.
+
+### PR2 — GDEQ0426T82 virtual peripheral + canvas (M2)
+
+Subtasks:
+1. **C peripheral**: `simulator/qemu-peripherals/ssd1677_gdeq0426t82.c`
+   implementing the hybrid FSM from `research/eink-spi-modeling.md`.
+   Out-of-tree QOM device class; loaded via `-device ssd1677-gdeq0426`.
+2. **Wire up**: SPI master (SPI2 on ESP32-S3) → device. GPIO matrix lines
+   for D/C#, CS#, RES#, BUSY, BS1 mapped per Mofei pin assignment (extract
+   from `lib/hal/HalDisplay*` and `open-x4-sdk/src/EInkDisplay/`).
+3. **IPC channel `0x01 framebuffer`**: on Master Activation, push 48 KB
+   1bpp buffer over the chardev to Tauri. Drive BUSY high for the
+   configured refresh duration.
+4. **Frontend**: React component that decodes the 1bpp buffer to Canvas2D
+   `ImageData` and blits at 1:1 scale (800×480 panel → fits 800×600 window).
+5. **Smoke test**: a hand-crafted firmware that draws a checkerboard
+   (`memset` framebuffer, command 0x24 with pattern, 0x22 0x20) renders
+   correctly in the Tauri canvas.
+6. **Acceptance gate**: `pio run -e mofei` firmware on the simulator boots
+   and reaches the splash/loading screen visibly.
+
+### PR3 — FT6336U virtual peripheral + input injection (M3)
+
+Subtasks:
+1. **C peripheral**: `simulator/qemu-peripherals/ft6336u.c` implementing
+   the minimal register machine from `research/ft6336u-i2c-modeling.md`.
+2. **Bit-bang I²C parser**: subscribe to GPIO12/13 lines, decode
+   START/STOP/ADDR/DATA, dispatch to register file. Verify protocol-level
+   conformance against `MofeiTouchDriver` traffic captured in PR2 logs.
+3. **INT pin**: drive GPIO44 low on touch, release on `TD_STATUS` read.
+4. **IPC channels**:
+   - `0x04 touch-event` inbound (Tauri → QEMU): `(action, x, y, finger_id)`.
+     Translate to FT6336U frame buffer + assert INT.
+   - `0x05 button-event` inbound: GPIO level changes for side buttons
+     (PgUp/PgDn) and Esc.
+5. **Frontend**: mouse-down/move/up handlers on the canvas → `0x04` frames.
+   Keyboard handlers: arrow keys → simulated swipe gestures (down at center,
+   move to direction over 200 ms, up); Space/Enter → tap center;
+   PgUp/PgDn/Esc → button events.
+6. **Smoke test**: firmware's serial log shows `FT6336U detected` and
+   touch events flow through to Dashboard taps.
+7. **Acceptance gate**: a tap and a swipe round-trip end-to-end.
+
+### PR4 — Production firmware to Dashboard (M4)
+
+Subtasks:
+1. Boot path: confirm production `pio run -e mofei` `firmware.bin` (with
+   real bootloader, real partitions) boots in our simulator. If `qio_opi`
+   blocks: add `[env:mofei_sim]` with `qio_dio` and document the deviation.
+2. SD card: bind `simulator/sim_data/` as the SD root (`-drive file=…,if=sd`
+   or virtual SD device).
+3. WiFi: enable QEMU SLIRP user-net. Confirm DHCP works.
+4. Stub OTA, battery: ensure firmware paths that touch these don't crash.
+5. **Acceptance gate**: full Dashboard activity reachable. Mouse a couple
+   of icons. Verify rendered icons match physical device.
+
+### PR5 (optional) — Headless screenshot CI hook
+
+Subtasks:
+1. CLI flag `--headless --screenshot path.png --duration N`: run for N
+   seconds, capture canvas pixel buffer, write PNG, exit.
+2. GitHub Actions job that boots an `[env:mofei]` build, takes 5 anchor
+   screenshots (boot, dashboard, reader open), diffs against committed
+   reference PNGs, fails on > N% delta.
+
+## Research References
+
+* [`research/qemu-esp32s3-options.md`](research/qemu-esp32s3-options.md) — Espressif `qemu` fork is the recommended runtime (with PSRAM/OPI-flash contingency); web sources marked `[needs verification]`.
+* [`research/eink-spi-modeling.md`](research/eink-spi-modeling.md) — SSD1677 hybrid FSM; full command set extracted from on-disk PDF page 10.
+* [`research/ft6336u-i2c-modeling.md`](research/ft6336u-i2c-modeling.md) — Minimal register machine; full register map sourced from `lib/hal/MofeiTouch.cpp`.
+* [`research/qemu-peripheral-ipc.md`](research/qemu-peripheral-ipc.md) — Single-chardev UDS multiplex with 8-byte header; QEMU API specifics marked `[needs verification]`.
