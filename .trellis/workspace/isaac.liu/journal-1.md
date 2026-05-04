@@ -44,3 +44,37 @@ Closed Mofei activity wishlist task. Simplified Dashboard to pure 9-grid layout 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 2: P0 touch coord debug — no defect found, screenshot tool fixed
+
+**Date**: 2026-05-04
+**Task**: P0 touch coord debug — no defect found, screenshot tool fixed
+**Package**: open-x4-sdk
+**Branch**: `feat/murphy`
+
+### Summary
+
+P0 touch-coordinate misalignment task closed without code fix. Captured 4 dashboard taps via mofei_touch_debug build; all Stage 1-5 pipeline behaviors (raw frame -> HAL conv -> orient transform -> hit-test -> hint fallback) match expectations. Visual cell border == hit-test rect (both come from cellRects[idx]). Confirmed user's earlier 'touch felt inaccurate' perception was the TC_8 small-font issue from before commit 08307f4. Deliverables: scripts/capture_touch_debug.py (reusable log harvester) and scripts/take_screenshot.py rotate-90-CW fix (panel native is 800x480 landscape, firmware drives logical 480x800 portrait via GfxRenderer rotation, the screenshot tool was dumping raw framebuffer without applying the rotation back). Archived task + research artifacts (capture log, analysis, BMP/PNG screenshots, panel spec).
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8e45639` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
