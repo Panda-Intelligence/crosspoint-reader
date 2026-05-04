@@ -164,4 +164,6 @@ class BaseTheme {
   static constexpr int batteryPercentSpacing = 4;
   static void drawBatteryOutline(const GfxRenderer& renderer, int x, int y, int battWidth, int rectHeight);
   static void drawBatteryLightningBolt(const GfxRenderer& renderer, int boltX, int boltY);
+  static int drawHeaderStatus(const GfxRenderer& renderer, const Rect& rect, int batteryX, int y, int height,
+                              int contentSidePadding, int maxStatusWidth);
 };

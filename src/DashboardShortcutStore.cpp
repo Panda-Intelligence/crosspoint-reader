@@ -39,10 +39,9 @@ constexpr std::array<const char*, static_cast<size_t>(DashboardShortcutId::Count
     "file_browser",   "settings", "weather", "today",   "study_today"};
 
 const DashboardShortcutStore::ShortcutList kDefaultShortcuts = {
-    DashboardShortcutId::RecentReading, DashboardShortcutId::ReadingHub, DashboardShortcutId::StudyHub,
-    DashboardShortcutId::DesktopHub,    DashboardShortcutId::ArcadeHub,  DashboardShortcutId::ImportSync,
-    DashboardShortcutId::FileBrowser,   DashboardShortcutId::Settings,   DashboardShortcutId::WeatherClock,
-    DashboardShortcutId::Today,         DashboardShortcutId::StudyToday,
+    DashboardShortcutId::RecentReading, DashboardShortcutId::ReadingHub,   DashboardShortcutId::StudyHub,
+    DashboardShortcutId::ArcadeHub,     DashboardShortcutId::ImportSync,   DashboardShortcutId::FileBrowser,
+    DashboardShortcutId::Settings,      DashboardShortcutId::WeatherClock, DashboardShortcutId::Today,
 };
 
 bool containsShortcut(const DashboardShortcutStore::ShortcutList& list, DashboardShortcutId id) {
@@ -62,7 +61,7 @@ bool containsShortcutExcept(const DashboardShortcutStore::ShortcutList& list, Da
 bool isValidShortcutList(const DashboardShortcutStore::ShortcutList& list) {
   std::array<bool, static_cast<size_t>(DashboardShortcutId::Count)> used = {};
   for (DashboardShortcutId id : list) {
-    if (!DashboardShortcutStore::isValid(id) || used[static_cast<size_t>(id)]) {
+    if (!DashboardShortcutStore::isAvailable(id) || used[static_cast<size_t>(id)]) {
       return false;
     }
     used[static_cast<size_t>(id)] = true;
@@ -74,7 +73,7 @@ bool isValidShortcutList(const DashboardShortcutStore::ShortcutList& list) {
 DashboardShortcutId firstUnusedShortcut(const std::array<bool, static_cast<size_t>(DashboardShortcutId::Count)>& used) {
   for (size_t i = 0; i < static_cast<size_t>(DashboardShortcutId::Count); i++) {
     const auto candidate = static_cast<DashboardShortcutId>(i);
-    if (!used[i] && !DashboardShortcutStore::isProtected(candidate)) {
+    if (!used[i] && DashboardShortcutStore::isAvailable(candidate) && !DashboardShortcutStore::isProtected(candidate)) {
       return candidate;
     }
   }
@@ -123,12 +122,16 @@ bool DashboardShortcutStore::isValid(DashboardShortcutId id) {
   return static_cast<size_t>(id) < static_cast<size_t>(DashboardShortcutId::Count);
 }
 
+bool DashboardShortcutStore::isAvailable(const DashboardShortcutId id) {
+  return isValid(id) && id != DashboardShortcutId::DesktopHub && id != DashboardShortcutId::StudyToday;
+}
+
 bool DashboardShortcutStore::isProtected(const DashboardShortcutId id) {
   return id == DashboardShortcutId::FileBrowser || id == DashboardShortcutId::Settings;
 }
 
 const DashboardShortcutDefinition* DashboardShortcutStore::definitionFor(DashboardShortcutId id) {
-  if (!isValid(id)) {
+  if (!isAvailable(id)) {
     return nullptr;
   }
   return &kDefinitions[static_cast<size_t>(id)];
@@ -198,7 +201,7 @@ bool DashboardShortcutStore::cycleSlot(const size_t index, const int direction) 
   DashboardShortcutId candidate = shortcuts[index];
   for (size_t attempts = 0; attempts < static_cast<size_t>(DashboardShortcutId::Count); attempts++) {
     candidate = nextShortcutId(candidate, direction);
-    if (isProtected(candidate) || containsShortcutExcept(shortcuts, candidate, index)) {
+    if (!isAvailable(candidate) || isProtected(candidate) || containsShortcutExcept(shortcuts, candidate, index)) {
       continue;
     }
     shortcuts[index] = candidate;
@@ -282,7 +285,7 @@ bool DashboardShortcutStore::normalizeAndRepair() {
   bool repaired = false;
 
   for (size_t i = 0; i < shortcuts.size(); i++) {
-    if (!isValid(shortcuts[i])) {
+    if (!isAvailable(shortcuts[i])) {
       shortcuts[i] = kDefaultShortcuts[i];
       repaired = true;
     }
@@ -292,7 +295,7 @@ bool DashboardShortcutStore::normalizeAndRepair() {
   used.fill(false);
   for (size_t i = 0; i < shortcuts.size(); i++) {
     DashboardShortcutId id = shortcuts[i];
-    if (!isValid(id) || used[static_cast<size_t>(id)]) {
+    if (!isAvailable(id) || used[static_cast<size_t>(id)]) {
       shortcuts[i] = firstUnusedShortcut(used);
       repaired = true;
     }

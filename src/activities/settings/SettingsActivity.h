@@ -24,6 +24,7 @@ enum class SettingAction {
   Language,
   PreviewSleepScreen,
   SleepWallpaper,
+  DashboardCustomize,
 };
 
 struct SettingInfo {

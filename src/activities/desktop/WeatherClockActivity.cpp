@@ -127,7 +127,7 @@ void WeatherClockActivity::render(RenderLock&&) {
     const int metricH = 58;
     const int gap = 8;
     const int metricW = (pageWidth - pad * 2 - gap * 2) / 3;
-    const int temp = summary.isOnline ? 24 : 22;
+    const int temp = summary.temperatureC;
 
     char rainStr[8];
     snprintf(rainStr, sizeof(rainStr), "%d%%", summary.isOnline ? 70 : 0);
@@ -153,7 +153,7 @@ void WeatherClockActivity::render(RenderLock&&) {
     // ── Page 1: 3-day forecast ─────────────────────────────────────────
     renderer.drawText(UI_10_FONT_ID, pad, contentTop + 4, tr(STR_WEATHER_FORECAST), true, EpdFontFamily::BOLD);
 
-    const int temp = summary.isOnline ? 24 : 22;
+    const int temp = summary.temperatureC;
     const int spread = summary.isOnline ? 6 : 5;
     struct DayForecast {
       StrId day;
@@ -163,7 +163,7 @@ void WeatherClockActivity::render(RenderLock&&) {
     };
     const DayForecast forecasts[3] = {
         {StrId::STR_DASHBOARD_TODAY, temp - spread, temp + spread,
-         summary.isOnline ? StrId::STR_WEATHER_CLOUDY : StrId::STR_WEATHER_CACHED},
+         summary.isOnline ? summary.weatherConditionId : StrId::STR_WEATHER_CACHED},
         {StrId::STR_WEATHER_TOMORROW, temp - spread - 1, temp + spread + 1,
          summary.isOnline ? StrId::STR_WEATHER_SUNNY : StrId::STR_WEATHER_OFFLINE},
         {StrId::STR_WEATHER_PLUS_2_DAYS, temp - spread + 1, temp + spread - 1,
@@ -195,7 +195,7 @@ void WeatherClockActivity::render(RenderLock&&) {
     // ── Page 2: Commute scenes ─────────────────────────────────────────
     renderer.drawText(UI_10_FONT_ID, pad, contentTop + 4, tr(STR_WEATHER_SCENES), true, EpdFontFamily::BOLD);
 
-    const int temp = summary.isOnline ? 24 : 22;
+    const int temp = summary.temperatureC;
     const bool carryUmbrella = summary.isOnline;
 
     struct Scene {

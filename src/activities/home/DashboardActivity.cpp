@@ -30,7 +30,6 @@ namespace {
 constexpr int kGridGapPx = 0;
 constexpr int kCellInnerPadPx = 0;
 constexpr int kCellCornerRadiusPx = 0;
-constexpr int kCustomizeCornerRadiusPx = 4;
 constexpr int kDashboardIosGridIconSizePx = 64;
 constexpr int kDashboardLabelSpacingPx = 3;
 constexpr int kDashboardCellBorderInsetPx = 3;
@@ -71,10 +70,9 @@ void logDashboardTouchHit(const InputTouchEvent& event, const char* target, cons
           rect.width, rect.height);
 }
 
-void logDashboardTouchMiss(const InputTouchEvent& event, const int itemCount, const Rect& customizeRect) {
-  LOG_INF("TOUCHDBG", "dashboard_miss layout=%s raw=(%u,%u) oriented=(%u,%u) items=%d customize=(%d,%d,%d,%d)",
-          dashboardLayoutName(), event.sourceX(), event.sourceY(), event.x, event.y, itemCount, customizeRect.x,
-          customizeRect.y, customizeRect.width, customizeRect.height);
+void logDashboardTouchMiss(const InputTouchEvent& event, const int itemCount) {
+  LOG_INF("TOUCHDBG", "dashboard_miss layout=%s raw=(%u,%u) oriented=(%u,%u) items=%d", dashboardLayoutName(),
+          event.sourceX(), event.sourceY(), event.x, event.y, itemCount);
 }
 #endif
 
@@ -225,17 +223,15 @@ std::string DashboardActivity::subtitleForShortcut(const DashboardShortcutId id)
       return summary.weatherLine;
     case DashboardShortcutId::Today:
       return summary.todaySecondary;
-    case DashboardShortcutId::StudyToday:
-      if (summary.loadedCards <= 0) {
-        return tr(STR_DASHBOARD_STUDY_IMPORT_HINT);
-      }
+    case DashboardShortcutId::StudyHub:
       if (summary.againCards > 0) {
         return formatDashboardValue(StrId::STR_DASHBOARD_STUDY_AGAIN_FORMAT, summary.againCards);
       }
-      return summary.dueCards > 0 ? formatDashboardValue(StrId::STR_DASHBOARD_STUDY_DUE_FORMAT, summary.dueCards)
-                                  : std::string(tr(STR_DASHBOARD_STUDY_CAUGHT_UP));
-    case DashboardShortcutId::StudyHub:
-      return formatDashboardValue(StrId::STR_DASHBOARD_STUDY_SUMMARY_FORMAT, summary.loadedCards, summary.laterCards);
+      if (summary.dueCards > 0) {
+        return formatDashboardValue(StrId::STR_DASHBOARD_STUDY_DUE_FORMAT, summary.dueCards);
+      }
+      return summary.loadedCards <= 0 ? std::string(tr(STR_DASHBOARD_STUDY_IMPORT_HINT))
+                                      : std::string(tr(STR_DASHBOARD_STUDY_CAUGHT_UP));
     default: {
       const auto* definition = DashboardShortcutStore::definitionFor(id);
       return definition != nullptr ? std::string(I18N.get(definition->subtitleId)) : std::string();
@@ -244,10 +240,6 @@ std::string DashboardActivity::subtitleForShortcut(const DashboardShortcutId id)
 }
 
 void DashboardActivity::openCurrentSelection() {
-  if (selectedIndex == customizeIndex()) {
-    activityManager.goToDashboardCustomize();
-    return;
-  }
   if (!isGridIndex(selectedIndex)) {
     requestUpdate();
     return;
@@ -260,11 +252,7 @@ void DashboardActivity::openCurrentSelection() {
     case DashboardShortcutId::Today:
       activityManager.goToCalendar();
       break;
-    case DashboardShortcutId::DesktopHub:
-      activityManager.goToDesktopHub();
-      break;
     case DashboardShortcutId::StudyHub:
-    case DashboardShortcutId::StudyToday:
       activityManager.goToStudyHub();
       break;
     case DashboardShortcutId::ReadingHub:
@@ -286,6 +274,8 @@ void DashboardActivity::openCurrentSelection() {
       activityManager.goToRecentBooks();
       break;
     case DashboardShortcutId::Count:
+    case DashboardShortcutId::DesktopHub:
+    case DashboardShortcutId::StudyToday:
       requestUpdate();
       return;
   }
@@ -306,15 +296,12 @@ void DashboardActivity::layoutGridCells() {
   const int sidePad = std::max(metrics.contentSidePadding, 0);
   const int count = itemCount();
   const int rows = std::max(gridRowCount(), 1);
-  const int customize = customizeIndex();
-  selectedIndex = std::clamp(selectedIndex, 0, customize);
+  selectedIndex = std::clamp(selectedIndex, 0, std::max(count - 1, 0));
 
   const int gridTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
-  const int customizeRowHeight = std::max(metrics.listRowHeight, 28);
   const int buttonHintsTop = pageHeight - metrics.buttonHintsHeight;
   const int contentBottom = std::max(buttonHintsTop, gridTop);
-  const int gridBottomLimit = std::max(contentBottom - customizeRowHeight - metrics.verticalSpacing, gridTop);
-  const int gridHeight = std::max(gridBottomLimit - gridTop, 0);
+  const int gridHeight = std::max(contentBottom - gridTop, 0);
 
   const int usableWidth = std::max(pageWidth - 2 * sidePad - (kGridCols - 1) * kGridGapPx, 0);
   const int cellWidth = usableWidth / kGridCols;
@@ -334,18 +321,11 @@ void DashboardActivity::layoutGridCells() {
       cellRects[idx] = Rect{x, y, cellWidth, cellHeight};
     }
   }
-
-  // Customize footer row spans full content width below the grid.
-  const int gridBottom = gridTop + rows * cellHeight + (rows - 1) * kGridGapPx;
-  const int customizeY = gridBottom + metrics.verticalSpacing;
-  const int customizeWidth = std::max(pageWidth - 2 * sidePad, 0);
-  cellRects[customize] = Rect{sidePad, customizeY, customizeWidth, customizeRowHeight};
 }
 
 void DashboardActivity::layoutListCells() {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  const int customize = customizeIndex();
-  selectedIndex = std::clamp(selectedIndex, 0, customize);
+  selectedIndex = std::clamp(selectedIndex, 0, std::max(selectionCount() - 1, 0));
   cellRects.fill(Rect{});
 
   const Rect listRect = dashboardListRect(renderer, metrics);
@@ -368,13 +348,9 @@ void DashboardActivity::moveSelectionHorizontally(const int delta) {
     return;
   }
 
-  if (selectedIndex == customizeIndex()) {
-    return;
-  }
-
   const int count = itemCount();
   if (count <= 0) {
-    selectedIndex = customizeIndex();
+    selectedIndex = 0;
     return;
   }
 
@@ -412,22 +388,16 @@ void DashboardActivity::moveSelectionVertically(const int delta) {
 
   const int count = itemCount();
   if (count <= 0) {
-    selectedIndex = customizeIndex();
+    selectedIndex = 0;
     return;
   }
 
-  const int customize = customizeIndex();
   const int lastRow = std::max(gridRowCount() - 1, 0);
-  if (selectedIndex == customize) {
-    selectedIndex = delta > 0 ? 0 : clampedIndexForRowAndColumn(lastRow, kGridCols - 1, count, kGridCols);
-    return;
-  }
-
   const int row = selectedIndex / kGridCols;
   const int column = selectedIndex % kGridCols;
   if (delta > 0) {
     if (row >= lastRow) {
-      selectedIndex = customize;
+      selectedIndex = 0;
       return;
     }
     selectedIndex = clampedIndexForRowAndColumn(row + 1, column, count, kGridCols);
@@ -459,16 +429,6 @@ void DashboardActivity::loop() {
           return;
         }
       }
-      if (TouchHitTest::pointInRect(touchEvent.x, touchEvent.y, cellRects[customizeIndex()])) {
-        mappedInput.suppressTouchButtonFallback();
-        selectedIndex = customizeIndex();
-#if MOFEI_TOUCH_DEBUG
-        logDashboardTouchHit(touchEvent, "customize", customizeIndex(), cellRects[customizeIndex()]);
-#endif
-        openCurrentSelection();
-        return;
-      }
-
 #if MOFEI_DEVICE
       uint8_t buttonIndex = 0;
       if (mapButtonHintTap(touchEvent, &buttonIndex)) {
@@ -502,7 +462,7 @@ void DashboardActivity::loop() {
       if (!mappedInput.isTouchButtonHintTap(touchEvent)) {
         mappedInput.suppressTouchButtonFallback();
 #if MOFEI_TOUCH_DEBUG
-        logDashboardTouchMiss(touchEvent, itemCount(), cellRects[customizeIndex()]);
+        logDashboardTouchMiss(touchEvent, itemCount());
 #endif
         return;
       }
@@ -588,7 +548,6 @@ void DashboardActivity::render(RenderLock&& lock) {
   const auto pageWidth = renderer.getScreenWidth();
   layoutCells();
   const int count = itemCount();
-  const int customize = customizeIndex();
 
   // Prewarm font cache to prevent extreme cache thrashing with CJK characters
   if (auto* fcm = renderer.getFontCacheManager()) {
@@ -602,7 +561,6 @@ void DashboardActivity::render(RenderLock&& lock) {
         allText += subtitleForShortcut(id);
       }
     }
-    allText += tr(STR_DASHBOARD_CUSTOMIZE);
     const auto labels = dashboardUsesListLayout()
                             ? mappedInput.mapLabels("", tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN))
                             : mappedInput.mapLabels("", tr(STR_OPEN), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
@@ -620,19 +578,11 @@ void DashboardActivity::render(RenderLock&& lock) {
     GUI.drawList(
         renderer, dashboardListRect(renderer, metrics), selectionCount(), selectedIndex,
         [this](int index) {
-          if (index == customizeIndex()) {
-            return std::string(tr(STR_DASHBOARD_CUSTOMIZE));
-          }
           const auto id = DASHBOARD_SHORTCUTS.getShortcut(static_cast<size_t>(index));
           const auto* definition = DashboardShortcutStore::definitionFor(id);
           return definition != nullptr ? std::string(I18N.get(definition->labelId)) : std::string();
         },
-        [this](int index) {
-          if (index == customizeIndex()) {
-            return std::string(tr(STR_DASHBOARD_CUSTOMIZE_SUBTITLE));
-          }
-          return subtitleForShortcut(DASHBOARD_SHORTCUTS.getShortcut(static_cast<size_t>(index)));
-        },
+        [this](int index) { return subtitleForShortcut(DASHBOARD_SHORTCUTS.getShortcut(static_cast<size_t>(index))); },
         nullptr, [this](int index) { return std::to_string(index + kDashboardListTitleReserveRows); }, true);
 
     const auto labels = mappedInput.mapLabels("", tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
@@ -705,48 +655,6 @@ void DashboardActivity::render(RenderLock&& lock) {
         renderer.drawText(SMALL_FONT_ID, subDrawX, subY, line.c_str(), true);
         subY += subLineH;
       }
-    }
-  }
-
-  // === Customize footer row ===
-  const Rect& cust = cellRects[customize];
-  if (cust.width > 0 && cust.height > 0) {
-    const bool selected = (selectedIndex == customize);
-    if (selected) {
-      renderer.fillRoundedRect(cust.x, cust.y, cust.width, cust.height, kCustomizeCornerRadiusPx, Color::LightGray);
-    }
-    renderer.drawRoundedRect(cust.x, cust.y, cust.width, cust.height, selected ? 2 : 1, kCustomizeCornerRadiusPx, true);
-
-    const char* customizeLabel = tr(STR_DASHBOARD_CUSTOMIZE);
-    const int custTextW = std::max(cust.width - 2 * kCellInnerPadPx, 0);
-    if (iosGrid) {
-      const int contentX = cust.x + kDashboardCellBorderInsetPx;
-      const int contentY = cust.y + kDashboardCellBorderInsetPx;
-      const int contentWidth = std::max(cust.width - 2 * kDashboardCellBorderInsetPx, 0);
-      const int contentHeight = std::max(cust.height - 2 * kDashboardCellBorderInsetPx, 0);
-      const int labelLineH = renderer.getLineHeight(UI_10_FONT_ID);
-      const int labelBlockHeight = labelLineH + kDashboardCellBottomInsetPx;
-      const int labelTextW = std::max(contentWidth - 2 * kCellInnerPadPx, 0);
-      const int labelBlockTop = contentY + std::max(contentHeight - labelBlockHeight, 0);
-      std::string truncLabel = renderer.truncatedText(UI_10_FONT_ID, customizeLabel, labelTextW, EpdFontFamily::BOLD);
-      const int labelWidth = renderer.getTextWidth(UI_10_FONT_ID, truncLabel.c_str(), EpdFontFamily::BOLD);
-      const int labelDrawX = contentX + std::max((labelTextW - labelWidth) / 2, 0);
-      renderer.drawText(UI_10_FONT_ID, labelDrawX, labelBlockTop, truncLabel.c_str(), true, EpdFontFamily::BOLD);
-
-      const int iconRegionTop = contentY;
-      const int iconRegionBottom = labelBlockTop - kDashboardLabelSpacingPx;
-      const int iconRegionHeight = std::max(iconRegionBottom - iconRegionTop, kDashboardIosGridIconSizePx);
-      const int iconX = contentX + std::max((contentWidth - kDashboardIosGridIconSizePx) / 2, 0);
-      const int iconY = iconRegionTop + std::max((iconRegionHeight - kDashboardIosGridIconSizePx) / 2, 0);
-      if (const uint8_t* iconBitmap = iconBitmap64ForName(UIIcon::Settings); iconBitmap != nullptr) {
-        renderer.drawIcon(iconBitmap, iconX, iconY, kDashboardIosGridIconSizePx, kDashboardIosGridIconSizePx);
-      }
-    } else {
-      std::string truncCust = renderer.truncatedText(UI_10_FONT_ID, customizeLabel, custTextW, EpdFontFamily::BOLD);
-      const int textY = renderer.getTextYForCentering(cust.y, cust.height, UI_10_FONT_ID);
-      const int textWidth = renderer.getTextWidth(UI_10_FONT_ID, truncCust.c_str(), EpdFontFamily::BOLD);
-      const int textX = cust.x + std::max((cust.width - textWidth) / 2, kCellInnerPadPx);
-      renderer.drawText(UI_10_FONT_ID, textX, textY, truncCust.c_str(), true, EpdFontFamily::BOLD);
     }
   }
 

@@ -7,8 +7,11 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
+#include <ctime>
 #include <string>
 
+#include "DesktopSummaryStore.h"
 #include "I18n.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
@@ -19,7 +22,89 @@ namespace {
 constexpr int homeMenuMargin = 20;
 constexpr int homeMarginTop = 30;
 constexpr int subtitleY = 738;
+constexpr int headerStatusGap = 6;
+constexpr int headerWeatherIconSize = 10;
 
+std::string headerStatusText() {
+  const auto& summary = DESKTOP_SUMMARY.getState();
+  char weather[40];
+  snprintf(weather, sizeof(weather), "%s %d%s", I18N.get(summary.weatherConditionId), summary.temperatureC,
+           tr(STR_TEMP_UNIT_C));
+
+  char timeText[8] = "";
+  const time_t now = time(nullptr);
+  struct tm localTm = {};
+  if (now > 0 && localtime_r(&now, &localTm) != nullptr) {
+    snprintf(timeText, sizeof(timeText), "%02d:%02d", localTm.tm_hour, localTm.tm_min);
+  }
+
+  std::string status = weather;
+  const char* lang = I18N.getLanguageName(I18N.getLanguage());
+  if (lang[0] != '\0') {
+    status += " ";
+    status += lang;
+  }
+  if (timeText[0] != '\0') {
+    status += " ";
+    status += timeText;
+  }
+  return status;
+}
+
+void drawHeaderWeatherIcon(const GfxRenderer& renderer, const int x, const int y, const StrId conditionId) {
+  if (conditionId == StrId::STR_WEATHER_OFFLINE || conditionId == StrId::STR_WEATHER_CACHED) {
+    renderer.drawLine(x, y + 2, x + headerWeatherIconSize - 1, y + headerWeatherIconSize - 3);
+    renderer.drawLine(x, y + headerWeatherIconSize - 3, x + headerWeatherIconSize - 1, y + 2);
+    return;
+  }
+
+  renderer.drawRect(x + 3, y + 3, 4, 4);
+  if (conditionId == StrId::STR_WEATHER_CLOUDY || conditionId == StrId::STR_WEATHER_RAIN_CHANCE) {
+    renderer.drawLine(x + 1, y + 7, x + 8, y + 7);
+    renderer.drawLine(x + 3, y + 5, x + 9, y + 5);
+  }
+  if (conditionId == StrId::STR_WEATHER_RAIN_CHANCE) {
+    renderer.drawPixel(x + 3, y + 9);
+    renderer.drawPixel(x + 6, y + 9);
+  }
+}
+}  // namespace
+
+int BaseTheme::drawHeaderStatus(const GfxRenderer& renderer, const Rect& rect, const int batteryX, const int y,
+                                const int height, const int contentSidePadding, const int maxStatusWidth) {
+  const auto& summary = DESKTOP_SUMMARY.getState();
+  const bool showBatteryPercentage =
+      SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS;
+  const uint16_t percentage = powerManager.getBatteryPercentage();
+  const std::string percentageText = showBatteryPercentage ? std::to_string(percentage) + "%" : "";
+  const int percentageWidth = showBatteryPercentage ? renderer.getTextWidth(SMALL_FONT_ID, percentageText.c_str()) : 0;
+  const int batteryBlockLeft =
+      batteryX - (showBatteryPercentage ? percentageWidth + BaseTheme::batteryPercentSpacing : 0);
+  const int statusRight = batteryBlockLeft - headerStatusGap;
+  const int statusLeftLimit = rect.x + rect.width / 2 + contentSidePadding;
+  const int statusWidth = std::min(maxStatusWidth, std::max(statusRight - statusLeftLimit, 0));
+  int statusBlockLeft = batteryBlockLeft;
+
+  if (statusWidth > 0) {
+    const std::string status = renderer.truncatedText(SMALL_FONT_ID, headerStatusText().c_str(), statusWidth);
+    const int statusTextWidth = renderer.getTextWidth(SMALL_FONT_ID, status.c_str());
+    const int iconX = statusRight - statusTextWidth - headerStatusGap - headerWeatherIconSize;
+    const int textX = statusRight - statusTextWidth;
+    statusBlockLeft = textX;
+    if (iconX >= statusLeftLimit) {
+      const int iconY = y + std::max((height - headerWeatherIconSize) / 2, 0);
+      drawHeaderWeatherIcon(renderer, iconX, iconY, summary.weatherConditionId);
+      statusBlockLeft = iconX;
+      renderer.drawText(SMALL_FONT_ID, textX, y, status.c_str());
+    } else {
+      renderer.drawText(SMALL_FONT_ID, textX, y, status.c_str());
+    }
+  }
+
+  return statusBlockLeft;
+}
+
+namespace {
 // Helper: draw battery icon at given position
 void drawBatteryIcon(const GfxRenderer& renderer, int x, int y, int battWidth, int rectHeight, uint16_t percentage) {
   // Draw battery outline (shared code)
@@ -318,24 +403,30 @@ void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
 void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle) const {
   // Hide last battery draw
-  constexpr int maxBatteryWidth = 80;
-  renderer.fillRect(rect.x + rect.width - maxBatteryWidth, rect.y + 5, maxBatteryWidth,
+  constexpr int maxStatusWidth = 180;
+  renderer.fillRect(rect.x + rect.width - maxStatusWidth, rect.y + 5, maxStatusWidth,
                     BaseMetrics::values.batteryHeight + 10, false);
 
   const bool showBatteryPercentage =
       SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS;
   // Position icon at right edge, drawBatteryRight will place text to the left
   const int batteryX = rect.x + rect.width - 12 - BaseMetrics::values.batteryWidth;
+  const int headerTextY = rect.y + 5;
+  const int statusLeft =
+      BaseTheme::drawHeaderStatus(renderer, rect, batteryX, headerTextY, BaseMetrics::values.batteryHeight,
+                                  BaseMetrics::values.contentSidePadding, maxStatusWidth - 50);
   drawBatteryRight(renderer,
-                   Rect{batteryX, rect.y + 5, BaseMetrics::values.batteryWidth, BaseMetrics::values.batteryHeight},
+                   Rect{batteryX, headerTextY, BaseMetrics::values.batteryWidth, BaseMetrics::values.batteryHeight},
                    showBatteryPercentage);
 
   if (title) {
-    int padding = rect.width - batteryX + BaseMetrics::values.batteryWidth;
-    auto truncatedTitle = renderer.truncatedText(UI_12_FONT_ID, title,
-                                                 rect.width - padding * 2 - BaseMetrics::values.contentSidePadding * 2,
-                                                 EpdFontFamily::BOLD);
-    renderer.drawCenteredText(UI_12_FONT_ID, rect.y + 5, truncatedTitle.c_str(), true, EpdFontFamily::BOLD);
+    const int titleLeft = rect.x + BaseMetrics::values.contentSidePadding;
+    const int titleRight = std::max(statusLeft - headerStatusGap, titleLeft);
+    const int titleWidth = std::max(titleRight - titleLeft, 0);
+    auto truncatedTitle = renderer.truncatedText(UI_12_FONT_ID, title, titleWidth, EpdFontFamily::BOLD);
+    const int titleTextWidth = renderer.getTextWidth(UI_12_FONT_ID, truncatedTitle.c_str(), EpdFontFamily::BOLD);
+    const int titleX = titleLeft + std::max((titleWidth - titleTextWidth) / 2, 0);
+    renderer.drawText(UI_12_FONT_ID, titleX, rect.y + 5, truncatedTitle.c_str(), true, EpdFontFamily::BOLD);
   }
 
   if (subtitle) {

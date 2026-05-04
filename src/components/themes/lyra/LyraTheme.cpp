@@ -145,8 +145,12 @@ void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
       SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS;
   // Position icon at right edge, drawBatteryRight will place text to the left
   const int batteryX = rect.x + rect.width - 12 - LyraMetrics::values.batteryWidth;
+  const int headerTextY = rect.y + 5;
+  const int statusLeft =
+      BaseTheme::drawHeaderStatus(renderer, rect, batteryX, headerTextY, LyraMetrics::values.batteryHeight,
+                                  LyraMetrics::values.contentSidePadding, 170);
   drawBatteryRight(renderer,
-                   Rect{batteryX, rect.y + 5, LyraMetrics::values.batteryWidth, LyraMetrics::values.batteryHeight},
+                   Rect{batteryX, headerTextY, LyraMetrics::values.batteryWidth, LyraMetrics::values.batteryHeight},
                    showBatteryPercentage);
 
   int maxTitleWidth = title != nullptr ? renderer.getTextWidth(UI_12_FONT_ID, title, EpdFontFamily::BOLD) : 0;
@@ -154,7 +158,7 @@ void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
       subtitle != nullptr ? renderer.getTextWidth(SMALL_FONT_ID, subtitle, EpdFontFamily::REGULAR) : 0;
 
   // Available space is the distance between the side paddings, and a with side padding between title and subtitle.
-  const int availableSpace = rect.width - LyraMetrics::values.contentSidePadding * 3;
+  const int availableSpace = std::max(statusLeft - rect.x - LyraMetrics::values.contentSidePadding * 2, rect.width / 2);
 
   if (maxTitleWidth + maxSubtitleWidth > availableSpace) {
     if ((maxTitleWidth > availableSpace / 2) && (maxSubtitleWidth > availableSpace / 2)) {
@@ -531,9 +535,7 @@ void LyraTheme::drawEmptyRecents(const GfxRenderer& renderer, const Rect rect) c
   const int hintH = renderer.getLineHeight(UI_10_FONT_ID);
   const int blockH = titleH + 4 + hintH;
   const int startY = rect.y + (rect.height - blockH) / 2;
-  renderer.drawText(UI_12_FONT_ID, rect.x + padding,
-                    startY, tr(STR_NO_OPEN_BOOK), true,
-                    EpdFontFamily::BOLD);
+  renderer.drawText(UI_12_FONT_ID, rect.x + padding, startY, tr(STR_NO_OPEN_BOOK), true, EpdFontFamily::BOLD);
   renderer.drawText(UI_10_FONT_ID, rect.x + padding, startY + titleH + 4, tr(STR_START_READING), true);
 }
 

@@ -19,6 +19,7 @@
 #include "StorageFontRegistry.h"
 #include "TraditionalChineseFontsActivity.h"
 #include "activities/boot_sleep/SleepActivity.h"
+#include "activities/home/DashboardCustomizeActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -105,6 +106,7 @@ void SettingsActivity::onEnter() {
   }
 
   // Append device-only ACTION items
+  displaySettings.push_back(SettingInfo::Action(StrId::STR_DASHBOARD_CUSTOMIZE, SettingAction::DashboardCustomize));
   displaySettings.push_back(SettingInfo::Action(StrId::STR_SLEEP_WALLPAPER_PICKER, SettingAction::SleepWallpaper));
   displaySettings.push_back(SettingInfo::Action(StrId::STR_PREVIEW_SLEEP_SCREEN, SettingAction::PreviewSleepScreen));
   controlsSettings.insert(controlsSettings.begin(),
@@ -322,6 +324,9 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
       case SettingAction::SleepWallpaper:
         startActivityForResult(std::make_unique<SleepWallpaperActivity>(renderer, mappedInput), resultHandler);
+        break;
+      case SettingAction::DashboardCustomize:
+        startActivityForResult(std::make_unique<DashboardCustomizeActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::None:
         // Do nothing

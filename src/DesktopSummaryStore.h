@@ -2,10 +2,14 @@
 
 #include <string>
 
+#include "I18nKeys.h"
+
 struct DesktopSummaryState {
   bool isOnline = false;
   std::string city = "Offline";
   std::string weatherLine = "No weather data";
+  StrId weatherConditionId = StrId::STR_WEATHER_OFFLINE;
+  int temperatureC = 22;
   std::string todayPrimary = "No events";
   std::string todaySecondary = "Use Calendar to plan";
   int dueCards = 0;

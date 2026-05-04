@@ -10,7 +10,7 @@ class DashboardActivity final : public Activity {
  public:
   static constexpr int kGridCols = 3;
   static constexpr int kGridCellCount = static_cast<int>(DashboardShortcutStore::SLOT_COUNT);
-  static constexpr int kItemCount = kGridCellCount + 1;
+  static constexpr int kItemCount = kGridCellCount;
 
   explicit DashboardActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
       : Activity("Dashboard", renderer, mappedInput) {}
@@ -21,14 +21,13 @@ class DashboardActivity final : public Activity {
 
  private:
   int selectedIndex = 0;
-  // Cached layout rects. cellRects[0..itemCount-1] = grid cells (row-major); cellRects[itemCount] = Customize row.
+  // Cached layout rects. cellRects[0..itemCount-1] = grid cells (row-major).
   // Recomputed by layoutCells(); render() and loop() must call layoutCells() before use.
   std::array<Rect, kItemCount> cellRects;
 
   int gridRowCount() const;
   int itemCount() const { return static_cast<int>(DASHBOARD_SHORTCUTS.getShortcuts().size()); }
-  int customizeIndex() const { return itemCount(); }
-  int selectionCount() const { return itemCount() + 1; }
+  int selectionCount() const { return itemCount(); }
   bool isGridIndex(int index) const;
   std::string subtitleForShortcut(DashboardShortcutId id) const;
   void openCurrentSelection();

@@ -5,8 +5,8 @@
 
 #include "StudyDeckStore.h"
 #include "StudyReviewQueueStore.h"
-#include "WifiCredentialStore.h"
 #include "StudyStateStore.h"
+#include "WifiCredentialStore.h"
 
 DesktopSummaryStore DesktopSummaryStore::instance;
 
@@ -18,9 +18,13 @@ void DesktopSummaryStore::refresh() {
   if (connected) {
     state.city = lastSsid.empty() ? "Online" : lastSsid;
     state.weatherLine = "Connected · ready for sync";
+    state.weatherConditionId = StrId::STR_WEATHER_CLOUDY;
+    state.temperatureC = 24;
   } else {
     state.city = lastSsid.empty() ? "Offline" : lastSsid;
     state.weatherLine = "Offline · cached data only";
+    state.weatherConditionId = StrId::STR_WEATHER_OFFLINE;
+    state.temperatureC = 22;
   }
 
   state.todayPrimary = "Today";

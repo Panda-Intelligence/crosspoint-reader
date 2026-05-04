@@ -32,7 +32,7 @@ struct DashboardShortcutDefinition {
 
 class DashboardShortcutStore {
  public:
-  static constexpr size_t SLOT_COUNT = static_cast<size_t>(DashboardShortcutId::Count);
+  static constexpr size_t SLOT_COUNT = 9;
   using ShortcutList = std::array<DashboardShortcutId, SLOT_COUNT>;
 
   static DashboardShortcutStore& getInstance() { return instance; }
@@ -51,6 +51,7 @@ class DashboardShortcutStore {
   static const char* keyFor(DashboardShortcutId id);
   static bool idFromKey(const char* key, DashboardShortcutId* outId);
   static bool isValid(DashboardShortcutId id);
+  static bool isAvailable(DashboardShortcutId id);
   static bool isProtected(DashboardShortcutId id);
 
  private:
