@@ -1,83 +1,174 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Image } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth, User } from '../src/contexts/AuthContext';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import * as AuthSession from 'expo-auth-session';
+
+import { useAuth, User } from '../src/contexts/AuthContext';
 
 WebBrowser.maybeCompleteAuthSession();
+
+// TODO: Replace with real GitHub OAuth App client_id before shipping.
+// Bundle ID must match: ai.pandacat.app.murphy.mate.
+// PKCE is enabled, so no client_secret is bundled in the app.
+// Configure the OAuth App with the redirect URI printed by makeRedirectUri()
+// (see console output on first run, e.g. murphymate://auth/github).
+const GITHUB_CLIENT_ID = 'YOUR_GITHUB_CLIENT_ID_HERE';
+const GITHUB_DISCOVERY: AuthSession.DiscoveryDocument = {
+  authorizationEndpoint: 'https://github.com/login/oauth/authorize',
+  tokenEndpoint: 'https://github.com/login/oauth/access_token',
+  revocationEndpoint: `https://github.com/settings/connections/applications/${GITHUB_CLIENT_ID}`,
+};
 
 export default function LoginScreen() {
   const { login } = useAuth();
   const router = useRouter();
 
-  // NOTE: In a real app, replace the client IDs below with those from Google Cloud Console.
-  // Must match the bundle ID: ai.pandacat.app.murphy.mate
-  const [request, response, promptAsync] = Google.useAuthRequest({
+  // --- Google ---
+  // NOTE: Replace with real client IDs from Google Cloud Console.
+  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
     iosClientId: 'YOUR_IOS_CLIENT_ID_HERE.apps.googleusercontent.com',
     androidClientId: 'YOUR_ANDROID_CLIENT_ID_HERE.apps.googleusercontent.com',
     webClientId: 'YOUR_WEB_CLIENT_ID_HERE.apps.googleusercontent.com',
   });
 
   useEffect(() => {
-    if (response?.type === 'success') {
-      const { authentication } = response;
-      // Fetch user info using the token
-      fetchUserInfo(authentication?.accessToken);
+    if (googleResponse?.type === 'success') {
+      void fetchGoogleUser(googleResponse.authentication?.accessToken);
     }
-  }, [response]);
+  }, [googleResponse]);
 
-  const fetchUserInfo = async (token?: string) => {
+  const fetchGoogleUser = async (token?: string) => {
     if (!token) return;
     try {
       const res = await fetch('https://www.googleapis.com/userinfo/v2/me', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const user = await res.json();
-      
+      const u = await res.json();
       const userData: User = {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        photo: user.picture,
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        photo: u.picture,
         provider: 'google',
       };
-      
       await login(userData);
       router.replace('/(tabs)');
     } catch (e) {
-      console.error('Failed to fetch Google user info', e);
+      console.error('Failed to fetch Google user', e);
+      Alert.alert('Sign-in failed', 'Could not fetch Google profile.');
     }
   };
 
-  const handleMockGithubLogin = async () => {
-    // Replace with real GitHub OAuth flow later
-    const mockUser: User = {
-      id: 'github_123',
-      name: 'GitHub User',
-      email: 'user@github.com',
-      provider: 'github',
-    };
-    await login(mockUser);
-    router.replace('/(tabs)');
+  // --- GitHub (PKCE, no client secret) ---
+  const githubRedirectUri = AuthSession.makeRedirectUri({
+    scheme: 'murphymate',
+    path: 'auth/github',
+  });
+
+  const [githubRequest, githubResponse, githubPromptAsync] =
+    AuthSession.useAuthRequest(
+      {
+        clientId: GITHUB_CLIENT_ID,
+        scopes: ['read:user', 'user:email'],
+        redirectUri: githubRedirectUri,
+        usePKCE: true,
+      },
+      GITHUB_DISCOVERY,
+    );
+
+  useEffect(() => {
+    if (githubResponse?.type === 'success' && githubRequest?.codeVerifier) {
+      void completeGithub(
+        githubResponse.params.code,
+        githubRequest.codeVerifier,
+      );
+    }
+  }, [githubResponse]);
+
+  const completeGithub = async (code: string, codeVerifier: string) => {
+    try {
+      const tokenResponse = await AuthSession.exchangeCodeAsync(
+        {
+          clientId: GITHUB_CLIENT_ID,
+          code,
+          redirectUri: githubRedirectUri,
+          extraParams: { code_verifier: codeVerifier },
+        },
+        { tokenEndpoint: GITHUB_DISCOVERY.tokenEndpoint! },
+      );
+      const accessToken = tokenResponse.accessToken;
+      if (!accessToken) throw new Error('No access token in response');
+
+      const userRes = await fetch('https://api.github.com/user', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/vnd.github+json',
+        },
+      });
+      if (!userRes.ok) throw new Error(`GitHub /user ${userRes.status}`);
+      const profile = await userRes.json();
+
+      // GitHub may not include the primary email in /user; query /user/emails.
+      let email: string | undefined = profile.email;
+      if (!email) {
+        try {
+          const emailRes = await fetch('https://api.github.com/user/emails', {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              Accept: 'application/vnd.github+json',
+            },
+          });
+          if (emailRes.ok) {
+            const emails: Array<{ email: string; primary: boolean; verified: boolean }> =
+              await emailRes.json();
+            email = emails.find((e) => e.primary && e.verified)?.email
+              ?? emails.find((e) => e.verified)?.email;
+          }
+        } catch {
+          // optional — fall back to placeholder below
+        }
+      }
+
+      const userData: User = {
+        id: String(profile.id),
+        name: profile.name || profile.login,
+        email: email || `${profile.login}@users.noreply.github.com`,
+        photo: profile.avatar_url,
+        provider: 'github',
+      };
+      await login(userData);
+      router.replace('/(tabs)');
+    } catch (e: any) {
+      console.error('GitHub sign-in failed', e);
+      Alert.alert('Sign-in failed', e?.message ?? 'GitHub OAuth error.');
+    }
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Murphy Mate</Text>
       <Text style={styles.subtitle}>Sign in to manage your Crosspoint Reader</Text>
-      
-      <TouchableOpacity 
-        style={styles.googleButton} 
-        disabled={!request}
-        onPress={() => promptAsync()}
+
+      <TouchableOpacity
+        style={styles.googleButton}
+        disabled={!googleRequest}
+        onPress={() => googlePromptAsync()}
       >
         <Text style={styles.googleButtonText}>Sign in with Google</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity 
-        style={styles.githubButton} 
-        onPress={handleMockGithubLogin}
+      <TouchableOpacity
+        style={styles.githubButton}
+        disabled={!githubRequest}
+        onPress={() => githubPromptAsync()}
       >
         <Text style={styles.githubButtonText}>Sign in with GitHub</Text>
       </TouchableOpacity>
