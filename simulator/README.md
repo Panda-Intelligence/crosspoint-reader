@@ -121,6 +121,23 @@ See
 [`../.trellis/tasks/05-04-mofei-simulator-bringup/research/qemu-peripheral-ipc.md`](../.trellis/tasks/05-04-mofei-simulator-bringup/research/qemu-peripheral-ipc.md)
 for the full protocol design.
 
+## CI / headless screenshot
+
+The `simulator/headless/` crate builds a separate binary that runs QEMU
+without the Tauri webview and writes a PNG of the last framebuffer
+received during a fixed observation window. Designed for boot-into-known-
+pixels regression in CI.
+
+```bash
+cd simulator/headless
+cargo run --release -- \
+    --firmware ../firmware-fixtures/hello_world.elf \
+    --duration 10 \
+    --out boot.png
+```
+
+Exits non-zero if no framebuffer was captured (useful as a CI gate).
+
 ## Known limitations (PR3)
 
 - The SSD1677 + FT6336U virtual peripherals are committed in

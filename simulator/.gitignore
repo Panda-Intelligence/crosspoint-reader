@@ -15,6 +15,10 @@ dist-ssr
 # QEMU build cache (Espressif fork, built by scripts/build-qemu.sh)
 .qemu-cache/
 
+# Cargo target dirs (src-tauri target is gitignored by Tauri's own setup;
+# headless target needs explicit exclusion)
+headless/target/
+
 # User-supplied firmware fixtures (binaries are kept out of git)
 firmware-fixtures/*.bin
 firmware-fixtures/*.elf

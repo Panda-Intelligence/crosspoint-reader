@@ -1,0 +1,15 @@
+[package]
+name = "mofei-sim-headless"
+version = "0.1.0"
+edition = "2021"
+description = "Headless screenshot harness for the Mofei simulator (PR5)"
+
+[[bin]]
+name = "mofei-sim-headless"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "=1.40", features = ["rt-multi-thread", "macros", "net", "io-util", "process", "time", "signal", "sync"] }
+clap = { version = "4", features = ["derive"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+anyhow = "1"

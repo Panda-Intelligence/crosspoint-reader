@@ -1,0 +1,120 @@
+diff --git a/hw/xtensa/esp32s3.c b/hw/xtensa/esp32s3.c
+index 0000000..0000001 100644
+--- a/hw/xtensa/esp32s3.c
++++ b/hw/xtensa/esp32s3.c
+@@ -45,6 +45,9 @@
+ #include "hw/ssi/esp32s3_spi.h"
+ #include "hw/ssi/ssi.h"
++#include "hw/i2c/i2c.h"
++#include "hw/i2c/bitbang_i2c.h"
++#include "chardev/char-fe.h"
+ #include "hw/gpio/esp32s3_gpio.h"
+
+ #define ESP32S3_DROM_LOW                0x3C000000
+@@ -60,6 +63,17 @@
+ #define ESP32S3_DR_REG_LOW              0x60000000
+ #define ESP32S3_DR_REG_HIGH             0x60100000
+
++/*
++ * Mofei device wiring (locked from .trellis/tasks/04-29-mofei-touch-support
++ * + on-disk firmware). Used by the SSD1677 + FT6336U virtual peripherals
++ * added below.
++ */
++#define MOFEI_TOUCH_SDA_GPIO  13
++#define MOFEI_TOUCH_SCL_GPIO  12
++#define MOFEI_TOUCH_INT_GPIO  44
++#define MOFEI_EPD_DC_GPIO      4   /* TODO verify against lib/hal/HalDisplay */
++#define MOFEI_EPD_CS_GPIO     10   /* TODO verify */
++#define MOFEI_EPD_RES_GPIO    47   /* TODO verify */
++#define MOFEI_EPD_BUSY_GPIO   48   /* TODO verify */
+
+ /* ESP32-S3 has 1 SPI master controller for flash and PSRAM (SPI0 internally,
+  * SPI1 in our model — see TYPE_ESP32S3_SPI). For Mofei we add a stub second
+@@ -132,7 +146,11 @@ struct Esp32s3SocState {
+     SsiPsramState *psram;
+
+     ESP32S3GPIOState gpio;
+-
++    ESP32S3SpiState spi2;          /* GPSPI2 (HSPI) — Mofei e-ink */
++    DeviceState     *bitbang_i2c;  /* Mofei FT6336U bus */
++    DeviceState     *epd;          /* TYPE_SSD1677_GDEQ0426 */
++    DeviceState     *touch;        /* TYPE_FT6336U */
++    CharBackend      mofei_chr;    /* shared chardev with the Tauri host */
+     /* SPI1 in QEMU/upstream nomenclature is the flash controller. The
+      * Mofei firmware uses GPSPI2 (Arduino's "SPI2" / HSPI) for the e-ink. */
+     ESP32S3SpiState spi1;
+@@ -639,7 +657,38 @@ static void esp32s3_soc_init(Object *obj)
+
+     object_initialize_child(OBJECT(ss), "spi1", &ss->spi1, TYPE_ESP32S3_SPI);
++    object_initialize_child(OBJECT(ss), "spi2", &ss->spi2, TYPE_ESP32S3_SPI);
+
+     object_initialize_child(OBJECT(ss), "gpio", &ss->gpio, TYPE_ESP32S3_GPIO);
+
++    /*
++     * UNVERIFIED — Mofei peripherals
++     *
++     * The TYPE_ESP32S3_SPI device class in this fork is currently modeled
++     * around the flash controller (its register file matches SPIMEM, not
++     * GPSPI2). Reusing it for GPSPI2 may behave correctly for simple
++     * outbound SPI transfers (the SSI child bus is generic) but the MMIO
++     * register interpretation may diverge from real ESP32-S3 GPSPI2.
++     *
++     * If the firmware's SPI traffic does not reach the SSD1677 once this
++     * patch is applied, the next step is to either:
++     *   (a) add a TYPE_ESP32S3_GPSPI device class with the GPSPI register
++     *       layout, or
++     *   (b) build a thin shim that translates GPSPI MMIO writes into SSI
++     *       transfers on a child bus.
++     */
++    ss->epd = qdev_new(TYPE_SSD1677_GDEQ0426);
++    qdev_prop_set_chr(ss->epd, "chardev", "mofei");
++
++    /* FT6336U on a bit-bang I²C bus driven by the GPIO matrix. */
++    ss->bitbang_i2c = qdev_new(TYPE_GPIO_I2C);  /* upstream BitBang I²C bus */
++    ss->touch = qdev_new(TYPE_FT6336U);
++    qdev_prop_set_uint8(ss->touch, "address", 0x2E);
++    qdev_prop_set_chr(ss->touch, "chardev", "mofei");
++
+     if (machine->kernel_filename) {
+@@ -680,6 +729,40 @@ static void esp32s3_soc_realize(DeviceState *dev, Error **errp)
+         ss->spi1.xts_aes = &ss->xts_aes;
+         sysbus_realize(SYS_BUS_DEVICE(&ss->spi1), &error_fatal);
++        sysbus_realize(SYS_BUS_DEVICE(&ss->spi2), &error_fatal);
++
++        /* GPSPI2 MMIO — TODO verify base against ESP32-S3 TRM (0x60024000?). */
++        memory_region_add_subregion(sys_mem, 0x60024000,
++            sysbus_mmio_get_region(SYS_BUS_DEVICE(&ss->spi2), 0));
++
++        /* Attach SSD1677 to spi2's child bus. */
++        BusState *spi2_bus = qdev_get_child_bus(DEVICE(&ss->spi2), "spi");
++        qdev_realize(ss->epd, spi2_bus, &error_fatal);
++
++        /* CS#/D/C#/RES# from GPIO matrix → SSD1677 inputs.
++         * BUSY from SSD1677 → GPIO matrix input. */
++        qdev_connect_gpio_out_named(DEVICE(&ss->spi2), SSI_GPIO_CS, 0,
++            qdev_get_gpio_in_named(ss->epd, SSI_GPIO_CS, 0));
++        qdev_connect_gpio_out(DEVICE(&ss->gpio), MOFEI_EPD_DC_GPIO,
++            qdev_get_gpio_in_named(ss->epd, "dc", 0));
++        qdev_connect_gpio_out(DEVICE(&ss->gpio), MOFEI_EPD_RES_GPIO,
++            qdev_get_gpio_in_named(ss->epd, "reset", 0));
++        qdev_connect_gpio_out_named(ss->epd, "busy", 0,
++            qdev_get_gpio_in(DEVICE(&ss->gpio), MOFEI_EPD_BUSY_GPIO));
++
++        /* Bit-bang I²C bus on GPIO12 (SCL) / GPIO13 (SDA). */
++        sysbus_realize_and_unref(SYS_BUS_DEVICE(ss->bitbang_i2c), &error_fatal);
++        I2CBus *i2c_bus = (I2CBus *)qdev_get_child_bus(ss->bitbang_i2c, "i2c");
++        qdev_realize_and_unref(ss->touch, BUS(i2c_bus), &error_fatal);
++        i2c_slave_set_address(I2C_SLAVE(ss->touch), 0x2E);
++
++        /* INT (GPIO44) from FT6336U → GPIO matrix. */
++        qdev_connect_gpio_out_named(ss->touch, "int", 0,
++            qdev_get_gpio_in(DEVICE(&ss->gpio), MOFEI_TOUCH_INT_GPIO));
++
++        /* TODO: connect the bit-bang I²C bus pads to GPIO12/13. The fork's
++         * BitBang_I2C device exposes SDA/SCL as GPIO in/out pairs that need
++         * to be wired into the GPIO matrix muxing. This step must be
++         * implemented before the firmware's soft-I²C driver can reach the
++         * touch slave. */
+
+         MemoryRegion *mr = sysbus_mmio_get_region(SYS_BUS_DEVICE(&ss->spi1), 0);
+         memory_region_add_subregion(sys_mem, 0x60002000, mr);
