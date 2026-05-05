@@ -1,4 +1,5 @@
 // Murphy Reader changelog data — update with each release
+// 所有內容使用繁體中文
 
 export interface ChangelogEntry {
   version: string;
@@ -17,30 +18,30 @@ export const changelog: ChangelogEntry[] = [
       {
         category: "Added",
         items: [
-          "Web USB flasher via ESP Web Tools (Chrome/Edge)",
-          "OTA update API (`/ota/latest`, `/ota/check`)",
-          "Cloudflare Worker serving firmware from R2",
-          "Touch offset calibration params (`MOFEI_TOUCH_OFFSET_X/Y`)",
-          "Six advanced Reader features (簡轉繁, 竖排, 高亮, 脚注弹出, 全书搜索, 字典)",
-          "Mate companion app: OAuth env config, theme constants, a11y labels",
-          "Bottom button hints hidden (touch screen only)",
-          "Mofei QEMU simulator peripherals (FT6336U, GDEQ0426T82)",
+          "Web USB 刷機工具：基於 ESP Web Tools，支援 Chrome/Edge 瀏覽器",
+          "OTA 更新 API（`/ota/latest`、`/ota/check`）",
+          "Cloudflare Worker 託管 R2 韌體存儲與分發",
+          "觸控偏移校準參數（`MOFEI_TOUCH_OFFSET_X/Y`）",
+          "六項進階閱讀器功能：簡轉繁文字轉換、豎排 CJK 佈局、文本範圍高亮選擇、腳註正文彈出、全書搜尋、閱讀器內字典查詢",
+          "Mate 伴侶 App：OAuth 環境變數配置、主題常數模組、無障礙標籤",
+          "底部實體按鍵提示已隱藏（純觸控螢幕模式）",
+          "Mofei QEMU 模擬器周邊（FT6336U 觸控、GDEQ0426T82 電子紙顯示）",
         ],
       },
       {
         category: "Changed",
         items: [
-          "EPUB Section cache version bumped to 23",
-          "Keyboard entry uses touch tap for character input",
-          "ActivityResult flow enhanced for reader sub-activities",
+          "EPUB 章節快取版本升級至 23",
+          "鍵盤輸入改為觸控點擊輸入字元",
+          "ActivityResult 流程增強以支援閱讀器子活動",
         ],
       },
       {
         category: "Fixed",
         items: [
-          "File re-download pre-delete in FilesApi",
-          "401 errors redirect to QR pairing instead of generic toast",
-          "`pio check` defects resolved",
+          "FilesApi 重複下載檔案前先刪除舊檔",
+          "401 錯誤改為導向 QR 配對頁面，不再顯示通用錯誤提示",
+          "`pio check` 靜態分析缺陷已修復",
         ],
       },
     ],

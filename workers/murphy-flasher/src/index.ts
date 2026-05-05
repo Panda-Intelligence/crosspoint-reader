@@ -147,7 +147,7 @@ function serveIndex(): Response {
     </div>
 
     <div class="version">
-      <a href="/changelog">📋 Changelog</a> · ${PRODUCT_NAME} v${FIRMWARE_VERSION} · Build ${FIRMWARE_BUILD_DATE}
+      <a href="/changelog">📋 更新日誌</a> · ${PRODUCT_NAME} v${FIRMWARE_VERSION} · Build ${FIRMWARE_BUILD_DATE}
     </div>
   </div>
 </body>
@@ -256,13 +256,20 @@ async function serveFirmware(path: string, env: Env): Promise<Response> {
 
 // Changelog HTML page
 function renderChangelogHtml(entries: ChangelogEntry[]): string {
+  const categoryLabel: Record<string, string> = {
+    Added: "新增",
+    Changed: "變更",
+    Fixed: "修復",
+    Removed: "移除",
+  };
+
   const items = entries
     .map((entry) => {
       const changes = entry.changes
         .map(
           (c) =>
             `<div class="cat"><span class="cat-label cat-${c.category.toLowerCase()}">${
-              c.category
+              categoryLabel[c.category]
             }</span><ul>${c.items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul></div>`
         )
         .join("");
@@ -277,14 +284,14 @@ function renderChangelogHtml(entries: ChangelogEntry[]): string {
     .join("");
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${PRODUCT_NAME} — Changelog</title>
+  <title>${PRODUCT_NAME} — 更新日誌</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0f0f1a;color:#e0e0e0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2rem 1rem}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","Noto Sans TC",Roboto,sans-serif;background:#0f0f1a;color:#e0e0e0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2rem 1rem}
     .container{max-width:680px;width:100%}
     h1{font-size:1.5rem;color:#7c8aff;margin-bottom:.25rem}
     .subtitle{color:#8888aa;margin-bottom:2rem}
@@ -293,7 +300,7 @@ function renderChangelogHtml(entries: ChangelogEntry[]): string {
     .version{font-size:1.25rem;font-weight:700;color:#7c8aff}
     .date{color:#666;font-size:.85rem}
     .cat{margin-bottom:.75rem}
-    .cat-label{display:inline-block;font-size:.75rem;font-weight:600;padding:2px 8px;border-radius:4px;margin-bottom:.35rem;text-transform:uppercase}
+    .cat-label{display:inline-block;font-size:.75rem;font-weight:600;padding:2px 8px;border-radius:4px;margin-bottom:.35rem}
     .cat-added{background:#1a3a1a;color:#4caf50}
     .cat-changed{background:#1a2a3a;color:#4da6ff}
     .cat-fixed{background:#3a2a1a;color:#ffa64d}
@@ -309,10 +316,10 @@ function renderChangelogHtml(entries: ChangelogEntry[]): string {
 </head>
 <body>
   <div class="container">
-    <h1>${PRODUCT_NAME} — Changelog</h1>
-    <div class="subtitle">All notable changes to Murphy Reader firmware</div>
+    <h1>${PRODUCT_NAME} — 更新日誌</h1>
+    <div class="subtitle">Murphy Reader 韌體的所有重要變更記錄</div>
     ${items}
-    <a class="back" href="/">&larr; Back to Flasher</a>
+    <a class="back" href="/">&larr; 返回刷機頁面</a>
   </div>
   <footer>${PRODUCT_NAME} v${FIRMWARE_VERSION}</footer>
 </body>
