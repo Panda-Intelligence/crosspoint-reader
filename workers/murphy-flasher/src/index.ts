@@ -1,6 +1,8 @@
 // Murphy Flasher — Cloudflare Worker
 // Web USB flasher (esp-web-tools) + OTA update API
-// Routes: / | /manifest.json | /ota/latest | /ota/check | /firmware/*
+// Routes: / | /changelog | /changelog.json | /manifest.json | /ota/latest | /ota/check | /firmware/*
+
+import { changelog, type ChangelogEntry } from "./changelog";
 
 interface Env {
   FIRMWARE_BUCKET: R2Bucket;
@@ -144,7 +146,9 @@ function serveIndex(): Response {
       <p><code>GET /firmware/${FIRMWARE_FILENAME}</code> — Firmware binary</p>
     </div>
 
-    <div class="version">${PRODUCT_NAME} v${FIRMWARE_VERSION} · Build ${FIRMWARE_BUILD_DATE}</div>
+    <div class="version">
+      <a href="/changelog">📋 Changelog</a> · ${PRODUCT_NAME} v${FIRMWARE_VERSION} · Build ${FIRMWARE_BUILD_DATE}
+    </div>
   </div>
 </body>
 </html>`;
@@ -250,6 +254,95 @@ async function serveFirmware(path: string, env: Env): Promise<Response> {
   );
 }
 
+// Changelog HTML page
+function renderChangelogHtml(entries: ChangelogEntry[]): string {
+  const items = entries
+    .map((entry) => {
+      const changes = entry.changes
+        .map(
+          (c) =>
+            `<div class="cat"><span class="cat-label cat-${c.category.toLowerCase()}">${
+              c.category
+            }</span><ul>${c.items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul></div>`
+        )
+        .join("");
+      return `<div class="release">
+        <div class="rel-header">
+          <span class="version">${escapeHtml(entry.version)}</span>
+          <span class="date">${entry.date}</span>
+        </div>
+        ${changes}
+      </div>`;
+    })
+    .join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${PRODUCT_NAME} — Changelog</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0f0f1a;color:#e0e0e0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2rem 1rem}
+    .container{max-width:680px;width:100%}
+    h1{font-size:1.5rem;color:#7c8aff;margin-bottom:.25rem}
+    .subtitle{color:#8888aa;margin-bottom:2rem}
+    .release{background:#1a1a2e;border-radius:12px;padding:1.5rem;margin-bottom:1rem;border:1px solid #2a2a4a}
+    .rel-header{display:flex;align-items:baseline;gap:.75rem;margin-bottom:1rem}
+    .version{font-size:1.25rem;font-weight:700;color:#7c8aff}
+    .date{color:#666;font-size:.85rem}
+    .cat{margin-bottom:.75rem}
+    .cat-label{display:inline-block;font-size:.75rem;font-weight:600;padding:2px 8px;border-radius:4px;margin-bottom:.35rem;text-transform:uppercase}
+    .cat-added{background:#1a3a1a;color:#4caf50}
+    .cat-changed{background:#1a2a3a;color:#4da6ff}
+    .cat-fixed{background:#3a2a1a;color:#ffa64d}
+    .cat-removed{background:#3a1a1a;color:#ff4d4d}
+    ul{list-style:none;padding-left:0}
+    li{padding:.15rem 0;font-size:.9rem;color:#ccc;line-height:1.5}
+    li::before{content:"– ";color:#555}
+    a{color:#7c8aff;text-decoration:none}
+    a:hover{text-decoration:underline}
+    .back{display:inline-block;margin-top:1.5rem;font-size:.9rem}
+    footer{text-align:center;color:#555;font-size:.8rem;margin-top:2rem}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>${PRODUCT_NAME} — Changelog</h1>
+    <div class="subtitle">All notable changes to Murphy Reader firmware</div>
+    ${items}
+    <a class="back" href="/">&larr; Back to Flasher</a>
+  </div>
+  <footer>${PRODUCT_NAME} v${FIRMWARE_VERSION}</footer>
+</body>
+</html>`;
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function serveChangelogHtml(): Response {
+  return new Response(renderChangelogHtml(changelog), {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=3600" },
+  });
+}
+
+function serveChangelogJson(): Response {
+  return new Response(JSON.stringify(changelog, null, 2), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "public, max-age=3600",
+    },
+  });
+}
+
 // Handle CORS preflight
 function handleOptions(_request: Request): Response {
   return new Response(null, {
@@ -276,6 +369,16 @@ export default {
     // Route: /
     if (path === "/" || path === "/index.html") {
       return serveIndex();
+    }
+
+    // Route: /changelog
+    if (path === "/changelog") {
+      return serveChangelogHtml();
+    }
+
+    // Route: /changelog.json
+    if (path === "/changelog.json") {
+      return serveChangelogJson();
     }
 
     // Route: /manifest.json
@@ -309,6 +412,8 @@ export default {
         error: "not_found",
         endpoints: [
           { path: "/", description: "Web flasher page" },
+          { path: "/changelog", description: "Release changelog" },
+          { path: "/changelog.json", description: "Changelog JSON API" },
           { path: "/manifest.json", description: "ESP Web Tools manifest" },
           { path: "/ota/latest", description: "OTA latest version info (JSON)" },
           { path: "/ota/check", description: "OTA version string (plain text)" },
