@@ -2,15 +2,20 @@
 // Web USB flasher (esp-web-tools) + OTA update API
 // Routes: / | /manifest.json | /ota/latest | /ota/check | /firmware/*
 
+interface Env {
+  FIRMWARE_BUCKET: R2Bucket;
+  FIRMWARE_META: KVNamespace;
+}
+
 const FIRMWARE_VERSION = "1.0.0";
 const FIRMWARE_BUILD_DATE = "2026-05-05";
-const FIRMWARE_FILENAME = "firmware.bin";
+const FIRMWARE_FILENAME = "murphy-26-0505-1.0.0.bin";
 const CHIP_FAMILY = "ESP32-S3";
 const PRODUCT_NAME = "Murphy Reader";
 const APP_OFFSET = 0x20000;
 
 // HTML template with esp-web-tools integration
-function serveIndex() {
+function serveIndex(): Response {
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -136,7 +141,7 @@ function serveIndex() {
       <p><code>GET /ota/latest</code> — Latest firmware info (JSON)</p>
       <p><code>GET /ota/check</code> — Simple version string</p>
       <p><code>GET /manifest.json</code> — ESP Web Tools manifest</p>
-      <p><code>GET /firmware/firmware.bin</code> — Firmware binary</p>
+      <p><code>GET /firmware/${FIRMWARE_FILENAME}</code> — Firmware binary</p>
     </div>
 
     <div class="version">${PRODUCT_NAME} v${FIRMWARE_VERSION} · Build ${FIRMWARE_BUILD_DATE}</div>
@@ -149,7 +154,7 @@ function serveIndex() {
 }
 
 // ESP Web Tools manifest
-function serveManifest(env) {
+function serveManifest(_env: Env): Response {
   const base = `https://murphy.pandacat.ai`;
   const manifest = {
     name: PRODUCT_NAME,
@@ -163,7 +168,7 @@ function serveManifest(env) {
           { path: `${base}/firmware/bootloader.bin`, offset: 0x0000 },
           { path: `${base}/firmware/partitions.bin`, offset: 0x8000 },
           { path: `${base}/firmware/boot_app0.bin`, offset: 0xe000 },
-          { path: `${base}/firmware/firmware.bin`, offset: APP_OFFSET },
+          { path: `${base}/firmware/${FIRMWARE_FILENAME}`, offset: APP_OFFSET },
         ],
       },
     ],
@@ -178,13 +183,13 @@ function serveManifest(env) {
 }
 
 // OTA latest version info
-function serveOtaLatest(env) {
+function serveOtaLatest(_env: Env): Response {
   const ota = {
     name: PRODUCT_NAME,
     version: FIRMWARE_VERSION,
     build_date: FIRMWARE_BUILD_DATE,
     chip_family: CHIP_FAMILY,
-    firmware_url: `https://murphy.pandacat.ai/firmware/firmware.bin`,
+    firmware_url: `https://murphy.pandacat.ai/firmware/${FIRMWARE_FILENAME}`,
     app_offset: APP_OFFSET,
     force_update: false,
   };
@@ -198,7 +203,7 @@ function serveOtaLatest(env) {
 }
 
 // Simple version check: returns plain text version string
-function serveOtaCheck(env) {
+function serveOtaCheck(_env: Env): Response {
   return new Response(FIRMWARE_VERSION, {
     headers: {
       "Content-Type": "text/plain",
@@ -209,8 +214,8 @@ function serveOtaCheck(env) {
 }
 
 // Serve firmware binary from R2 bucket
-async function serveFirmware(path, env, ctx) {
-  // path is like "/firmware/firmware.bin" or "/firmware/bootloader.bin"
+async function serveFirmware(path: string, env: Env): Promise<Response> {
+  // path is like `/firmware/murphy-26-0505-1.0.0.bin` or `/firmware/bootloader.bin`
   const key = path.replace("/firmware/", "");
 
   // Try R2 first, fall back to static response
@@ -233,7 +238,7 @@ async function serveFirmware(path, env, ctx) {
     JSON.stringify({
       error: "firmware_not_found",
       message: `Firmware file '${key}' not found in storage. Upload it to the R2 bucket.`,
-      hint: "Use: wrangler r2 object put murphy-firmware/firmware.bin --file=.pio/build/mofei/firmware.bin",
+      hint: "Use: wrangler r2 object put murphy-firmware/murphy-26-0505-1.0.0.bin --file=.pio/build/mofei/firmware.bin",
     }),
     {
       status: 404,
@@ -246,7 +251,7 @@ async function serveFirmware(path, env, ctx) {
 }
 
 // Handle CORS preflight
-function handleOptions(request) {
+function handleOptions(_request: Request): Response {
   return new Response(null, {
     headers: {
       "Access-Control-Allow-Origin": "*",
@@ -259,7 +264,7 @@ function handleOptions(request) {
 
 // Main request handler
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     // CORS preflight
     if (request.method === "OPTIONS") {
       return handleOptions(request);
@@ -295,7 +300,7 @@ export default {
 
     // Route: /firmware/*
     if (path.startsWith("/firmware/")) {
-      return serveFirmware(path, env, ctx);
+      return serveFirmware(path, env);
     }
 
     // 404

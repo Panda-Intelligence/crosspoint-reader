@@ -10,7 +10,13 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 BUILD_DIR="$PROJECT_ROOT/.pio/build/mofei"
 BUCKET="murphy-firmware"
 
+# Build the firmware filename: murphy-YY-MMDD-VERSION.bin
+YEAR="$(date +%y)"
+MONTHDAY="$(date +%m%d)"
+FIRMWARE_NAME="murphy-${YEAR}-${MONTHDAY}-${VERSION}.bin"
+
 echo "=== Murphy Firmware Upload v${VERSION} ==="
+echo "  Firmware: $FIRMWARE_NAME"
 
 # Check files exist
 for f in bootloader.bin partitions.bin boot_app0.bin firmware.bin; do
@@ -24,19 +30,20 @@ done
 echo ""
 echo "Uploading to R2 bucket: $BUCKET..."
 
-# Upload individual files
+# Upload bootloader/partition files as-is, firmware with the new name
 wrangler r2 object put "$BUCKET/bootloader.bin"   --file="$BUILD_DIR/bootloader.bin"   --content-type=application/octet-stream
 wrangler r2 object put "$BUCKET/partitions.bin"   --file="$BUILD_DIR/partitions.bin"   --content-type=application/octet-stream
 wrangler r2 object put "$BUCKET/boot_app0.bin"    --file="$BUILD_DIR/boot_app0.bin"    --content-type=application/octet-stream
-wrangler r2 object put "$BUCKET/firmware.bin"     --file="$BUILD_DIR/firmware.bin"     --content-type=application/octet-stream
+wrangler r2 object put "$BUCKET/$FIRMWARE_NAME"   --file="$BUILD_DIR/firmware.bin"     --content-type=application/octet-stream
 
 # Store version metadata in KV
 wrangler kv key put --binding=FIRMWARE_META "latest-version" "$VERSION"
 wrangler kv key put --binding=FIRMWARE_META "latest-build-date" "$(date +%Y-%m-%d)"
 wrangler kv key put --binding=FIRMWARE_META "firmware-size" "$(stat -f%z "$BUILD_DIR/firmware.bin")"
+wrangler kv key put --binding=FIRMWARE_META "firmware-name" "$FIRMWARE_NAME"
 
 echo ""
 echo "=== Upload complete ==="
-echo "  Web flasher: https://murphy.pandacat.ai/"
+echo "  Web flasher:  https://murphy.pandacat.ai/"
 echo "  OTA endpoint: https://murphy.pandacat.ai/ota/latest"
-echo "  Firmware:     https://murphy.pandacat.ai/firmware/firmware.bin"
+echo "  Firmware:     https://murphy.pandacat.ai/firmware/$FIRMWARE_NAME"
