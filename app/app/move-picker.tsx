@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Modal,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -14,7 +17,9 @@ import { DeviceFileEntry, FilesApi } from '../src/api/files';
 // move-picker.tsx — destination-folder picker invoked by /files when the
 // user chooses "Move…" on a row. The source path is passed via route
 // params; on confirmation we call FilesApi.move and router.back() so the
-// caller (files.tsx) can re-list its current directory.
+// caller (files.tsx) can re-list its current directory. Includes an
+// inline "+ Folder" affordance so users can create a new destination
+// without leaving the move flow.
 export default function MovePickerScreen() {
   const router = useRouter();
   const { source } = useLocalSearchParams<{ source: string }>();
@@ -24,13 +29,16 @@ export default function MovePickerScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // mkdir sub-modal.
+  const [mkdirOpen, setMkdirOpen] = useState(false);
+  const [mkdirName, setMkdirName] = useState('');
+  const [mkdirBusy, setMkdirBusy] = useState(false);
+
   const fetchList = useCallback(async (p: string) => {
     setLoading(true);
     setError(null);
     try {
       const list = await FilesApi.list(p);
-      // Only directories are valid move targets; filter the rest out so
-      // they don't get tapped by mistake.
       setEntries(list.filter((e) => e.isDirectory));
     } catch (e: any) {
       setError(e?.message ?? 'Failed to load.');
@@ -72,15 +80,48 @@ export default function MovePickerScreen() {
     setPath(FilesApi.parentOf(path));
   };
 
+  const submitMkdir = async () => {
+    const name = mkdirName.trim();
+    if (!name) return;
+    if (name.includes('/') || name.includes('\\')) {
+      Alert.alert('Invalid name', 'Folder name cannot contain slashes.');
+      return;
+    }
+    setMkdirBusy(true);
+    try {
+      await FilesApi.mkdir(path, name);
+      setMkdirOpen(false);
+      setMkdirName('');
+      await fetchList(path);
+    } catch (e: any) {
+      Alert.alert('Create folder failed', e?.message ?? 'Could not create folder.');
+    } finally {
+      setMkdirBusy(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.pathBar}>
-        <TouchableOpacity onPress={goUp} style={styles.upButton} disabled={busy}>
+        <TouchableOpacity
+          onPress={goUp}
+          style={styles.upButton}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel={path === '/' ? 'Cancel move' : 'Up one folder'}>
           <Text style={styles.upButtonText}>{path === '/' ? '‹ Cancel' : '‹ Up'}</Text>
         </TouchableOpacity>
         <Text style={styles.pathText} numberOfLines={1} ellipsizeMode="middle">
           {path}
         </Text>
+        <TouchableOpacity
+          onPress={() => setMkdirOpen(true)}
+          style={styles.mkdirButton}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel="Create new folder here">
+          <Text style={styles.mkdirButtonText}>+ Folder</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.subtitleBar}>
@@ -109,7 +150,9 @@ export default function MovePickerScreen() {
             <TouchableOpacity
               style={styles.row}
               onPress={() => setPath(FilesApi.joinPath(path, item.name))}
-              disabled={busy}>
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel={`Enter folder ${item.name}`}>
               <Text style={styles.icon}>📁</Text>
               <Text style={styles.rowName} numberOfLines={1}>
                 {item.name}
@@ -132,7 +175,9 @@ export default function MovePickerScreen() {
             (busy || isInvalidTarget) && styles.buttonDisabled,
           ]}
           onPress={confirmMove}
-          disabled={busy || isInvalidTarget}>
+          disabled={busy || isInvalidTarget}
+          accessibilityRole="button"
+          accessibilityLabel={`Move into ${path}`}>
           {busy ? (
             <ActivityIndicator color="#fff" />
           ) : (
@@ -142,6 +187,50 @@ export default function MovePickerScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={mkdirOpen}
+        onRequestClose={() => setMkdirOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>New Folder</Text>
+            <Text style={styles.modalHint}>under {path}</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={mkdirName}
+              onChangeText={setMkdirName}
+              placeholder="Folder name"
+              placeholderTextColor="#aaa"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => {
+                  setMkdirOpen(false);
+                  setMkdirName('');
+                }}
+                disabled={mkdirBusy}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmit, mkdirBusy && styles.modalSubmitDisabled]}
+                onPress={submitMkdir}
+                disabled={mkdirBusy || !mkdirName.trim()}>
+                {mkdirBusy ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Create</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -160,6 +249,8 @@ const styles = StyleSheet.create({
   upButton: { paddingVertical: 6, paddingHorizontal: 10 },
   upButtonText: { color: '#007AFF', fontSize: 16, fontWeight: '600' },
   pathText: { flex: 1, fontSize: 13, color: '#444', fontFamily: 'monospace' },
+  mkdirButton: { paddingVertical: 6, paddingHorizontal: 10 },
+  mkdirButtonText: { color: '#007AFF', fontSize: 14, fontWeight: '600' },
   subtitleBar: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -196,4 +287,49 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.5, backgroundColor: '#A0A0A0' },
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 360,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '600', marginBottom: 4 },
+  modalHint: { fontSize: 12, color: '#888', marginBottom: 12 },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    fontSize: 15,
+    color: '#333',
+    marginBottom: 16,
+  },
+  modalActions: { flexDirection: 'row', gap: 12 },
+  modalCancel: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    alignItems: 'center',
+  },
+  modalCancelText: { color: '#444', fontWeight: '600' },
+  modalSubmit: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalSubmitDisabled: { opacity: 0.5, backgroundColor: '#A0A0A0' },
+  modalSubmitText: { color: '#fff', fontWeight: '600' },
 });
