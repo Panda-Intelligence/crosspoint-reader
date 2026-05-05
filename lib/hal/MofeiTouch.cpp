@@ -883,8 +883,10 @@ void MofeiTouchDriver::normalizePoint(uint16_t* x, uint16_t* y) const {
   ty = ty >= rawHeight ? 0 : (rawHeight - 1 - ty);
 #endif
 
-  *x = scaleAxis(tx, rawWidth, MOFEI_TOUCH_LOGICAL_WIDTH);
-  *y = scaleAxis(ty, rawHeight, MOFEI_TOUCH_LOGICAL_HEIGHT);
+  *x = static_cast<uint16_t>(
+      std::max<int>(0, static_cast<int>(scaleAxis(tx, rawWidth, MOFEI_TOUCH_LOGICAL_WIDTH)) + MOFEI_TOUCH_OFFSET_X));
+  *y = static_cast<uint16_t>(
+      std::max<int>(0, static_cast<int>(scaleAxis(ty, rawHeight, MOFEI_TOUCH_LOGICAL_HEIGHT)) + MOFEI_TOUCH_OFFSET_Y));
 }
 
 void MofeiTouchDriver::logStatus(unsigned long now) {

@@ -88,6 +88,14 @@
 #define MOFEI_TOUCH_INVERT_Y 0
 #endif
 
+#ifndef MOFEI_TOUCH_OFFSET_X
+#define MOFEI_TOUCH_OFFSET_X 0
+#endif
+
+#ifndef MOFEI_TOUCH_OFFSET_Y
+#define MOFEI_TOUCH_OFFSET_Y 0
+#endif
+
 class MofeiTouchDriver {
  public:
   enum class EventType : uint8_t { None, Tap, SwipeLeft, SwipeRight, SwipeUp, SwipeDown };
