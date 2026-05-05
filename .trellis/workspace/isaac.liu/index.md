@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 4
+- **Total Sessions**: 5
 - **Last Active**: 2026-05-05
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~152 | Active |
+| `journal-1.md` | ~186 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 5 | 2026-05-05 | P2 grayscale antialiasing — audit confirms already shipping | `5cb2a48` | `feat/murphy` |
 | 4 | 2026-05-05 | P1 lockscreen passcode — 4-digit numeric, configurable timeout | `05f9f8c`, `41ba426`, `6ddff38`, `243ee6a`, `6614a61` | `feat/murphy` |
 | 3 | 2026-05-04 | P1 dashboard icons — fix 5 misaligned shortcut icons (Bootstrap Icons) | `e71e3bd` | `feat/murphy` |
 | 2 | 2026-05-04 | P0 touch coord debug — no defect found, screenshot tool fixed | `8e45639` | `feat/murphy` |

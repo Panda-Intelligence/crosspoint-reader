@@ -150,3 +150,37 @@ P1 lockscreen passcode task closed (implemented in parallel by codex runtime per
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: P2 grayscale antialiasing — audit confirms already shipping
+
+**Date**: 2026-05-05
+**Task**: P2 grayscale antialiasing — audit confirms already shipping
+**Package**: open-x4-sdk
+**Branch**: `feat/murphy`
+
+### Summary
+
+P2 grayscale antialiasing task closed without code change. Audit found the originally-scoped feature is already in production: TC EPF font packs are 2-bit (is2Bit=1, verified by parsing FontPackHeader of every notosans_tc_*.epf), build_multilingual_font_pack.py invokes fontconvert.py with --2bit --compress, GfxRenderer::renderCharImpl 2-bit branch is wired and dispatched by renderMode (BW / GRAYSCALE_LSB / GRAYSCALE_MSB), EpubReaderActivity::render does the 3-pass (BW -> gray-LSB -> gray-MSB -> displayGrayBuffer) when SETTINGS.textAntiAliasing == 1 (default 1), drawBitmap reads 2-bit pixel value and dispatches per renderMode. Same pattern in XtcReaderActivity via ReaderUtils.h. Non-reader activities (Dashboard, Settings, all hubs, keyboard) use single-pass BW by design; extending grayscale would triple full-refresh time (3.5 s vs 1.5 s on Mofei panel) for visual gain that is lost on 1-bit icon assets. Audit + screenshot evidence in research/grayscale-audit.md and current-state.bmp/png. Two follow-up candidates documented (extend grayscale to UI / improve screenshot tool to dump gray buffers) but neither is blocking.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5cb2a48` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
