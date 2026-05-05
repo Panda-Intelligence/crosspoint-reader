@@ -118,4 +118,32 @@ export const FilesApi = {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   },
+
+  /**
+   * Rename a file or folder in place. `newName` must NOT contain slashes;
+   * the firmware enforces this and rejects protected names.
+   */
+  async rename(path: string, newName: string): Promise<void> {
+    const client = await getApiClient();
+    const body = new URLSearchParams({ path, name: newName });
+    await client.post('/rename', body.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  },
+
+  /**
+   * Move an item into the given destination directory. The destination
+   * folder must already exist on the device. The basename of `path` is
+   * preserved.
+   */
+  async move(path: string, destDir: string): Promise<void> {
+    const client = await getApiClient();
+    const basename = path.split('/').filter(Boolean).pop() ?? '';
+    if (!basename) throw new Error('Cannot move root.');
+    const dest = joinPath(destDir, basename);
+    const body = new URLSearchParams({ path, dest });
+    await client.post('/move', body.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  },
 };

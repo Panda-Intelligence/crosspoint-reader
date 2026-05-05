@@ -11,6 +11,8 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
+import * as Sharing from 'expo-sharing';
 
 import { DeviceFileEntry, FilesApi } from '../src/api/files';
 
@@ -23,6 +25,7 @@ function formatSize(bytes: number): string {
 
 export default function FilesScreen() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const [path, setPath] = useState<string>('/');
   const [entries, setEntries] = useState<DeviceFileEntry[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,6 +35,10 @@ export default function FilesScreen() {
   // mkdir modal
   const [mkdirOpen, setMkdirOpen] = useState(false);
   const [mkdirName, setMkdirName] = useState('');
+
+  // Rename modal — `target` holds the path being renamed.
+  const [renameTarget, setRenameTarget] = useState<DeviceFileEntry | null>(null);
+  const [renameName, setRenameName] = useState('');
 
   const fetchList = useCallback(async (p: string) => {
     setLoading(true);
@@ -47,28 +54,55 @@ export default function FilesScreen() {
   }, []);
 
   useEffect(() => {
-    void fetchList(path);
-  }, [path, fetchList]);
+    if (isFocused) {
+      void fetchList(path);
+    }
+  }, [path, isFocused, fetchList]);
 
   const open = (entry: DeviceFileEntry) => {
     if (entry.isDirectory) {
+      // Directories: tap navigates in. Long-press would be the natural
+      // place for the action sheet, but Alert.alert + onLongPress isn't
+      // ergonomic on Android, so we surface a nav-vs-actions choice for
+      // folders too. Tap → navigate; long-press → actions.
       setPath(FilesApi.joinPath(path, entry.name));
       return;
     }
+    showActions(entry);
+  };
+
+  const showActions = (entry: DeviceFileEntry) => {
+    const fullPath = FilesApi.joinPath(path, entry.name);
     Alert.alert(
       entry.name,
-      `${formatSize(entry.size)}${entry.isEpub ? ' · EPUB' : ''}`,
+      `${entry.isDirectory ? 'Folder' : `${formatSize(entry.size)}${entry.isEpub ? ' · EPUB' : ''}`}`,
       [
+        ...(entry.isDirectory
+          ? []
+          : [
+              {
+                text: 'Download to phone',
+                onPress: () => downloadOne(fullPath),
+              } as const,
+            ]),
         {
-          text: 'Download to phone',
-          onPress: () => downloadOne(FilesApi.joinPath(path, entry.name)),
-        },
+          text: 'Rename',
+          onPress: () => {
+            setRenameTarget(entry);
+            setRenameName(entry.name);
+          },
+        } as const,
+        {
+          text: 'Move…',
+          onPress: () =>
+            router.push({ pathname: '/move-picker', params: { source: fullPath } }),
+        } as const,
         {
           text: 'Delete',
-          style: 'destructive',
+          style: 'destructive' as const,
           onPress: () => confirmDelete(entry),
         },
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' as const },
       ],
     );
   };
@@ -77,10 +111,20 @@ export default function FilesScreen() {
     setBusy(true);
     try {
       const result = await FilesApi.download(remotePath);
-      Alert.alert(
-        'Saved',
-        `${remotePath.split('/').pop()} (${formatSize(result.size)}) saved to:\n${result.localUri}`,
-      );
+      const basename = remotePath.split('/').pop() ?? 'file';
+      // Surface the share sheet so the user can hand the file off to
+      // another app. Falls back to a plain confirmation alert when the
+      // platform doesn't support sharing.
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(result.localUri, {
+          dialogTitle: `Share ${basename}`,
+        });
+      } else {
+        Alert.alert(
+          'Saved',
+          `${basename} (${formatSize(result.size)}) saved to:\n${result.localUri}`,
+        );
+      }
     } catch (e: any) {
       Alert.alert('Download failed', e?.message ?? 'Could not download.');
     } finally {
@@ -142,6 +186,33 @@ export default function FilesScreen() {
     }
   };
 
+  const submitRename = async () => {
+    if (!renameTarget) return;
+    const name = renameName.trim();
+    if (!name || name === renameTarget.name) {
+      setRenameTarget(null);
+      return;
+    }
+    if (name.includes('/') || name.includes('\\')) {
+      Alert.alert('Invalid name', 'Name cannot contain slashes.');
+      return;
+    }
+    const fullPath = FilesApi.joinPath(path, renameTarget.name);
+    setBusy(true);
+    try {
+      await FilesApi.rename(fullPath, name);
+      setRenameTarget(null);
+      setRenameName('');
+      await fetchList(path);
+    } catch (e: any) {
+      Alert.alert('Rename failed', e?.message ?? 'Could not rename.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Re-fetch on path change AND on focus (covers returning from move-picker).
+
   return (
     <View style={styles.container}>
       {/* Breadcrumb / path bar */}
@@ -182,6 +253,7 @@ export default function FilesScreen() {
             <TouchableOpacity
               style={styles.row}
               onPress={() => open(item)}
+              onLongPress={() => showActions(item)}
               disabled={busy}>
               <Text style={styles.icon}>
                 {item.isDirectory ? '📁' : item.isEpub ? '📖' : '📄'}
@@ -251,6 +323,56 @@ export default function FilesScreen() {
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={styles.modalSubmitText}>Create</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={renameTarget !== null}
+        onRequestClose={() => setRenameTarget(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Rename</Text>
+            <Text style={styles.modalHint} numberOfLines={1}>
+              {renameTarget?.name}
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={renameName}
+              onChangeText={setRenameName}
+              placeholder="New name"
+              placeholderTextColor="#aaa"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => {
+                  setRenameTarget(null);
+                  setRenameName('');
+                }}
+                disabled={busy}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmit, busy && styles.buttonDisabled]}
+                onPress={submitRename}
+                disabled={
+                  busy ||
+                  !renameName.trim() ||
+                  renameName.trim() === renameTarget?.name
+                }>
+                {busy ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Rename</Text>
                 )}
               </TouchableOpacity>
             </View>
