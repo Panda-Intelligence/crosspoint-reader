@@ -52,6 +52,12 @@ void EpubSearchResultsActivity::openSelectedResult() {
 }
 
 std::string EpubSearchResultsActivity::labelForResult(const EpubSearchResult& result) const {
+  if (fullBook) {
+    const int spineIndex = static_cast<int>((result.page >> 16) & 0xFFFF);
+    const int pageNumber = static_cast<int>(result.page & 0xFFFF);
+    return std::string(tr(STR_CHAPTER_PREFIX)) + std::to_string(spineIndex + 1) + " " + std::string(tr(STR_PAGE_LABEL)) +
+           " " + std::to_string(pageNumber + 1) + "  " + result.snippet;
+  }
   return std::string(tr(STR_PAGE_LABEL)) + " " + std::to_string(result.page + 1) + "  " + result.snippet;
 }
 
@@ -153,7 +159,7 @@ void EpubSearchResultsActivity::render(RenderLock&&) {
       contentX + (contentWidth - renderer.getTextWidth(UI_12_FONT_ID, tr(STR_SEARCH_RESULTS), EpdFontFamily::BOLD)) / 2;
   renderer.drawText(UI_12_FONT_ID, titleX, 15 + contentY, tr(STR_SEARCH_RESULTS), true, EpdFontFamily::BOLD);
 
-  std::string scopeLine = tr(STR_SEARCH_SCOPE_CURRENT_CHAPTER);
+  std::string scopeLine = fullBook ? tr(STR_SEARCH_SCOPE_FULL_BOOK) : tr(STR_SEARCH_SCOPE_CURRENT_CHAPTER);
   if (!query.empty()) {
     scopeLine += "  ";
     scopeLine += tr(STR_SEARCH_QUERY_PREFIX);

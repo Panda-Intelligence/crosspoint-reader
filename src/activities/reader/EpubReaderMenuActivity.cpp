@@ -59,8 +59,10 @@ std::vector<EpubReaderMenuActivity::MenuItem> EpubReaderMenuActivity::buildMenuI
     items.push_back({MenuAction::FOOTNOTES, StrId::STR_FOOTNOTES});
   }
   items.push_back({MenuAction::SEARCH, StrId::STR_SEARCH_CURRENT_CHAPTER});
+  items.push_back({MenuAction::FULL_BOOK_SEARCH, StrId::STR_SEARCH_FULL_BOOK});
   items.push_back({MenuAction::TOGGLE_BOOKMARK, StrId::STR_ADD_BOOKMARK});
   items.push_back({MenuAction::TOGGLE_HIGHLIGHT, StrId::STR_ADD_HIGHLIGHT});
+  items.push_back({MenuAction::DICTIONARY_LOOKUP, StrId::STR_DICTIONARY_LOOKUP});
   items.push_back({MenuAction::BOOKMARKS, StrId::STR_BOOKMARKS});
   items.push_back({MenuAction::FONT_SIZE_DOWN, StrId::STR_READER_FONT_SIZE_DOWN});
   items.push_back({MenuAction::FONT_SIZE_UP, StrId::STR_READER_FONT_SIZE_UP});

@@ -15,6 +15,7 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "DictionaryActivity.h"
 #include "EpubBookmarksActivity.h"
 #include "EpubReaderChapterSelectionActivity.h"
 #include "EpubReaderFootnotesActivity.h"
@@ -441,12 +442,32 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       openChapterSearch();
       break;
     }
+    case EpubReaderMenuActivity::MenuAction::FULL_BOOK_SEARCH: {
+      openFullBookSearch();
+      break;
+    }
     case EpubReaderMenuActivity::MenuAction::TOGGLE_BOOKMARK: {
       toggleCurrentBookmark();
       break;
     }
     case EpubReaderMenuActivity::MenuAction::TOGGLE_HIGHLIGHT: {
       toggleCurrentHighlight();
+      break;
+    }
+    case EpubReaderMenuActivity::MenuAction::DICTIONARY_LOOKUP: {
+      // Open keyboard for word lookup
+      startActivityForResult(
+          std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_DICTIONARY_LOOKUP), "", 48),
+          [this](const ActivityResult& result) {
+            if (!result.isCancelled) {
+              const auto& keyboard = std::get<KeyboardResult>(result.data);
+              if (!keyboard.text.empty()) {
+                openDictionaryLookup(keyboard.text);
+              }
+            } else {
+              requestUpdate();
+            }
+          });
       break;
     }
     case EpubReaderMenuActivity::MenuAction::BOOKMARKS: {
@@ -698,7 +719,7 @@ void EpubReaderActivity::openChapterSearch() {
                            const auto& keyboard = std::get<KeyboardResult>(result.data);
                            const auto results = searchCurrentChapter(keyboard.text);
                            startActivityForResult(std::make_unique<EpubSearchResultsActivity>(renderer, mappedInput,
-                                                                                              results, keyboard.text),
+                                                                                               results, keyboard.text),
                                                   [this](const ActivityResult& result) {
                                                     if (!result.isCancelled) {
                                                       const auto page = std::get<PageResult>(result.data).page;
@@ -714,6 +735,98 @@ void EpubReaderActivity::openChapterSearch() {
                                                     requestUpdate();
                                                   });
                          });
+}
+
+void EpubReaderActivity::openFullBookSearch() {
+  startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_SEARCH_QUERY), "", 48),
+                         [this](const ActivityResult& result) {
+                           if (result.isCancelled) {
+                             requestUpdate();
+                             return;
+                           }
+
+                           const auto& keyboard = std::get<KeyboardResult>(result.data);
+                           const auto results = searchFullBook(keyboard.text);
+                           startActivityForResult(
+                               std::make_unique<EpubSearchResultsActivity>(
+                                   renderer, mappedInput, results, keyboard.text, /*fullBook=*/true),
+                               [this](const ActivityResult& result) {
+                                 if (!result.isCancelled) {
+                                   const auto pageResult = std::get<PageResult>(result.data);
+                                   const uint16_t page = static_cast<uint16_t>(pageResult.page & 0xFFFF);
+                                   const int targetSpine = static_cast<int>((pageResult.page >> 16) & 0xFFFF);
+                                   if (targetSpine == currentSpineIndex) {
+                                     if (section && page < section->pageCount) {
+                                       section->currentPage = static_cast<int>(page);
+                                       nextPageNumber = static_cast<int>(page);
+                                     } else {
+                                       nextPageNumber = static_cast<int>(page);
+                                       pendingPageJump = page;
+                                       section.reset();
+                                     }
+                                   } else {
+                                     RenderLock lock(*this);
+                                     currentSpineIndex = targetSpine;
+                                     nextPageNumber = static_cast<int>(page);
+                                     pendingPageJump = page;
+                                     cachedChapterTotalPageCount = 0;
+                                     section.reset();
+                                   }
+                                 }
+                                 requestUpdate();
+                               });
+                         });
+}
+
+std::vector<EpubSearchResult> EpubReaderActivity::searchFullBook(const std::string& query) const {
+  std::vector<EpubSearchResult> results;
+  if (!epub || query.empty()) {
+    return results;
+  }
+
+  const std::string normalizedQuery = asciiLowerCopy(query);
+  const int spineCount = epub->getSpineItemsCount();
+
+  for (int spineIdx = 0; spineIdx < spineCount && results.size() < kMaxSearchResults; spineIdx++) {
+    Section searchSection(epub, spineIdx, renderer);
+    const int readerFontId = currentReaderFontId(renderer);
+    if (!searchSection.loadSectionFile(readerFontId, SETTINGS.getReaderLineCompression(),
+                                       SETTINGS.extraParagraphSpacing, SETTINGS.paragraphAlignment,
+                                       /*viewportWidth=*/0, /*viewportHeight=*/0, SETTINGS.hyphenationEnabled,
+                                       SETTINGS.readerSimplifiedToTraditional, SETTINGS.readerTextLayout,
+                                       SETTINGS.embeddedStyle, SETTINGS.imageRendering)) {
+      continue;  // Chapter not cached, skip
+    }
+
+    for (uint16_t pageIndex = 0; pageIndex < searchSection.pageCount && results.size() < kMaxSearchResults;
+         pageIndex++) {
+      auto page = searchSection.loadPageFromSectionFile(pageIndex);
+      if (!page) {
+        continue;
+      }
+
+      const std::string text = pageTextFromPage(*page);
+      if (text.empty()) {
+        continue;
+      }
+
+      const std::string normalizedText = asciiLowerCopy(text);
+      const size_t matchOffset = normalizedText.find(normalizedQuery);
+      if (matchOffset == std::string::npos) {
+        continue;
+      }
+
+      // Encode spine index and page in the result page field: upper 16 bits = spine, lower 16 bits = page
+      const uint32_t encodedPage = (static_cast<uint32_t>(spineIdx) << 16) | static_cast<uint32_t>(pageIndex);
+      results.push_back(EpubSearchResult{encodedPage, snippetForMatch(text, matchOffset)});
+    }
+  }
+  return results;
+}
+
+void EpubReaderActivity::openDictionaryLookup(const std::string& word) {
+  // Open dictionary activity with the lookup word
+  activityManager.replaceActivity(std::make_unique<DictionaryActivity>(renderer, mappedInput, word));
 }
 
 EpubBookmark EpubReaderActivity::currentBookmark() const {
@@ -736,8 +849,57 @@ EpubBookmark EpubReaderActivity::currentBookmark() const {
 }
 
 EpubHighlight EpubReaderActivity::currentHighlight() const {
-  const EpubBookmark bookmark = currentBookmark();
-  return EpubHighlight{bookmark.spineIndex, bookmark.page, bookmark.pageCount, bookmark.title};
+  EpubHighlight highlight;
+  highlight.spineIndex = currentSpineIndex;
+  highlight.page = section ? section->currentPage : nextPageNumber;
+  highlight.pageCount = section ? section->pageCount : cachedChapterTotalPageCount;
+
+  if (epub && currentSpineIndex >= 0 && currentSpineIndex < epub->getSpineItemsCount()) {
+    const int tocIndex = epub->getTocIndexForSpineIndex(currentSpineIndex);
+    if (tocIndex >= 0) {
+      highlight.title = epub->getTocItem(tocIndex).title;
+    }
+  }
+
+  if (highlight.title.empty()) {
+    highlight.title = std::string(tr(STR_CHAPTER_PREFIX)) + std::to_string(currentSpineIndex + 1);
+  }
+
+  // Capture text-range anchors from the current page's TextBlocks.
+  if (section) {
+    auto page = section->loadPageFromSectionFile(static_cast<uint16_t>(section->currentPage));
+    if (page && !page->elements.empty()) {
+      // Find first and last PageLine elements
+      int firstBlockIndex = -1;
+      int firstTokenStart = -1;
+      int lastBlockIndex = -1;
+      int lastTokenEnd = -1;
+      for (const auto& el : page->elements) {
+        if (el->getTag() == TAG_PageLine) {
+          const auto& line = static_cast<const PageLine&>(*el);
+          if (line.getBlock()) {
+            const int bi = line.getBlock()->getBlockIndex();
+            const int ts = line.getBlock()->getTokenStartIndex();
+            const int wc = static_cast<int>(line.getBlock()->wordCount());
+            if (firstBlockIndex < 0) {
+              firstBlockIndex = bi;
+              firstTokenStart = ts;
+            }
+            lastBlockIndex = bi;
+            lastTokenEnd = ts + wc;
+          }
+        }
+      }
+      if (firstBlockIndex >= 0) {
+        highlight.startBlockIndex = firstBlockIndex;
+        highlight.startTokenIndex = firstTokenStart;
+        highlight.endBlockIndex = lastBlockIndex;
+        highlight.endTokenIndex = lastTokenEnd;
+      }
+    }
+  }
+
+  return highlight;
 }
 
 void EpubReaderActivity::toggleCurrentBookmark() {

@@ -174,25 +174,33 @@ void EpubReaderFootnotesActivity::render(RenderLock&&) {
   if (showingDetail && selectedIndex >= 0 && selectedIndex < static_cast<int>(footnotes.size())) {
     const auto& footnote = footnotes[selectedIndex];
     int y = kFootnoteStartY + contentY;
+    // Draw popup background
+    renderer.fillRect(contentX + 10, y - 5, contentWidth - 20, 160, true);
+    renderer.fillRect(contentX + 12, y - 3, contentWidth - 24, 156, false);
+
+    renderer.drawText(UI_12_FONT_ID, contentX + 25, y + 8, tr(STR_FOOTNOTE_BODY_TITLE), false, EpdFontFamily::BOLD);
+
     std::string label = footnote.number;
     if (label.empty()) {
       label = tr(STR_LINK);
     }
-    label = renderer.truncatedText(UI_12_FONT_ID, label.c_str(), contentWidth - 40, EpdFontFamily::BOLD);
-    renderer.drawText(UI_12_FONT_ID, contentX + 20, y, label.c_str(), true, EpdFontFamily::BOLD);
-    y += 34;
+    y += 40;
+    label = renderer.truncatedText(UI_10_FONT_ID, label.c_str(), contentWidth - 50);
+    renderer.drawText(UI_10_FONT_ID, contentX + 25, y, label.c_str(), false);
 
+    y += 28;
     std::string href = footnote.href;
     if (href.empty()) {
       href = tr(STR_LINK);
     }
-    const auto lines = renderer.wrappedText(UI_10_FONT_ID, href.c_str(), contentWidth - 40, 5);
+    const auto lines = renderer.wrappedText(SMALL_FONT_ID, href.c_str(), contentWidth - 50, 3);
     for (const auto& line : lines) {
-      renderer.drawText(UI_10_FONT_ID, contentX + 20, y, line.c_str(), true);
-      y += 24;
+      renderer.drawText(SMALL_FONT_ID, contentX + 25, y, line.c_str(), false);
+      y += 20;
     }
 
-    renderer.drawText(SMALL_FONT_ID, contentX + 20, y + 10, tr(STR_FOOTNOTE_DETAIL_HINT), true);
+    y += 8;
+    renderer.drawText(SMALL_FONT_ID, contentX + 25, y, tr(STR_FOOTNOTE_DETAIL_HINT), false);
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_OPEN), "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
     renderer.displayBuffer();

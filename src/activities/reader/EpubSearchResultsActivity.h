@@ -8,15 +8,19 @@
 #include "util/ButtonNavigator.h"
 
 struct EpubSearchResult {
-  uint16_t page = 0;
+  uint32_t page = 0;
   std::string snippet;
 };
 
 class EpubSearchResultsActivity final : public Activity {
  public:
   explicit EpubSearchResultsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                     std::vector<EpubSearchResult> results, std::string query)
-      : Activity("EpubSearchResults", renderer, mappedInput), results(std::move(results)), query(std::move(query)) {}
+                                      std::vector<EpubSearchResult> results, std::string query,
+                                      bool fullBook = false)
+      : Activity("EpubSearchResults", renderer, mappedInput),
+        results(std::move(results)),
+        query(std::move(query)),
+        fullBook(fullBook) {}
 
   void onEnter() override;
   void onExit() override;
@@ -27,6 +31,7 @@ class EpubSearchResultsActivity final : public Activity {
  private:
   std::vector<EpubSearchResult> results;
   std::string query;
+  bool fullBook = false;
   ButtonNavigator buttonNavigator;
   int selectedIndex = 0;
 

@@ -99,6 +99,11 @@ export default function DiscoverScreen() {
               <Text style={styles.emptyHint}>
                 Make sure your phone and reader are on the same network.
               </Text>
+              <Text style={styles.emptyHint}>
+                Tip: this scan only covers the local /24 subnet (×.×.×.1–254).
+                If your network uses /16 or a separate guest VLAN, the device
+                won&apos;t be discovered — pair via QR code instead.
+              </Text>
             </View>
           ) : null
         }

@@ -6,6 +6,7 @@ import {
   Modal,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -126,12 +127,19 @@ interface FolderPickerProps {
 }
 
 // Inline folder picker — kept local rather than extracted to a shared
-// component. Lists only directories, supports navigating up.
+// component. Lists only directories, supports navigating up. Includes
+// a "+ New folder" affordance so users can create a destination
+// without leaving the upload flow.
 function FolderPickerModal({ visible, initialPath, onCancel, onConfirm }: FolderPickerProps) {
   const [path, setPath] = useState(initialPath);
   const [entries, setEntries] = useState<DeviceFileEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // mkdir sub-modal state.
+  const [mkdirOpen, setMkdirOpen] = useState(false);
+  const [mkdirName, setMkdirName] = useState('');
+  const [mkdirBusy, setMkdirBusy] = useState(false);
 
   const fetchList = useCallback(async (p: string) => {
     setLoading(true);
@@ -158,18 +166,47 @@ function FolderPickerModal({ visible, initialPath, onCancel, onConfirm }: Folder
     if (visible) void fetchList(path);
   }, [visible, path, fetchList]);
 
+  const submitMkdir = async () => {
+    const name = mkdirName.trim();
+    if (!name) return;
+    if (name.includes('/') || name.includes('\\')) {
+      Alert.alert('Invalid name', 'Folder name cannot contain slashes.');
+      return;
+    }
+    setMkdirBusy(true);
+    try {
+      await FilesApi.mkdir(path, name);
+      setMkdirOpen(false);
+      setMkdirName('');
+      await fetchList(path);
+    } catch (e: any) {
+      Alert.alert('Create folder failed', e?.message ?? 'Could not create folder.');
+    } finally {
+      setMkdirBusy(false);
+    }
+  };
+
   return (
     <Modal animationType="slide" transparent={false} visible={visible} onRequestClose={onCancel}>
       <View style={pickerStyles.container}>
         <View style={pickerStyles.pathBar}>
           <TouchableOpacity
             onPress={() => (path === '/' ? onCancel() : setPath(FilesApi.parentOf(path)))}
-            style={pickerStyles.upButton}>
+            style={pickerStyles.upButton}
+            accessibilityRole="button"
+            accessibilityLabel={path === '/' ? 'Cancel' : 'Up one folder'}>
             <Text style={pickerStyles.upButtonText}>{path === '/' ? '‹ Cancel' : '‹ Up'}</Text>
           </TouchableOpacity>
           <Text style={pickerStyles.pathText} numberOfLines={1} ellipsizeMode="middle">
             {path}
           </Text>
+          <TouchableOpacity
+            onPress={() => setMkdirOpen(true)}
+            style={pickerStyles.mkdirButton}
+            accessibilityRole="button"
+            accessibilityLabel="Create new folder here">
+            <Text style={pickerStyles.mkdirButtonText}>+ Folder</Text>
+          </TouchableOpacity>
         </View>
 
         {loading ? (
@@ -191,7 +228,9 @@ function FolderPickerModal({ visible, initialPath, onCancel, onConfirm }: Folder
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={pickerStyles.row}
-                onPress={() => setPath(FilesApi.joinPath(path, item.name))}>
+                onPress={() => setPath(FilesApi.joinPath(path, item.name))}
+                accessibilityRole="button"
+                accessibilityLabel={`Enter folder ${item.name}`}>
                 <Text style={pickerStyles.icon}>📁</Text>
                 <Text style={pickerStyles.rowName} numberOfLines={1}>
                   {item.name}
@@ -208,10 +247,58 @@ function FolderPickerModal({ visible, initialPath, onCancel, onConfirm }: Folder
         )}
 
         <View style={pickerStyles.actions}>
-          <TouchableOpacity style={pickerStyles.confirm} onPress={() => onConfirm(path)}>
+          <TouchableOpacity
+            style={pickerStyles.confirm}
+            onPress={() => onConfirm(path)}
+            accessibilityRole="button"
+            accessibilityLabel={`Use folder ${path}`}>
             <Text style={pickerStyles.confirmText}>Use this folder ({path})</Text>
           </TouchableOpacity>
         </View>
+
+        <Modal
+          animationType="fade"
+          transparent
+          visible={mkdirOpen}
+          onRequestClose={() => setMkdirOpen(false)}>
+          <View style={pickerStyles.modalBackdrop}>
+            <View style={pickerStyles.modalCard}>
+              <Text style={pickerStyles.modalTitle}>New Folder</Text>
+              <Text style={pickerStyles.modalHint}>under {path}</Text>
+              <TextInput
+                style={pickerStyles.modalInput}
+                value={mkdirName}
+                onChangeText={setMkdirName}
+                placeholder="Folder name"
+                placeholderTextColor="#aaa"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoFocus
+              />
+              <View style={pickerStyles.modalActions}>
+                <TouchableOpacity
+                  style={pickerStyles.modalCancel}
+                  onPress={() => {
+                    setMkdirOpen(false);
+                    setMkdirName('');
+                  }}
+                  disabled={mkdirBusy}>
+                  <Text style={pickerStyles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[pickerStyles.modalSubmit, mkdirBusy && pickerStyles.modalSubmitDisabled]}
+                  onPress={submitMkdir}
+                  disabled={mkdirBusy || !mkdirName.trim()}>
+                  {mkdirBusy ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={pickerStyles.modalSubmitText}>Create</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </Modal>
   );
@@ -286,6 +373,8 @@ const pickerStyles = StyleSheet.create({
   upButton: { paddingVertical: 6, paddingHorizontal: 10 },
   upButtonText: { color: '#007AFF', fontSize: 16, fontWeight: '600' },
   pathText: { flex: 1, fontSize: 13, color: '#444', fontFamily: 'monospace' },
+  mkdirButton: { paddingVertical: 6, paddingHorizontal: 10 },
+  mkdirButtonText: { color: '#007AFF', fontSize: 14, fontWeight: '600' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   errorText: { color: '#c44', fontSize: 14, textAlign: 'center', marginBottom: 12 },
   retry: {
@@ -315,4 +404,49 @@ const pickerStyles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 360,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '600', marginBottom: 4 },
+  modalHint: { fontSize: 12, color: '#888', marginBottom: 12 },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    fontSize: 15,
+    color: '#333',
+    marginBottom: 16,
+  },
+  modalActions: { flexDirection: 'row', gap: 12 },
+  modalCancel: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    alignItems: 'center',
+  },
+  modalCancelText: { color: '#444', fontWeight: '600' },
+  modalSubmit: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalSubmitDisabled: { opacity: 0.5, backgroundColor: '#A0A0A0' },
+  modalSubmitText: { color: '#fff', fontWeight: '600' },
 });

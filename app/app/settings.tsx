@@ -107,6 +107,34 @@ export default function SettingsScreen() {
     }
   };
 
+  const confirmReset = () => {
+    Alert.alert(
+      'Reset to defaults?',
+      'This rolls back every setting on the device to its factory ' +
+        'value. Your API token, lock-screen passcode, and OPDS ' +
+        'credentials are preserved. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            setSaving(true);
+            try {
+              await DeviceApi.resetSettings();
+              await fetchSettings();
+              Alert.alert('Done', 'Settings reset to factory defaults.');
+            } catch (e: any) {
+              Alert.alert('Reset failed', e?.message ?? 'Could not reset settings.');
+            } finally {
+              setSaving(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -403,6 +431,15 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   saveButtonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  resetButton: {
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+  },
+  resetButtonText: { color: '#FF3B30', fontSize: 14, fontWeight: '600' },
   buttonDisabled: { opacity: 0.6, backgroundColor: '#A0A0A0' },
   primaryButton: {
     backgroundColor: '#007AFF',

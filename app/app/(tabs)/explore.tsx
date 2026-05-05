@@ -29,9 +29,19 @@ export default function DeviceScreen() {
   const [settings, setSettings] = useState<DeviceSetting[] | null>(null);
   const [deviceStatus, setDeviceStatus] = useState<DeviceStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshAt, setLastRefreshAt] = useState<number | null>(null);
+  // Drives the "5 s ago" relative timestamp in the status panel; ticks
+  // once per second while the tab is focused.
+  const [tick, setTick] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = async () => {
+  // Throttle: ignore manual refresh taps that come within 5 s of the
+  // previous one to keep the device from being hammered.
+  const MIN_REFRESH_GAP_MS = 5000;
+  const refresh = async (manual = false) => {
+    if (manual && lastRefreshAt && Date.now() - lastRefreshAt < MIN_REFRESH_GAP_MS) {
+      return;
+    }
     setRefreshing(true);
     setError(null);
     try {
@@ -74,6 +84,7 @@ export default function DeviceScreen() {
       setError(e?.message ?? 'Failed to refresh.');
     } finally {
       setRefreshing(false);
+      setLastRefreshAt(Date.now());
     }
   };
 
@@ -82,6 +93,13 @@ export default function DeviceScreen() {
       void refresh();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFocused]);
+
+  // Tick every second while focused so the "X s ago" label updates.
+  useEffect(() => {
+    if (!isFocused) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
   }, [isFocused]);
 
   const summary = useMemo(() => {
@@ -139,8 +157,10 @@ export default function DeviceScreen() {
             </View>
             <TouchableOpacity
               style={styles.linkAction}
-              onPress={refresh}
-              disabled={refreshing}>
+              onPress={() => refresh(true)}
+              disabled={refreshing}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh device status">
               {refreshing ? (
                 <ActivityIndicator color="#007AFF" size="small" />
               ) : (
@@ -184,6 +204,14 @@ export default function DeviceScreen() {
               value={formatUptime(deviceStatus.uptime)}
             />
           </View>
+          {/* `tick` is intentionally referenced so this re-renders each
+              second and the "X s ago" string stays current. */}
+          <Text style={styles.lastRefresh}>
+            {lastRefreshAt
+              ? `Last refresh ${formatAgo(Date.now() - lastRefreshAt)}`
+              : 'Never refreshed'}
+            {tick >= 0 ? '' : ''}
+          </Text>
         </ThemedView>
       )}
 
@@ -303,6 +331,16 @@ function formatUptime(seconds: number): string {
   return `${m}m ${s}s`;
 }
 
+function formatAgo(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 5) return 'just now';
+  if (s < 60) return `${s} s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  return `${h} h ago`;
+}
+
 function StatusCell({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.statusCell}>
@@ -402,5 +440,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
+  },
+  lastRefresh: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 8,
+    textAlign: 'right',
   },
 });

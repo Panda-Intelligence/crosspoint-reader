@@ -171,7 +171,11 @@ void DictionaryActivity::render(RenderLock&&) {
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_DICTIONARY));
+  std::string headerTitle = tr(STR_DICTIONARY);
+  if (hasQueryWord && !queryWord.empty()) {
+    headerTitle += ": " + queryWord;
+  }
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, headerTitle.c_str());
 
   if (!showingDetail) {
     GUI.drawList(

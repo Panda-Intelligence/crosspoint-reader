@@ -60,7 +60,10 @@ class EpubReaderActivity final : public Activity {
   void changeFontSize(int delta);
   void toggleTouchLock();
   void openChapterSearch();
+  void openFullBookSearch();
   std::vector<EpubSearchResult> searchCurrentChapter(const std::string& query) const;
+  std::vector<EpubSearchResult> searchFullBook(const std::string& query) const;
+  void openDictionaryLookup(const std::string& word);
   EpubBookmark currentBookmark() const;
   EpubHighlight currentHighlight() const;
   void toggleCurrentBookmark();
