@@ -1,0 +1,15 @@
+{
+  "name": "murphy-flasher",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Murphy Reader — Cloudflare Worker for Web USB flashing + OTA updates",
+  "main": "src/index.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "upload-firmware": "bash scripts/upload-firmware.sh"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

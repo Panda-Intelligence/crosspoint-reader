@@ -1,0 +1,24 @@
+name = "murphy-flasher"
+main = "src/index.js"
+compatibility_date = "2026-05-05"
+
+# Route to your custom domain
+routes = [
+  { pattern = "murphy.pandacat.ai/ota/*", zone_id = "YOUR_ZONE_ID" },
+  { pattern = "murphy.pandacat.ai/*", zone_id = "YOUR_ZONE_ID" }
+]
+
+# R2 bucket for firmware binaries
+[[r2_buckets]]
+binding = "FIRMWARE_BUCKET"
+bucket_name = "murphy-firmware"
+
+# KV namespace for version metadata (small, fast access)
+[[kv_namespaces]]
+binding = "FIRMWARE_META"
+id = "YOUR_KV_ID"
+
+[env.production]
+routes = [
+  { pattern = "murphy.pandacat.ai/*", zone_id = "YOUR_ZONE_ID" }
+]
