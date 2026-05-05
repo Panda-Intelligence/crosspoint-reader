@@ -136,7 +136,9 @@ export default function FilesScreen() {
     const fullPath = FilesApi.joinPath(path, entry.name);
     Alert.alert(
       'Delete?',
-      `Permanently delete "${entry.name}" from the device?`,
+      entry.isDirectory
+        ? `Permanently delete "${entry.name}" and everything inside it from the device?`
+        : `Permanently delete "${entry.name}" from the device?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -148,7 +150,15 @@ export default function FilesScreen() {
               await FilesApi.remove(fullPath);
               await fetchList(path);
             } catch (e: any) {
-              Alert.alert('Delete failed', e?.message ?? 'Could not delete.');
+              // Firmware refuses to delete non-empty directories with a
+              // 4xx text body. Surface that hint when applicable.
+              const msg = e?.response?.data ?? e?.message ?? 'Could not delete.';
+              Alert.alert(
+                'Delete failed',
+                entry.isDirectory
+                  ? `${msg}\n\nNon-empty folders must be emptied first.`
+                  : String(msg),
+              );
             } finally {
               setBusy(false);
             }

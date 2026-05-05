@@ -57,7 +57,9 @@ export default function HomeScreen() {
         {deviceIp ? (
           <View style={styles.statusBox}>
             <Text style={styles.statusText}>Connected to: {deviceIp}</Text>
-            <TouchableOpacity style={styles.disconnectButton} onPress={handleDisconnect}>
+            <TouchableOpacity style={styles.disconnectButton} onPress={handleDisconnect}
+              accessibilityRole="button"
+              accessibilityLabel="Unbind paired device">
               <Text style={styles.disconnectText}>Unbind</Text>
             </TouchableOpacity>
           </View>
@@ -69,12 +71,16 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={styles.connectButton}
               onPress={() => router.push('/scanner')}
+              accessibilityRole="button"
+              accessibilityLabel="Scan QR code to pair device"
             >
               <Text style={styles.buttonText}>Scan QR Code</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.discoverButton}
               onPress={() => router.push('/discover')}
+              accessibilityRole="button"
+              accessibilityLabel="Discover Crosspoint Reader on local Wi-Fi"
             >
               <Text style={styles.discoverButtonText}>Discover on Wi-Fi</Text>
             </TouchableOpacity>
@@ -87,10 +93,13 @@ export default function HomeScreen() {
         <ThemedText>
           Send books (EPUB, TXT) or images directly to your device.
         </ThemedText>
-        <TouchableOpacity 
-          style={[styles.transferButton, !deviceIp && styles.disabledButton]} 
+        <TouchableOpacity
+          style={[styles.transferButton, !deviceIp && styles.disabledButton]}
           disabled={!deviceIp}
           onPress={() => router.push('/transfer')}
+          accessibilityRole="button"
+          accessibilityLabel="Send files to device"
+          accessibilityState={{ disabled: !deviceIp }}
         >
           <Text style={styles.buttonText}>Send Files</Text>
         </TouchableOpacity>
@@ -101,10 +110,13 @@ export default function HomeScreen() {
         <ThemedText>
           Manage device settings and reading preferences from your phone.
         </ThemedText>
-        <TouchableOpacity 
-          style={[styles.settingsButton, !deviceIp && styles.disabledButton]} 
+        <TouchableOpacity
+          style={[styles.settingsButton, !deviceIp && styles.disabledButton]}
           disabled={!deviceIp}
           onPress={() => router.push('/settings')}
+          accessibilityRole="button"
+          accessibilityLabel="Edit device settings"
+          accessibilityState={{ disabled: !deviceIp }}
         >
           <Text style={styles.buttonText}>Edit Settings</Text>
         </TouchableOpacity>
@@ -115,16 +127,23 @@ export default function HomeScreen() {
         <ThemedText>
           Set a custom wallpaper or sleep screen for your Reader.
         </ThemedText>
-        <TouchableOpacity 
-          style={[styles.wallpaperButton, !deviceIp && styles.disabledButton]} 
+        <TouchableOpacity
+          style={[styles.wallpaperButton, !deviceIp && styles.disabledButton]}
           disabled={!deviceIp}
           onPress={() => router.push('/wallpaper')}
+          accessibilityRole="button"
+          accessibilityLabel="Send wallpaper to device"
+          accessibilityState={{ disabled: !deviceIp }}
         >
           <Text style={styles.buttonText}>Send Wallpaper</Text>
         </TouchableOpacity>
       </ThemedView>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+      <TouchableOpacity
+        style={styles.logoutButton}
+        onPress={handleLogout}
+        accessibilityRole="button"
+        accessibilityLabel="Log out of Murphy Mate">
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
     </ParallaxScrollView>
