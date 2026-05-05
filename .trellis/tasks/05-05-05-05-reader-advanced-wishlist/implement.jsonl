@@ -1,0 +1,4 @@
+{"file":".trellis/spec/guides/index.md","reason":"Shared thinking guide for code reuse and cross-layer changes"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Search-before-new-helper guidance for compact text transform"}
+{"file":".trellis/tasks/05-05-05-05-reader-advanced-wishlist/prd.md","reason":"Task requirements and ordered Reader plan"}
+{"file":".trellis/tasks/05-05-05-05-reader-advanced-wishlist/research/code-context.md","reason":"Reader EPUB text pipeline and cache context"}
