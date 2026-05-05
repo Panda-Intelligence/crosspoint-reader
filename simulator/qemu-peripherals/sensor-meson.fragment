@@ -1,0 +1,1 @@
+system_ss.add(when: 'CONFIG_FT6336U_MOFEI', if_true: files('ft6336u.c'))

@@ -7,11 +7,14 @@ Runs the **unmodified production `firmware.bin`** under QEMU full emulation,
 with virtual e-ink + touch peripherals bridged to a Tauri webview UI for
 display, mouse/keyboard input, and SD-card-as-local-directory.
 
-> **Status (2026-05-04): PR1 / M1 only.** Today this project boots an
-> ESP-IDF `hello_world` ELF and surfaces its serial UART in the Tauri UI.
-> Display, touch, real firmware boot, and SD/WiFi land in PR2–PR4. See
-> [`../.trellis/tasks/05-04-mofei-simulator-bringup/prd.md`](../.trellis/tasks/05-04-mofei-simulator-bringup/prd.md)
-> for the full milestone plan.
+> **Status (2026-05-05): PR3 / M3 partial.** PR1+PR2+PR3 host-side
+> plumbing is complete (QEMU launcher, IPC reader+writer, e-ink canvas,
+> mouse/keyboard input injection). The QEMU SoC integration patch that
+> wires the SSD1677 + FT6336U virtual peripherals into the Espressif
+> fork's machine model is **partial** — see
+> [`qemu-peripherals/INTEGRATION.md`](qemu-peripherals/INTEGRATION.md)
+> for the SPI2/SPI3 controller stub still to land. Full milestone plan in
+> [`../.trellis/tasks/05-04-mofei-simulator-bringup/prd.md`](../.trellis/tasks/05-04-mofei-simulator-bringup/prd.md).
 
 ## One-time setup
 
@@ -66,9 +69,24 @@ cd simulator
 npm run tauri dev
 ```
 
-A window opens. Click **Launch QEMU**. The serial console at the bottom
-of the window streams the firmware's UART output. **Stop** kills the QEMU
-child process.
+A window opens. Click **Launch QEMU**. The 800×480 e-ink canvas reflects
+the firmware's framebuffer; the serial console at the bottom streams UART.
+**Stop** kills the QEMU child process.
+
+### Keyboard / mouse input injection
+
+| Input | Effect |
+|---|---|
+| Click / drag on canvas | Touch tap / swipe at canvas coordinates |
+| ←→↑↓ | Simulated swipe from canvas center |
+| Space / Enter | Tap at canvas center |
+| PageUp / PageDown | Side buttons (Up / Down) |
+| Esc | Home button |
+| R | Hardware refresh button |
+
+Input events are routed through the Tauri backend → IPC writer → QEMU
+`chardev` → FT6336U virtual peripheral (channel 0x04) or button virtual
+device (channel 0x05).
 
 ## Architecture (PR1)
 
@@ -103,15 +121,17 @@ See
 [`../.trellis/tasks/05-04-mofei-simulator-bringup/research/qemu-peripheral-ipc.md`](../.trellis/tasks/05-04-mofei-simulator-bringup/research/qemu-peripheral-ipc.md)
 for the full protocol design.
 
-## Known limitations (PR1)
+## Known limitations (PR3)
 
-- No display rendering yet (PR2).
-- No touch or button input yet (PR3).
+- The SSD1677 + FT6336U virtual peripherals are committed in
+  `qemu-peripherals/` but the QEMU build integration patch (Meson
+  fragments, Kconfig, and ESP32-S3 SoC machine wiring) is partial —
+  pending a SPI2/SPI3 controller stub upstream. See
+  [`qemu-peripherals/INTEGRATION.md`](qemu-peripherals/INTEGRATION.md).
 - No SD card / WiFi / OTA yet (PR4).
-- The `start_sim` QEMU invocation flags are committed unverified — they
-  rely on training-knowledge of the Espressif fork. See
-  [`../.trellis/tasks/05-04-mofei-simulator-bringup/research/verification-pending.md`](../.trellis/tasks/05-04-mofei-simulator-bringup/research/verification-pending.md)
-  for the post-recovery verification checklist.
+- PSRAM (`R8`) and `qio_opi` flash mode emulation status for the
+  production `firmware.bin` is unverified — see
+  [`../.trellis/tasks/05-04-mofei-simulator-bringup/research/verification-pending.md`](../.trellis/tasks/05-04-mofei-simulator-bringup/research/verification-pending.md).
 
 ## Project layout
 

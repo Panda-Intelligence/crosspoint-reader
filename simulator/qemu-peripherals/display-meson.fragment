@@ -1,0 +1,1 @@
+system_ss.add(when: 'CONFIG_SSD1677_GDEQ0426', if_true: files('ssd1677_gdeq0426t82.c'))

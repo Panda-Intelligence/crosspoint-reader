@@ -1,0 +1,5 @@
+config FT6336U_MOFEI
+    bool
+    default y if XTENSA_ESP32S3
+    depends on I2C
+    select BITBANG_I2C

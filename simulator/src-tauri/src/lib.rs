@@ -1,25 +1,31 @@
 // Mofei Simulator — Tauri backend.
 //
 // Spawns the Espressif QEMU fork as a child process and bridges its custom
-// peripherals to the Tauri webview through a Unix-domain-socket chardev.
+// peripherals to the Tauri webview through a Unix-domain-socket chardev
+// (single socket, length-prefixed binary multiplex — see ipc.rs).
 //
-// PR1 scope (M1 milestone): smoke-test the QEMU launch path and surface
-// firmware UART output as a "serial-log" Tauri event. No display, no touch,
-// no SD/WiFi yet — those land in PR2–PR4.
+// Outbound (QEMU → UI): serial log (PR1), framebuffer (PR2).
+// Inbound (UI → QEMU): touch events, button events (PR3).
+//
+// QEMU integration of the SSD1677 + FT6336U virtual peripherals into the
+// Espressif fork's machine model is *partial* — see
+// simulator/qemu-peripherals/INTEGRATION.md. Today the IPC plumbing is
+// fully exercised end-to-end on the host side; the firmware-facing side
+// requires the SoC machine patch to land.
 
 mod ipc;
 
 use std::path::PathBuf;
 use std::process::{Child, Command};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, State};
 
 struct SimState {
     process: Mutex<Option<Child>>,
+    writer: Arc<ipc::IpcWriter>,
 }
 
 fn project_root() -> PathBuf {
-    // src-tauri/ is two levels under simulator/, so two pops to reach simulator/
     let mut p = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     if p.ends_with("src-tauri") {
         p.pop();
@@ -36,8 +42,6 @@ fn default_firmware_path() -> PathBuf {
 }
 
 fn ipc_socket_path() -> PathBuf {
-    // Use $XDG_RUNTIME_DIR on Linux; on macOS that's typically unset, fall
-    // back to /tmp. The simulator is a dev tool, single-user, so /tmp is fine.
     let base = std::env::var("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("/tmp"));
@@ -46,7 +50,6 @@ fn ipc_socket_path() -> PathBuf {
 
 fn cleanup_stale_socket(path: &std::path::Path) {
     if path.exists() {
-        // Best-effort: remove a leftover socket file from a prior run.
         let _ = std::fs::remove_file(path);
     }
 }
@@ -63,7 +66,7 @@ fn start_sim(app: AppHandle, state: State<'_, SimState>) -> Result<String, Strin
         return Err(format!(
             "QEMU binary not found at {}.\n\
              Run `simulator/scripts/build-qemu.sh` first.\n\
-             Required deps (macOS): brew install ninja glib pixman libgcrypt pkg-config",
+             Required deps (macOS): brew install ninja glib pixman libgcrypt pkg-config gnutls",
             qemu.display()
         ));
     }
@@ -82,18 +85,14 @@ fn start_sim(app: AppHandle, state: State<'_, SimState>) -> Result<String, Strin
     let socket = ipc_socket_path();
     cleanup_stale_socket(&socket);
 
-    // Args based on verified espressif/qemu fork (QEMU 9.2.2). `-machine
-    // esp32s3` is the correct flag (no `-cpu esp32s3` — that is rejected).
-    // PSRAM (octal) and qio_opi flash mode boot are still unverified — see
-    // .trellis/tasks/05-04-mofei-simulator-bringup/research/verification-pending.md
+    // `-machine esp32s3` is the verified flag (`-cpu esp32s3` is rejected by
+    // the fork). PSRAM/qio_opi flash mode boot — still unverified for the
+    // production firmware.bin; see verification-pending.md.
     let mut cmd = Command::new(&qemu);
     cmd.arg("-machine").arg("esp32s3")
         .arg("-kernel").arg(&firmware)
         .arg("-nographic")
-        // serial UART → host stdout (separate from our binary IPC)
         .arg("-serial").arg("stdio")
-        // binary IPC chardev — virtual peripherals (PR2+) write framebuffer
-        // / GPIO frames here.
         .arg("-chardev").arg(format!(
             "socket,id=mofei,path={},server=on,wait=off",
             socket.display()
@@ -102,9 +101,7 @@ fn start_sim(app: AppHandle, state: State<'_, SimState>) -> Result<String, Strin
     match cmd.spawn() {
         Ok(child) => {
             *process_guard = Some(child);
-            // Start the IPC reader. It tolerates the socket not being ready
-            // immediately (retries internally).
-            ipc::spawn_reader(app, socket);
+            ipc::spawn_io(app, state.writer.clone(), socket);
             Ok("started".to_string())
         }
         Err(e) => Err(format!("failed to spawn qemu-system-xtensa: {}", e)),
@@ -118,18 +115,50 @@ fn stop_sim(state: State<'_, SimState>) -> Result<String, String> {
         let _ = child.kill();
         let _ = child.wait();
         cleanup_stale_socket(&ipc_socket_path());
+        state.writer.unbind();
         Ok("stopped".to_string())
     } else {
         Ok("not_running".to_string())
     }
 }
 
+#[tauri::command]
+fn inject_touch(
+    state: State<'_, SimState>,
+    action: u8,
+    x: u16,
+    y: u16,
+    finger_id: u8,
+) -> Result<bool, String> {
+    let frame = ipc::encode_touch_event(action, x, y, finger_id);
+    Ok(state.writer.try_send(frame))
+}
+
+#[tauri::command]
+fn inject_button(
+    state: State<'_, SimState>,
+    button_id: u8,
+    pressed: bool,
+) -> Result<bool, String> {
+    let frame = ipc::encode_button_event(button_id, pressed);
+    Ok(state.writer.try_send(frame))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let writer = Arc::new(ipc::IpcWriter::new());
     tauri::Builder::default()
-        .manage(SimState { process: Mutex::new(None) })
+        .manage(SimState {
+            process: Mutex::new(None),
+            writer,
+        })
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![start_sim, stop_sim])
+        .invoke_handler(tauri::generate_handler![
+            start_sim,
+            stop_sim,
+            inject_touch,
+            inject_button
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
