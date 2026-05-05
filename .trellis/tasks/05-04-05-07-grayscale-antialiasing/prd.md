@@ -11,17 +11,94 @@ sharper on the Mofei e-ink panel.
 - Mofei panel (GDEQ0426T82-T01C) supports 4-grayscale mode; `MofeiDisplay`
   already implements the LUT.
 - `EpdFontPackHeader.is2Bit` field exists; `fontconvert.py` supports 2-bit
-  output. Current TC EPF packs are 1-bit (`is2Bit=false`).
-- `GfxRenderer::renderCharImpl` has both 1-bit and 2-bit branches; the
-  2-bit branch is in place but unused for production fonts today.
+  output via `--2bit`.
+- `GfxRenderer::renderCharImpl` has both 1-bit and 2-bit branches.
 - `JpegToFramebufferConverter` and `PngToFramebufferConverter` decode to
-  grayscale internally, then quantize to 1-bit dither for the framebuffer.
+  grayscale internally, then quantize.
 - PSRAM budget today (post `05-01` task): TC_8 ≈ 1.48 MB, TC_10 ≈ 1.87 MB
-  (whitelist). 2-bit doubles bitmap data; expect TC_8 ≈ 2.5 MB, TC_10 ≈
-  3.2 MB. Hot-group decompression for builtin Noto CJK still needs ~3.3 MB
-  contiguous.
-- Spec contract (just codified): `isAllowedTraditionalChineseFontId`
-  whitelist must be re-evaluated if pack sizes change.
+  (whitelist).
+
+## Auto-discovery (2026-05-05)
+
+While auditing the codebase before doing any work, I found grayscale
+antialiasing is **already shipping**:
+
+1. **TC EPF packs already 2-bit**:
+   ```
+   $ python3 -c 'parse FontPackHeader of each tc_*.epf'
+     TC_8:  is2Bit=1, bitmapSize=1069981, ascender=20, advanceY=24
+     TC_10: is2Bit=1, bitmapSize=1466793, ascender=25, advanceY=30
+     TC_12: is2Bit=1, bitmapSize=1938680, ascender=29, advanceY=36
+     TC_14: is2Bit=1, bitmapSize=2227485, ascender=34, advanceY=42
+   ```
+   `scripts/build_multilingual_font_pack.py:84` already calls
+   `fontconvert.py --2bit --compress`.
+
+2. **Reader already does the 3-pass grayscale render** in
+   `src/activities/reader/EpubReaderActivity.cpp:1101-1124` when
+   `SETTINGS.textAntiAliasing == 1` (default 1):
+   ```
+   render BW pass        → renderer.displayBuffer()
+   render GRAYSCALE_LSB  → copyGrayscaleLsbBuffers()
+   render GRAYSCALE_MSB  → copyGrayscaleMsbBuffers()
+   displayGrayBuffer()   → 4-level overlay
+   ```
+
+3. **Image rendering already 2-bit-aware** in
+   `lib/GfxRenderer/GfxRenderer.cpp:738-744`. `drawBitmap` reads the
+   2-bit pixel value and dispatches `BW / GRAYSCALE_MSB / GRAYSCALE_LSB`
+   based on `renderMode`. EPUB image cache files use `Bitmap` so they
+   participate in the same 3-pass render.
+
+So the task as originally framed ("regenerate 2-bit packs + extend image
+pipeline") is **already done**. What remains is verification, and
+identifying any UI surfaces that DON'T benefit (Dashboard, Sleep,
+Settings — these are mostly 1-pass BW renders today).
+
+## Decision (ADR-lite — Q1 phasing, REVISED)
+
+**Context**: Originally scoped as "implement 2-bit grayscale". After
+auto-discovery, the implementation is already shipping for
+reader text + reader images. The new scope is **verification + visual
+A/B + extending grayscale to UI surfaces that haven't been touched**.
+
+**Decision**: Revised MVP — drop the implementation phase entirely, focus
+on **visual verification** and **scope what (if anything) still needs
+grayscale that doesn't have it**.
+
+**Consequences**:
+- No font regeneration commit needed.
+- No image converter commit needed.
+- Add a `research/grayscale-audit.md` documenting what's already
+  grayscale-rendered and what isn't.
+- Take before-vs-after-irrelevant screenshots that show CJK in reader
+  using grayscale (already shipping).
+- If non-reader surfaces (Dashboard / Settings / Sleep) would benefit,
+  spin a follow-up task. Today they use 1-pass BW which is fine for
+  short labels but suboptimal for icons.
+
+## Implementation Plan (revised)
+
+### Step 1 — Visual A/B verification
+1. Boot, take screenshot of an EPUB reader page with CJK text.
+2. Inspect for 4-level grayscale (anti-aliased edges) vs 1-bit dither.
+3. If grayscale is clearly visible, the task is verified-as-shipped.
+
+### Step 2 — UI grayscale audit
+Scan all activities for `setRenderMode(GRAYSCALE_*)` callsites. Anything
+that doesn't switch render mode is implicitly BW. Document the list:
+
+```
+Already grayscale: EpubReaderActivity, ReaderUtils, SleepActivity (cover mode)
+Still BW:          DashboardActivity, SettingsActivity, all hub activities,
+                   keypad, list activities
+```
+
+### Step 3 — Decide follow-up
+Based on Step 2's audit, decide if any non-reader surface visibly
+suffers from BW-only rendering (e.g. dashboard icon edges look jaggy).
+If yes, file a separate task `05-08-ui-grayscale-extension`. If no,
+close this task as "already shipping; visually verified".
 
 ## Assumptions (temporary)
 
