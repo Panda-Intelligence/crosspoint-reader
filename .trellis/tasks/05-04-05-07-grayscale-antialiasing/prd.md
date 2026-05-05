@@ -33,20 +33,59 @@ sharper on the Mofei e-ink panel.
 
 ## Open Questions
 
-- (Preference) Phasing strategy:
-  1. Font first, then image (each gets its own commit + flash test).
-  2. Image first (smaller scope, easier to verify visually).
-  3. Both together (single large commit, harder to bisect).
-- (Preference) PSRAM trade-off if 2-bit fonts exceed budget:
-  1. Drop TC_10 from resident set; only TC_8 (smaller pack) loaded; UI
-     gets smaller as a side effect.
-  2. Keep both 1-bit fonts available as a runtime "low-memory mode"
-     toggle.
-  3. Accept tighter PSRAM headroom; rely on FontDecompressor's failure
-     tracking to skip hot groups when OOM.
-- (Blocking) Is there hardware time available for full A/B visual
-  comparison on a real Mofei device? Without it, we can't tell whether
-  the 2-bit output is meaningfully better than the current dithering.
+- ~~(Preference) Phasing strategy~~ — **Resolved (Q1)**: option 2 — font
+  + image both in this task. Single MVP, ship together.
+- ~~(Preference) PSRAM trade-off~~ — **Resolved**: keep both TC_8 and
+  TC_10 if 2-bit pack sizes fit; if either exceeds the 3.3 MB hot-group
+  contiguous block requirement, drop TC_10 first (TC_8 is the smaller
+  pack and is already the EXTRA_SMALL reader font). Spec contract updated
+  if whitelist changes.
+- ~~(Blocking) Hardware time for A/B comparison~~ — **Resolved**: device
+  is at `/dev/cu.usbmodem1101`; flash + screenshot tooling already
+  proven (`scripts/take_screenshot.py`, `scripts/capture_touch_debug.py`).
+
+## Decision (ADR-lite — Q1 phasing)
+
+**Context**: 2-bit grayscale spans two pipelines (font + image). Each is
+non-trivial individually, but they share verification overhead (one flash
+cycle covers both).
+
+**Decision**: Combine font and image into a single task. Two commits:
+1. `feat(font): 2-bit grayscale TC packs + GfxRenderer 2-bit blit`
+2. `feat(image): 4-grayscale JPEG/PNG framebuffer converters`
+
+This keeps each commit individually revertable while sharing the visual
+verification session.
+
+**Consequences**:
+- One PSRAM rebudget pass.
+- One spec contract update (if TC_10 drops out of whitelist).
+- One task close-out, two journal commits if needed.
+
+## Implementation Plan (small commits)
+
+### Commit 1 — Font 2-bit
+1. Run `fontconvert.py --2bit` on the 4 input TC fonts at sizes 8 and 10
+   (the 2 packs in the active whitelist). Output to `.mofei-fontpacks/`
+   with same filenames; the SD-side path stays `/.mofei/fonts/...`.
+2. Verify `GfxRenderer::renderCharImpl` 2-bit branch — already in code,
+   gated by `fontData->is2Bit`.
+3. Measure runtime PSRAM impact via `[TCFONT_MEM]` and `[MEM]` logs.
+4. If TC_10 won't fit, drop it from `isAllowedTraditionalChineseFontId`
+   whitelist; reader medium+ sizes fall back to TC_8 (8 pt CJK is
+   readable in reader context where line height matters less than
+   horizontal density).
+5. Update spec `.trellis/spec/open-x4-sdk/backend/quality-guidelines.md`
+   "Restrict Mofei TC Font Hot-Swap" if whitelist changes.
+
+### Commit 2 — Image 2-bit
+1. `JpegToFramebufferConverter` and `PngToFramebufferConverter` already
+   decode to 8-bit grayscale internally; today they quantize to 1-bit
+   via dither. Switch quantization to 4-level (cuts at 64 / 128 / 192).
+2. Display layer must accept the 4-level pixel writes. Confirm
+   `MofeiDisplay::writePixel` or equivalent supports 2-bit values.
+3. Verify with an EPUB containing inline images (any sample EPUB will
+   do).
 
 ## Requirements (evolving)
 
