@@ -87,4 +87,16 @@ export const DeviceApi = {
     const client = await getApiClient();
     await client.post('/api/settings', diff);
   },
+
+  /**
+   * Reset the device's user-facing preferences (Display / Reader / Controls
+   * / System enums + toggles + values + display strings) back to factory
+   * defaults. The firmware deliberately preserves the API token, the
+   * lock-screen passcode + lockout state, and legacy OPDS credentials —
+   * see CrossPointSettings::resetUserPreferencesToDefaults.
+   */
+  async resetSettings(): Promise<void> {
+    const client = await getApiClient();
+    await client.post('/api/settings/reset');
+  },
 };

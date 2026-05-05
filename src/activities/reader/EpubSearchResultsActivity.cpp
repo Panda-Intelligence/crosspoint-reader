@@ -11,7 +11,7 @@
 #include "util/TouchHitTest.h"
 
 namespace {
-constexpr int kSearchStartY = 60;
+constexpr int kSearchStartY = 78;
 constexpr int kSearchLineHeight = 36;
 
 Rect searchContentRect(const GfxRenderer& renderer) {
@@ -152,6 +152,19 @@ void EpubSearchResultsActivity::render(RenderLock&&) {
   const int titleX =
       contentX + (contentWidth - renderer.getTextWidth(UI_12_FONT_ID, tr(STR_SEARCH_RESULTS), EpdFontFamily::BOLD)) / 2;
   renderer.drawText(UI_12_FONT_ID, titleX, 15 + contentY, tr(STR_SEARCH_RESULTS), true, EpdFontFamily::BOLD);
+
+  std::string scopeLine = tr(STR_SEARCH_SCOPE_CURRENT_CHAPTER);
+  if (!query.empty()) {
+    scopeLine += "  ";
+    scopeLine += tr(STR_SEARCH_QUERY_PREFIX);
+    scopeLine += renderer.truncatedText(SMALL_FONT_ID, query.c_str(), contentWidth / 2);
+  }
+  scopeLine += "  ";
+  scopeLine += std::to_string(results.size());
+  scopeLine += " ";
+  scopeLine += tr(STR_SEARCH_RESULT_COUNT_SUFFIX);
+  scopeLine = renderer.truncatedText(SMALL_FONT_ID, scopeLine.c_str(), contentWidth - 30);
+  renderer.drawCenteredText(SMALL_FONT_ID, 43 + contentY, scopeLine.c_str());
 
   if (results.empty()) {
     renderer.drawCenteredText(UI_10_FONT_ID, renderer.getTextYForCentering(contentY, contentHeight, UI_10_FONT_ID),

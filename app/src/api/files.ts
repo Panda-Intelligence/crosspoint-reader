@@ -1,4 +1,5 @@
 import {
+  deleteAsync,
   downloadAsync,
   getInfoAsync,
   makeDirectoryAsync,
@@ -91,6 +92,10 @@ export const FilesApi = {
     if (!dirInfo.exists) {
       await makeDirectoryAsync(targetDir, { intermediates: true });
     }
+    // Idempotent pre-delete so re-downloading the same path always
+    // overwrites cleanly. Some platform backends of downloadAsync
+    // refuse to overwrite an existing file.
+    await deleteAsync(targetUri, { idempotent: true });
 
     const result = await downloadAsync(remoteUrl, targetUri);
     if (result.status < 200 || result.status >= 300) {

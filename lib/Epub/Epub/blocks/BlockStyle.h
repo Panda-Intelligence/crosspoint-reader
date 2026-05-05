@@ -26,7 +26,10 @@ struct BlockStyle {
   // Combined horizontal insets (margin + padding)
   [[nodiscard]] int16_t leftInset() const { return marginLeft + paddingLeft; }
   [[nodiscard]] int16_t rightInset() const { return marginRight + paddingRight; }
+  [[nodiscard]] int16_t topInset() const { return marginTop + paddingTop; }
+  [[nodiscard]] int16_t bottomInset() const { return marginBottom + paddingBottom; }
   [[nodiscard]] int16_t totalHorizontalInset() const { return leftInset() + rightInset(); }
+  [[nodiscard]] int16_t totalVerticalInset() const { return topInset() + bottomInset(); }
 
   // Combine with another block style. Useful for parent -> child styles, where the child style should be
   // applied on top of the parent's style to get the combined style.

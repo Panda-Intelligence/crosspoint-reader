@@ -214,6 +214,7 @@ void CrossPointWebServer::begin() {
   server->on("/fonts", HTTP_GET, [this] { handleFontsPage(); });
   server->on("/api/settings", HTTP_GET, [this] { handleGetSettings(); });
   server->on("/api/settings", HTTP_POST, [this] { handlePostSettings(); });
+  server->on("/api/settings/reset", HTTP_POST, [this] { handleResetSettings(); });
   server->on("/api/fonts", HTTP_GET, [this] { handleGetFontPacks(); });
   server->on("/api/fonts/reload", HTTP_POST, [this] { handleReloadFontPacks(); });
   server->on("/api/fonts/delete", HTTP_POST, [this] { handleDeleteFontPack(); });
@@ -1425,6 +1426,23 @@ void CrossPointWebServer::handlePostSettings() {
 
   LOG_DBG("WEB", "Applied %d setting(s)", applied);
   server->send(200, "text/plain", String("Applied ") + String(applied) + " setting(s)");
+}
+
+void CrossPointWebServer::handleResetSettings() {
+  if (!checkAuth(server.get())) {
+    server->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
+    return;
+  }
+  // Reset user-facing prefs to defaults. Sensitive fields (api token,
+  // passcode hash + salt + lockout state, OPDS legacy creds) are
+  // intentionally preserved — see CrossPointSettings::resetUserPreferencesToDefaults.
+  SETTINGS.resetUserPreferencesToDefaults();
+  if (!SETTINGS.saveToFile()) {
+    server->send(500, "text/plain", "Reset applied in memory but save failed");
+    return;
+  }
+  LOG_DBG("WEB", "Settings reset to defaults via API");
+  server->send(200, "text/plain", "Settings reset to defaults");
 }
 
 // ---- OPDS Server API ----

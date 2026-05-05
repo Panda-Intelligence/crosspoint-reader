@@ -3,6 +3,7 @@
 #include <Epub/FootnoteEntry.h>
 #include <Epub/Section.h>
 #include <EpubBookmarkStore.h>
+#include <EpubHighlightStore.h>
 
 #include <optional>
 
@@ -34,6 +35,7 @@ class EpubReaderActivity final : public Activity {
   bool automaticPageTurnActive = false;
   bool touchLockEnabled = false;
   EpubBookmarkStore bookmarkStore;
+  EpubHighlightStore highlightStore;
 
   // Footnote support
   std::vector<FootnoteEntry> currentPageFootnotes;
@@ -60,7 +62,9 @@ class EpubReaderActivity final : public Activity {
   void openChapterSearch();
   std::vector<EpubSearchResult> searchCurrentChapter(const std::string& query) const;
   EpubBookmark currentBookmark() const;
+  EpubHighlight currentHighlight() const;
   void toggleCurrentBookmark();
+  void toggleCurrentHighlight();
   void openBookmarks();
   void openReaderMenu();
   void pageTurn(bool isForwardTurn);

@@ -152,6 +152,8 @@ export default function SettingsScreen() {
         style={[styles.saveButton, (!dirty || saving) && styles.buttonDisabled]}
         onPress={saveSettings}
         disabled={!dirty || saving}
+        accessibilityRole="button"
+        accessibilityLabel={dirty ? 'Sync settings to device' : 'No changes to sync'}
       >
         {saving ? (
           <ActivityIndicator color="#fff" />
@@ -162,7 +164,20 @@ export default function SettingsScreen() {
         )}
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.linkButton} onPress={() => router.back()}>
+      <TouchableOpacity
+        style={styles.resetButton}
+        onPress={confirmReset}
+        disabled={saving}
+        accessibilityRole="button"
+        accessibilityLabel="Reset device settings to defaults">
+        <Text style={styles.resetButtonText}>Reset to defaults…</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.linkButton}
+        onPress={() => router.back()}
+        accessibilityRole="button"
+        accessibilityLabel="Close settings">
         <Text style={styles.linkButtonText}>Cancel</Text>
       </TouchableOpacity>
     </ScrollView>

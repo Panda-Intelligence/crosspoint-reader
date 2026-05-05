@@ -37,7 +37,8 @@ EpubReaderMenuActivity::EpubReaderMenuActivity(GfxRenderer& renderer, MappedInpu
                                                const std::string& title, const int currentPage, const int totalPages,
                                                const int bookProgressPercent, const uint8_t currentOrientation,
                                                const bool hasFootnotes, const uint8_t fontSize,
-                                               const bool touchLockEnabled, const bool currentPageBookmarked)
+                                               const bool touchLockEnabled, const bool currentPageBookmarked,
+                                               const bool currentPageHighlighted)
     : Activity("EpubReaderMenu", renderer, mappedInput),
       menuItems(buildMenuItems(hasFootnotes)),
       title(title.empty() ? tr(STR_READING) : title),
@@ -45,6 +46,7 @@ EpubReaderMenuActivity::EpubReaderMenuActivity(GfxRenderer& renderer, MappedInpu
       currentFontSize(fontSize),
       touchLockEnabled(touchLockEnabled),
       currentPageBookmarked(currentPageBookmarked),
+      currentPageHighlighted(currentPageHighlighted),
       currentPage(currentPage),
       totalPages(totalPages),
       bookProgressPercent(bookProgressPercent) {}
@@ -58,6 +60,7 @@ std::vector<EpubReaderMenuActivity::MenuItem> EpubReaderMenuActivity::buildMenuI
   }
   items.push_back({MenuAction::SEARCH, StrId::STR_SEARCH_CURRENT_CHAPTER});
   items.push_back({MenuAction::TOGGLE_BOOKMARK, StrId::STR_ADD_BOOKMARK});
+  items.push_back({MenuAction::TOGGLE_HIGHLIGHT, StrId::STR_ADD_HIGHLIGHT});
   items.push_back({MenuAction::BOOKMARKS, StrId::STR_BOOKMARKS});
   items.push_back({MenuAction::FONT_SIZE_DOWN, StrId::STR_READER_FONT_SIZE_DOWN});
   items.push_back({MenuAction::FONT_SIZE_UP, StrId::STR_READER_FONT_SIZE_UP});
@@ -255,6 +258,9 @@ void EpubReaderMenuActivity::render(RenderLock&&) {
     StrId labelId = menuItems[i].labelId;
     if (menuItems[i].action == MenuAction::TOGGLE_BOOKMARK && currentPageBookmarked) {
       labelId = StrId::STR_REMOVE_BOOKMARK;
+    }
+    if (menuItems[i].action == MenuAction::TOGGLE_HIGHLIGHT && currentPageHighlighted) {
+      labelId = StrId::STR_REMOVE_HIGHLIGHT;
     }
     renderer.drawText(UI_10_FONT_ID, contentX + 20, displayY, I18N.get(labelId), !isSelected);
 

@@ -104,6 +104,7 @@ class CrossPointSettings {
     BOOK_STYLE = 4,
     PARAGRAPH_ALIGNMENT_COUNT
   };
+  enum READER_TEXT_LAYOUT { TEXT_LAYOUT_HORIZONTAL = 0, TEXT_LAYOUT_VERTICAL = 1, READER_TEXT_LAYOUT_COUNT };
 
   // Auto-sleep timeout options (in minutes)
   enum SLEEP_TIMEOUT {
@@ -199,6 +200,8 @@ class CrossPointSettings {
   // E-ink refresh frequency (default 15 pages)
   uint8_t refreshFrequency = REFRESH_15;
   uint8_t hyphenationEnabled = 0;
+  uint8_t readerSimplifiedToTraditional = 0;
+  uint8_t readerTextLayout = TEXT_LAYOUT_HORIZONTAL;
 
   // Reader screen margin settings
   uint8_t screenMargin = 5;
@@ -256,6 +259,20 @@ class CrossPointSettings {
 
   bool saveToFile() const;
   bool loadFromFile();
+
+  // Reset all user-facing preferences (Display / Reader / Controls /
+  // System enums + toggles + values + display strings) back to their
+  // factory defaults. Deliberately PRESERVES:
+  //   - apiToken         (re-establishing pairing is a separate flow)
+  //   - lockScreenSalt   (passcode hash + salt; user must explicitly
+  //     disable the lock screen via its own flow to clear these)
+  //   - lockScreenHash
+  //   - lockScreenWrongCount + lockScreenLockoutUntilEpoch (rate-limit
+  //     state — resetting these would let an attacker bypass lockout)
+  //   - opdsServerUrl / opdsUsername / opdsPassword (credentials live
+  //     in their own store; legacy fields kept for migration only)
+  // Caller is responsible for invoking saveToFile() afterwards.
+  void resetUserPreferencesToDefaults();
 
   static void validateFrontButtonMapping(CrossPointSettings& settings);
 

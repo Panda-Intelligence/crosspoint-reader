@@ -9,6 +9,7 @@
 #include <expat.h>
 
 #include "../../Epub.h"
+#include "../EpubTextTransform.h"
 #include "../Page.h"
 #include "../converters/ImageDecoderFactory.h"
 #include "../converters/ImageToFramebufferDecoder.h"
@@ -120,7 +121,10 @@ void ChapterHtmlSlimParser::flushPartWordBuffer() {
 
   // flush the buffer
   partWordBuffer[partWordBufferIndex] = '\0';
-  currentTextBlock->addWord(partWordBuffer, fontStyle, false, nextWordContinues);
+  const std::string word =
+      simplifiedToTraditional ? EpubTextTransform::simplifiedToTraditional(partWordBuffer, partWordBufferIndex)
+                              : std::string(partWordBuffer, partWordBufferIndex);
+  currentTextBlock->addWord(word, fontStyle, false, nextWordContinues);
   partWordBufferIndex = 0;
   nextWordContinues = false;
 }
@@ -150,7 +154,8 @@ void ChapterHtmlSlimParser::startNewTextBlock(const BlockStyle& blockStyle) {
     anchorData.push_back({std::move(pendingAnchorId), static_cast<uint16_t>(completedPageCount)});
     pendingAnchorId.clear();
   }
-  currentTextBlock.reset(new ParsedText(extraParagraphSpacing, hyphenationEnabled, blockStyle));
+  currentTextBlock.reset(
+      new ParsedText(extraParagraphSpacing, hyphenationEnabled, blockStyle, textLayout == 1, textBlockIndex++));
   wordsExtractedInBlock = 0;
 }
 
@@ -917,7 +922,10 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
   if (self->insideFootnoteLink && self->depth == self->footnoteLinkDepth) {
     if (self->currentFootnote.number[0] != '\0' && self->currentFootnote.href[0] != '\0') {
       FootnoteEntry entry;
-      strncpy(entry.number, self->currentFootnote.number, sizeof(entry.number) - 1);
+      const std::string number =
+          self->simplifiedToTraditional ? EpubTextTransform::simplifiedToTraditional(self->currentFootnote.number)
+                                        : std::string(self->currentFootnote.number);
+      strncpy(entry.number, number.c_str(), sizeof(entry.number) - 1);
       entry.number[sizeof(entry.number) - 1] = '\0';
       strncpy(entry.href, self->currentFootnote.href, sizeof(entry.href) - 1);
       entry.href[sizeof(entry.href) - 1] = '\0';
@@ -1081,13 +1089,15 @@ bool ChapterHtmlSlimParser::parseAndBuildPages() {
 
 void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
   const int lineHeight = renderer.getLineHeight(fontId) * lineCompression;
+  const bool verticalLayoutEnabled = textLayout == 1;
+  const int pageStep = verticalLayoutEnabled ? renderer.getTextHeight(fontId) : lineHeight;
 
   if (!currentPage) {
     currentPage.reset(new Page());
     currentPageNextY = 0;
   }
 
-  if (currentPageNextY + lineHeight > viewportHeight) {
+  if (currentPageNextY + pageStep > (verticalLayoutEnabled ? viewportWidth : viewportHeight)) {
     completePageFn(std::move(currentPage), xpathParagraphIndex);
     completedPageCount++;
     currentPage.reset(new Page());
@@ -1104,9 +1114,15 @@ void ChapterHtmlSlimParser::addLineToPage(std::shared_ptr<TextBlock> line) {
   pendingFootnotes.erase(pendingFootnotes.begin(), footnoteIt);
 
   // Apply horizontal left inset (margin + padding) as x position offset
-  const int16_t xOffset = line->getBlockStyle().leftInset();
-  currentPage->elements.push_back(std::make_shared<PageLine>(line, xOffset, currentPageNextY));
-  currentPageNextY += lineHeight;
+  if (verticalLayoutEnabled) {
+    const int16_t xOffset = static_cast<int16_t>(viewportWidth - currentPageNextY - pageStep);
+    const int16_t yOffset = line->getBlockStyle().topInset();
+    currentPage->elements.push_back(std::make_shared<PageLine>(line, xOffset, yOffset, true));
+  } else {
+    const int16_t xOffset = line->getBlockStyle().leftInset();
+    currentPage->elements.push_back(std::make_shared<PageLine>(line, xOffset, currentPageNextY));
+  }
+  currentPageNextY += pageStep;
 }
 
 void ChapterHtmlSlimParser::makePages() {
@@ -1121,20 +1137,31 @@ void ChapterHtmlSlimParser::makePages() {
   }
 
   const int lineHeight = renderer.getLineHeight(fontId) * lineCompression;
+  const bool verticalLayoutEnabled = textLayout == 1;
 
   // Apply top spacing before the paragraph (stored in pixels)
   const BlockStyle& blockStyle = currentTextBlock->getBlockStyle();
-  if (blockStyle.marginTop > 0) {
-    currentPageNextY += blockStyle.marginTop;
-  }
-  if (blockStyle.paddingTop > 0) {
-    currentPageNextY += blockStyle.paddingTop;
+  if (verticalLayoutEnabled) {
+    if (blockStyle.marginRight > 0) {
+      currentPageNextY += blockStyle.marginRight;
+    }
+    if (blockStyle.paddingRight > 0) {
+      currentPageNextY += blockStyle.paddingRight;
+    }
+  } else {
+    if (blockStyle.marginTop > 0) {
+      currentPageNextY += blockStyle.marginTop;
+    }
+    if (blockStyle.paddingTop > 0) {
+      currentPageNextY += blockStyle.paddingTop;
+    }
   }
 
   // Calculate effective width accounting for horizontal margins/padding
-  const int horizontalInset = blockStyle.totalHorizontalInset();
+  const int availableMeasure = verticalLayoutEnabled ? viewportHeight : viewportWidth;
+  const int inset = verticalLayoutEnabled ? blockStyle.totalVerticalInset() : blockStyle.totalHorizontalInset();
   const uint16_t effectiveWidth =
-      (horizontalInset < viewportWidth) ? static_cast<uint16_t>(viewportWidth - horizontalInset) : viewportWidth;
+      (inset < availableMeasure) ? static_cast<uint16_t>(availableMeasure - inset) : availableMeasure;
 
   currentTextBlock->layoutAndExtractLines(
       renderer, fontId, effectiveWidth,
@@ -1151,15 +1178,24 @@ void ChapterHtmlSlimParser::makePages() {
   }
 
   // Apply bottom spacing after the paragraph (stored in pixels)
-  if (blockStyle.marginBottom > 0) {
-    currentPageNextY += blockStyle.marginBottom;
-  }
-  if (blockStyle.paddingBottom > 0) {
-    currentPageNextY += blockStyle.paddingBottom;
+  if (verticalLayoutEnabled) {
+    if (blockStyle.marginLeft > 0) {
+      currentPageNextY += blockStyle.marginLeft;
+    }
+    if (blockStyle.paddingLeft > 0) {
+      currentPageNextY += blockStyle.paddingLeft;
+    }
+  } else {
+    if (blockStyle.marginBottom > 0) {
+      currentPageNextY += blockStyle.marginBottom;
+    }
+    if (blockStyle.paddingBottom > 0) {
+      currentPageNextY += blockStyle.paddingBottom;
+    }
   }
 
   // Extra paragraph spacing if enabled (default behavior)
   if (extraParagraphSpacing) {
-    currentPageNextY += lineHeight / 2;
+    currentPageNextY += verticalLayoutEnabled ? renderer.getTextHeight(fontId) / 2 : lineHeight / 2;
   }
 }

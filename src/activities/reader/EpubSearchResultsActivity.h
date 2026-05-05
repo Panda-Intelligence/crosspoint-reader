@@ -15,8 +15,8 @@ struct EpubSearchResult {
 class EpubSearchResultsActivity final : public Activity {
  public:
   explicit EpubSearchResultsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                     std::vector<EpubSearchResult> results)
-      : Activity("EpubSearchResults", renderer, mappedInput), results(std::move(results)) {}
+                                     std::vector<EpubSearchResult> results, std::string query)
+      : Activity("EpubSearchResults", renderer, mappedInput), results(std::move(results)), query(std::move(query)) {}
 
   void onEnter() override;
   void onExit() override;
@@ -26,6 +26,7 @@ class EpubSearchResultsActivity final : public Activity {
 
  private:
   std::vector<EpubSearchResult> results;
+  std::string query;
   ButtonNavigator buttonNavigator;
   int selectedIndex = 0;
 

@@ -74,6 +74,17 @@ uint16_t measureWordWidth(const GfxRenderer& renderer, const int fontId, const s
   return renderer.getTextAdvanceX(fontId, sanitized.c_str(), style);
 }
 
+std::vector<std::string> splitUtf8Codepoints(const std::string& text) {
+  std::vector<std::string> parts;
+  const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
+  while (*ptr != 0) {
+    const auto* start = ptr;
+    utf8NextCodepoint(&ptr);
+    parts.emplace_back(reinterpret_cast<const char*>(start), reinterpret_cast<const char*>(ptr));
+  }
+  return parts;
+}
+
 }  // namespace
 
 void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle, const bool underline,
@@ -99,6 +110,7 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
 
   // Apply fixed transforms before any per-line layout work.
   applyParagraphIndent();
+  applyVerticalTokenSplit();
 
   const int pageWidth = viewportWidth;
   auto wordWidths = calculateWordWidths(renderer, fontId);
@@ -123,6 +135,35 @@ void ParsedText::layoutAndExtractLines(const GfxRenderer& renderer, const int fo
     wordStyles.erase(wordStyles.begin(), wordStyles.begin() + consumed);
     wordContinues.erase(wordContinues.begin(), wordContinues.begin() + consumed);
   }
+}
+
+void ParsedText::applyVerticalTokenSplit() {
+  if (!verticalLayout || words.empty()) {
+    return;
+  }
+
+  std::vector<std::string> splitWords;
+  std::vector<EpdFontFamily::Style> splitStyles;
+  std::vector<bool> splitContinues;
+  splitWords.reserve(words.size() * 2);
+  splitStyles.reserve(wordStyles.size() * 2);
+  splitContinues.reserve(wordContinues.size() * 2);
+
+  for (size_t i = 0; i < words.size(); ++i) {
+    const auto codepoints = splitUtf8Codepoints(words[i]);
+    if (codepoints.empty()) {
+      continue;
+    }
+    for (size_t cpIndex = 0; cpIndex < codepoints.size(); ++cpIndex) {
+      splitWords.push_back(codepoints[cpIndex]);
+      splitStyles.push_back(wordStyles[i]);
+      splitContinues.push_back(cpIndex == 0 ? wordContinues[i] : true);
+    }
+  }
+
+  words = std::move(splitWords);
+  wordStyles = std::move(splitStyles);
+  wordContinues = std::move(splitContinues);
 }
 
 std::vector<uint16_t> ParsedText::calculateWordWidths(const GfxRenderer& renderer, const int fontId) {
@@ -536,6 +577,9 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
     }
   }
 
-  processLine(
-      std::make_shared<TextBlock>(std::move(lineWords), std::move(lineXPos), std::move(lineWordStyles), blockStyle));
+  std::vector<bool> lineContinues(continuesVec.begin() + static_cast<long>(lastBreakAt),
+                                  continuesVec.begin() + static_cast<long>(lineBreak));
+  processLine(std::make_shared<TextBlock>(std::move(lineWords), std::move(lineXPos), std::move(lineWordStyles),
+                                          std::move(lineContinues), blockStyle, verticalLayout, blockIndex,
+                                          static_cast<uint16_t>(lastBreakAt)));
 }

@@ -6,22 +6,28 @@
 
 void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int x, const int y) const {
   // Validate iterator bounds before rendering
-  if (words.size() != wordXpos.size() || words.size() != wordStyles.size()) {
-    LOG_ERR("TXB", "Render skipped: size mismatch (words=%u, xpos=%u, styles=%u)\n", (uint32_t)words.size(),
-            (uint32_t)wordXpos.size(), (uint32_t)wordStyles.size());
+  if (words.size() != wordXpos.size() || words.size() != wordStyles.size() || words.size() != wordContinues.size()) {
+    LOG_ERR("TXB", "Render skipped: size mismatch (words=%u, xpos=%u, styles=%u, continues=%u)\n",
+            (uint32_t)words.size(), (uint32_t)wordXpos.size(), (uint32_t)wordStyles.size(),
+            (uint32_t)wordContinues.size());
     return;
   }
 
   for (size_t i = 0; i < words.size(); i++) {
-    const int wordX = wordXpos[i] + x;
+    const int wordX = verticalLayout ? x : wordXpos[i] + x;
+    const int wordY = verticalLayout ? y + wordXpos[i] : y;
     const EpdFontFamily::Style currentStyle = wordStyles[i];
-    renderer.drawText(fontId, wordX, y, words[i].c_str(), true, currentStyle);
+    if (verticalLayout) {
+      renderer.drawTextRotated90CW(fontId, wordX, wordY, words[i].c_str(), true, currentStyle);
+    } else {
+      renderer.drawText(fontId, wordX, wordY, words[i].c_str(), true, currentStyle);
+    }
 
     if ((currentStyle & EpdFontFamily::UNDERLINE) != 0) {
       const std::string& w = words[i];
-      const int fullWordWidth = renderer.getTextWidth(fontId, w.c_str(), currentStyle);
-      // y is the top of the text line; add ascender to reach baseline, then offset 2px below
-      const int underlineY = y + renderer.getFontAscenderSize(fontId) + 2;
+      const int fullWordWidth =
+          verticalLayout ? renderer.getTextHeight(fontId) : renderer.getTextWidth(fontId, w.c_str(), currentStyle);
+      const int underlineY = wordY + renderer.getFontAscenderSize(fontId) + 2;
 
       int startX = wordX;
       int underlineWidth = fullWordWidth;
@@ -36,15 +42,17 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
         underlineWidth = visibleWidth;
       }
 
-      renderer.drawLine(startX, underlineY, startX + underlineWidth, underlineY, true);
+      if (!verticalLayout) {
+        renderer.drawLine(startX, underlineY, startX + underlineWidth, underlineY, true);
+      }
     }
   }
 }
 
 bool TextBlock::serialize(FsFile& file) const {
-  if (words.size() != wordXpos.size() || words.size() != wordStyles.size()) {
-    LOG_ERR("TXB", "Serialization failed: size mismatch (words=%u, xpos=%u, styles=%u)\n", words.size(),
-            wordXpos.size(), wordStyles.size());
+  if (words.size() != wordXpos.size() || words.size() != wordStyles.size() || words.size() != wordContinues.size()) {
+    LOG_ERR("TXB", "Serialization failed: size mismatch (words=%u, xpos=%u, styles=%u, continues=%u)\n", words.size(),
+            wordXpos.size(), wordStyles.size(), wordContinues.size());
     return false;
   }
 
@@ -53,6 +61,10 @@ bool TextBlock::serialize(FsFile& file) const {
   for (const auto& w : words) serialization::writeString(file, w);
   for (auto x : wordXpos) serialization::writePod(file, x);
   for (auto s : wordStyles) serialization::writePod(file, s);
+  for (const bool c : wordContinues) serialization::writePod(file, c);
+  serialization::writePod(file, verticalLayout);
+  serialization::writePod(file, blockIndex);
+  serialization::writePod(file, tokenStartIndex);
 
   // Style (alignment + margins/padding/indent)
   serialization::writePod(file, blockStyle.alignment);
@@ -76,7 +88,11 @@ std::unique_ptr<TextBlock> TextBlock::deserialize(FsFile& file) {
   std::vector<std::string> words;
   std::vector<int16_t> wordXpos;
   std::vector<EpdFontFamily::Style> wordStyles;
+  std::vector<bool> wordContinues;
   BlockStyle blockStyle;
+  bool verticalLayout = false;
+  uint16_t blockIndex = 0;
+  uint16_t tokenStartIndex = 0;
 
   // Word count
   serialization::readPod(file, wc);
@@ -91,9 +107,18 @@ std::unique_ptr<TextBlock> TextBlock::deserialize(FsFile& file) {
   words.resize(wc);
   wordXpos.resize(wc);
   wordStyles.resize(wc);
+  wordContinues.resize(wc);
   for (auto& w : words) serialization::readString(file, w);
   for (auto& x : wordXpos) serialization::readPod(file, x);
   for (auto& s : wordStyles) serialization::readPod(file, s);
+  for (size_t i = 0; i < wordContinues.size(); ++i) {
+    bool continued = false;
+    serialization::readPod(file, continued);
+    wordContinues[i] = continued;
+  }
+  serialization::readPod(file, verticalLayout);
+  serialization::readPod(file, blockIndex);
+  serialization::readPod(file, tokenStartIndex);
 
   // Style (alignment + margins/padding/indent)
   serialization::readPod(file, blockStyle.alignment);
@@ -109,6 +134,7 @@ std::unique_ptr<TextBlock> TextBlock::deserialize(FsFile& file) {
   serialization::readPod(file, blockStyle.textIndent);
   serialization::readPod(file, blockStyle.textIndentDefined);
 
-  return std::unique_ptr<TextBlock>(
-      new TextBlock(std::move(words), std::move(wordXpos), std::move(wordStyles), blockStyle));
+  return std::unique_ptr<TextBlock>(new TextBlock(std::move(words), std::move(wordXpos), std::move(wordStyles),
+                                                  std::move(wordContinues), blockStyle, verticalLayout, blockIndex,
+                                                  tokenStartIndex));
 }

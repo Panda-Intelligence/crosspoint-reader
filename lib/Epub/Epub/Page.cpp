@@ -10,6 +10,7 @@ void PageLine::render(GfxRenderer& renderer, const int fontId, const int xOffset
 bool PageLine::serialize(FsFile& file) {
   serialization::writePod(file, xPos);
   serialization::writePod(file, yPos);
+  serialization::writePod(file, verticalLayout);
 
   // serialize TextBlock pointed to by PageLine
   return block->serialize(file);
@@ -18,11 +19,13 @@ bool PageLine::serialize(FsFile& file) {
 std::unique_ptr<PageLine> PageLine::deserialize(FsFile& file) {
   int16_t xPos;
   int16_t yPos;
+  bool verticalLayout = false;
   serialization::readPod(file, xPos);
   serialization::readPod(file, yPos);
+  serialization::readPod(file, verticalLayout);
 
   auto tb = TextBlock::deserialize(file);
-  return std::unique_ptr<PageLine>(new PageLine(std::move(tb), xPos, yPos));
+  return std::unique_ptr<PageLine>(new PageLine(std::move(tb), xPos, yPos, verticalLayout));
 }
 
 void PageImage::render(GfxRenderer& renderer, const int fontId, const int xOffset, const int yOffset) {

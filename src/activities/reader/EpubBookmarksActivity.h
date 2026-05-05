@@ -2,6 +2,7 @@
 
 #include <Epub.h>
 #include <EpubBookmarkStore.h>
+#include <EpubHighlightStore.h>
 
 #include <memory>
 #include <string>
@@ -14,8 +15,12 @@
 class EpubBookmarksActivity final : public Activity {
  public:
   explicit EpubBookmarksActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                 const std::shared_ptr<Epub>& epub, std::vector<EpubBookmark> bookmarks)
-      : Activity("EpubBookmarks", renderer, mappedInput), epub(epub), bookmarks(std::move(bookmarks)) {}
+                                 const std::shared_ptr<Epub>& epub, std::vector<EpubBookmark> bookmarks,
+                                 std::vector<EpubHighlight> highlights)
+      : Activity("EpubBookmarks", renderer, mappedInput),
+        epub(epub),
+        bookmarks(std::move(bookmarks)),
+        highlights(std::move(highlights)) {}
 
   void onEnter() override;
   void onExit() override;
@@ -26,10 +31,14 @@ class EpubBookmarksActivity final : public Activity {
  private:
   std::shared_ptr<Epub> epub;
   std::vector<EpubBookmark> bookmarks;
+  std::vector<EpubHighlight> highlights;
   ButtonNavigator buttonNavigator;
   int selectedIndex = 0;
 
   int getPageItems() const;
+  int getTotalItems() const;
+  bool isHighlightIndex(int index) const;
   void openSelectedBookmark();
   std::string labelForBookmark(const EpubBookmark& bookmark) const;
+  std::string labelForHighlight(const EpubHighlight& highlight) const;
 };

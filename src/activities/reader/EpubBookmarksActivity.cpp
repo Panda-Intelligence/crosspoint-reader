@@ -42,13 +42,24 @@ int EpubBookmarksActivity::getPageItems() const {
   return std::max(1, availableHeight / kBookmarkLineHeight);
 }
 
+int EpubBookmarksActivity::getTotalItems() const { return static_cast<int>(bookmarks.size() + highlights.size()); }
+
+bool EpubBookmarksActivity::isHighlightIndex(const int index) const {
+  return index >= static_cast<int>(bookmarks.size());
+}
+
 void EpubBookmarksActivity::openSelectedBookmark() {
-  if (selectedIndex < 0 || selectedIndex >= static_cast<int>(bookmarks.size())) {
+  if (selectedIndex < 0 || selectedIndex >= getTotalItems()) {
     return;
   }
 
-  const auto& bookmark = bookmarks[selectedIndex];
-  setResult(BookmarkResult{bookmark.spineIndex, bookmark.page});
+  if (isHighlightIndex(selectedIndex)) {
+    const auto& highlight = highlights[static_cast<size_t>(selectedIndex - static_cast<int>(bookmarks.size()))];
+    setResult(BookmarkResult{highlight.spineIndex, highlight.page});
+  } else {
+    const auto& bookmark = bookmarks[static_cast<size_t>(selectedIndex)];
+    setResult(BookmarkResult{bookmark.spineIndex, bookmark.page});
+  }
   finish();
 }
 
@@ -71,8 +82,27 @@ std::string EpubBookmarksActivity::labelForBookmark(const EpubBookmark& bookmark
   return label;
 }
 
+std::string EpubBookmarksActivity::labelForHighlight(const EpubHighlight& highlight) const {
+  std::string title = highlight.title;
+  if (title.empty() && epub) {
+    const int tocIndex = epub->getTocIndexForSpineIndex(highlight.spineIndex);
+    if (tocIndex >= 0) {
+      title = epub->getTocItem(tocIndex).title;
+    }
+  }
+  if (title.empty()) {
+    title = std::string(tr(STR_CHAPTER_PREFIX)) + std::to_string(highlight.spineIndex + 1);
+  }
+
+  std::string label = title + "  " + tr(STR_PAGE_LABEL) + " " + std::to_string(highlight.page + 1);
+  if (highlight.pageCount > 0) {
+    label += "/" + std::to_string(highlight.pageCount);
+  }
+  return label;
+}
+
 void EpubBookmarksActivity::loop() {
-  const int totalItems = static_cast<int>(bookmarks.size());
+  const int totalItems = getTotalItems();
   const int pageItems = getPageItems();
 
   InputTouchEvent touchEvent;
@@ -169,7 +199,7 @@ void EpubBookmarksActivity::render(RenderLock&&) {
       contentX + (contentWidth - renderer.getTextWidth(UI_12_FONT_ID, tr(STR_BOOKMARKS), EpdFontFamily::BOLD)) / 2;
   renderer.drawText(UI_12_FONT_ID, titleX, 15 + contentY, tr(STR_BOOKMARKS), true, EpdFontFamily::BOLD);
 
-  if (bookmarks.empty()) {
+  if (getTotalItems() == 0) {
     renderer.drawCenteredText(UI_10_FONT_ID, renderer.getTextYForCentering(contentY, contentHeight, UI_10_FONT_ID),
                               tr(STR_NO_BOOKMARKS));
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
@@ -180,7 +210,7 @@ void EpubBookmarksActivity::render(RenderLock&&) {
 
   const int pageItems = getPageItems();
   const int pageStartIndex = selectedIndex / pageItems * pageItems;
-  const int pageEndIndex = std::min(static_cast<int>(bookmarks.size()), pageStartIndex + pageItems);
+  const int pageEndIndex = std::min(getTotalItems(), pageStartIndex + pageItems);
 
   renderer.fillRect(contentX, kBookmarkStartY + contentY + (selectedIndex - pageStartIndex) * kBookmarkLineHeight - 2,
                     contentWidth - 1, kBookmarkLineHeight);
@@ -188,8 +218,15 @@ void EpubBookmarksActivity::render(RenderLock&&) {
   for (int i = pageStartIndex; i < pageEndIndex; i++) {
     const int y = kBookmarkStartY + contentY + (i - pageStartIndex) * kBookmarkLineHeight;
     const bool isSelected = (i == selectedIndex);
-    const std::string label = renderer.truncatedText(UI_10_FONT_ID, labelForBookmark(bookmarks[i]).c_str(),
-                                                     contentWidth - 40, EpdFontFamily::REGULAR);
+    std::string label;
+    if (isHighlightIndex(i)) {
+      const auto& highlight = highlights[static_cast<size_t>(i - static_cast<int>(bookmarks.size()))];
+      label = labelForHighlight(highlight);
+      label = std::string(tr(STR_HIGHLIGHT_PREFIX)) + " " + label;
+    } else {
+      label = labelForBookmark(bookmarks[static_cast<size_t>(i)]);
+    }
+    label = renderer.truncatedText(UI_10_FONT_ID, label.c_str(), contentWidth - 40, EpdFontFamily::REGULAR);
     renderer.drawText(UI_10_FONT_ID, contentX + 20, y + 3, label.c_str(), !isSelected);
   }
 

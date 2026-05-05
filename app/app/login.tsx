@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
 import {
+  Alert,
   StyleSheet,
   Text,
-  View,
   TouchableOpacity,
-  Alert,
+  View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -12,19 +12,32 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as AuthSession from 'expo-auth-session';
 
 import { useAuth, User } from '../src/contexts/AuthContext';
+import { Palette, Spacing, Radii } from '../src/ui-theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// TODO: Replace with real GitHub OAuth App client_id before shipping.
-// Bundle ID must match: ai.pandacat.app.murphy.mate.
-// PKCE is enabled, so no client_secret is bundled in the app.
-// Configure the OAuth App with the redirect URI printed by makeRedirectUri()
-// (see console output on first run, e.g. murphymate://auth/github).
-const GITHUB_CLIENT_ID = 'YOUR_GITHUB_CLIENT_ID_HERE';
+// OAuth client IDs are read from EXPO_PUBLIC_* env vars at build time
+// (see app/.env.example). When unset, the corresponding sign-in option
+// is rendered disabled with a "Not configured" hint, instead of going
+// through OAuth and failing with an unhelpful HTTP 400.
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '';
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? '';
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
+const GITHUB_CLIENT_ID = process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID ?? '';
+
+// At least one of the platform-specific Google IDs must be set for the
+// Google flow to be usable. Web ID is always required.
+const GOOGLE_CONFIGURED =
+  GOOGLE_WEB_CLIENT_ID !== '' &&
+  (GOOGLE_IOS_CLIENT_ID !== '' || GOOGLE_ANDROID_CLIENT_ID !== '');
+const GITHUB_CONFIGURED = GITHUB_CLIENT_ID !== '';
+
 const GITHUB_DISCOVERY: AuthSession.DiscoveryDocument = {
   authorizationEndpoint: 'https://github.com/login/oauth/authorize',
   tokenEndpoint: 'https://github.com/login/oauth/access_token',
-  revocationEndpoint: `https://github.com/settings/connections/applications/${GITHUB_CLIENT_ID}`,
+  revocationEndpoint: GITHUB_CLIENT_ID
+    ? `https://github.com/settings/connections/applications/${GITHUB_CLIENT_ID}`
+    : 'https://github.com/settings/applications',
 };
 
 export default function LoginScreen() {
@@ -32,17 +45,17 @@ export default function LoginScreen() {
   const router = useRouter();
 
   // --- Google ---
-  // NOTE: Replace with real client IDs from Google Cloud Console.
   const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
-    iosClientId: 'YOUR_IOS_CLIENT_ID_HERE.apps.googleusercontent.com',
-    androidClientId: 'YOUR_ANDROID_CLIENT_ID_HERE.apps.googleusercontent.com',
-    webClientId: 'YOUR_WEB_CLIENT_ID_HERE.apps.googleusercontent.com',
+    iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID || undefined,
+    webClientId: GOOGLE_WEB_CLIENT_ID || undefined,
   });
 
   useEffect(() => {
     if (googleResponse?.type === 'success') {
       void fetchGoogleUser(googleResponse.authentication?.accessToken);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [googleResponse]);
 
   const fetchGoogleUser = async (token?: string) => {
@@ -76,7 +89,7 @@ export default function LoginScreen() {
   const [githubRequest, githubResponse, githubPromptAsync] =
     AuthSession.useAuthRequest(
       {
-        clientId: GITHUB_CLIENT_ID,
+        clientId: GITHUB_CLIENT_ID || 'unset',
         scopes: ['read:user', 'user:email'],
         redirectUri: githubRedirectUri,
         usePKCE: true,
@@ -91,6 +104,7 @@ export default function LoginScreen() {
         githubRequest.codeVerifier,
       );
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [githubResponse]);
 
   const completeGithub = async (code: string, codeVerifier: string) => {
@@ -116,7 +130,6 @@ export default function LoginScreen() {
       if (!userRes.ok) throw new Error(`GitHub /user ${userRes.status}`);
       const profile = await userRes.json();
 
-      // GitHub may not include the primary email in /user; query /user/emails.
       let email: string | undefined = profile.email;
       if (!email) {
         try {
@@ -158,20 +171,37 @@ export default function LoginScreen() {
       <Text style={styles.subtitle}>Sign in to manage your Crosspoint Reader</Text>
 
       <TouchableOpacity
-        style={styles.googleButton}
-        disabled={!googleRequest}
+        style={[styles.googleButton, !GOOGLE_CONFIGURED && styles.buttonDisabled]}
+        disabled={!GOOGLE_CONFIGURED || !googleRequest}
         onPress={() => googlePromptAsync()}
-      >
+        accessibilityRole="button"
+        accessibilityLabel="Sign in with Google"
+        accessibilityState={{ disabled: !GOOGLE_CONFIGURED }}>
         <Text style={styles.googleButtonText}>Sign in with Google</Text>
+        {!GOOGLE_CONFIGURED && (
+          <Text style={styles.notConfigured}>Not configured</Text>
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={styles.githubButton}
-        disabled={!githubRequest}
+        style={[styles.githubButton, !GITHUB_CONFIGURED && styles.buttonDisabled]}
+        disabled={!GITHUB_CONFIGURED || !githubRequest}
         onPress={() => githubPromptAsync()}
-      >
+        accessibilityRole="button"
+        accessibilityLabel="Sign in with GitHub"
+        accessibilityState={{ disabled: !GITHUB_CONFIGURED }}>
         <Text style={styles.githubButtonText}>Sign in with GitHub</Text>
+        {!GITHUB_CONFIGURED && (
+          <Text style={styles.notConfigured}>Not configured</Text>
+        )}
       </TouchableOpacity>
+
+      {(!GOOGLE_CONFIGURED || !GITHUB_CONFIGURED) && (
+        <Text style={styles.helpText}>
+          Set EXPO_PUBLIC_GOOGLE_* / EXPO_PUBLIC_GITHUB_CLIENT_ID in
+          app/.env.local — see app/.env.example.
+        </Text>
+      )}
     </View>
   );
 }
@@ -179,47 +209,43 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: Spacing.xl,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: Palette.bg,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
+  title: { fontSize: 32, fontWeight: 'bold', marginBottom: Spacing.md },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: Palette.textSecondary,
     marginBottom: 50,
     textAlign: 'center',
   },
   googleButton: {
-    backgroundColor: '#4285F4',
+    backgroundColor: '#4285F4', // Google brand blue (intentionally not Palette.primary)
     paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: Radii.button,
     width: '100%',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: Spacing.md,
   },
-  googleButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  googleButtonText: { color: Palette.white, fontSize: 16, fontWeight: 'bold' },
   githubButton: {
-    backgroundColor: '#24292e',
+    backgroundColor: '#24292e', // GitHub brand near-black
     paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: Radii.button,
     width: '100%',
     alignItems: 'center',
   },
-  githubButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  githubButtonText: { color: Palette.white, fontSize: 16, fontWeight: 'bold' },
+  buttonDisabled: { opacity: 0.45 },
+  notConfigured: { color: Palette.white, fontSize: 11, marginTop: 4, opacity: 0.85 },
+  helpText: {
+    fontSize: 11,
+    color: Palette.textTertiary,
+    textAlign: 'center',
+    marginTop: Spacing.xl,
   },
 });

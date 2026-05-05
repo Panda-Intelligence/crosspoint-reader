@@ -83,6 +83,94 @@ bool CrossPointSettings::saveToFile() const {
   return JsonSettingsIO::saveSettings(*this, SETTINGS_FILE_JSON);
 }
 
+void CrossPointSettings::resetUserPreferencesToDefaults() {
+  // Snapshot the fields we must preserve so we can restore them after
+  // copy-assignment from a freshly-constructed instance. (We can't
+  // simply construct a new singleton because CrossPointSettings is
+  // singleton + non-copyable; instead we copy field-by-field via a
+  // local default-constructed object on the stack.)
+  //
+  // Stack size: CrossPointSettings ~700 bytes — safely below the
+  // ESP32-S3 task stack limits (Activities / setup() use 8KB+ stacks).
+  static_assert(sizeof(CrossPointSettings) < 4096,
+                "CrossPointSettings grew past 4KB — reconsider stack-allocating defaults");
+
+  // Save sensitive / non-resettable fields.
+  char savedApiToken[sizeof(apiToken)];
+  char savedLockSalt[sizeof(lockScreenSalt)];
+  char savedLockHash[sizeof(lockScreenHash)];
+  const uint8_t savedLockEnabled = lockScreenEnabled;
+  const uint8_t savedLockTimeout = lockScreenTimeoutMinutes;
+  const uint8_t savedLockWrongCount = lockScreenWrongCount;
+  const uint32_t savedLockoutUntil = lockScreenLockoutUntilEpoch;
+  char savedOpdsServerUrl[sizeof(opdsServerUrl)];
+  char savedOpdsUsername[sizeof(opdsUsername)];
+  char savedOpdsPassword[sizeof(opdsPassword)];
+
+  memcpy(savedApiToken, apiToken, sizeof(apiToken));
+  memcpy(savedLockSalt, lockScreenSalt, sizeof(lockScreenSalt));
+  memcpy(savedLockHash, lockScreenHash, sizeof(lockScreenHash));
+  memcpy(savedOpdsServerUrl, opdsServerUrl, sizeof(opdsServerUrl));
+  memcpy(savedOpdsUsername, opdsUsername, sizeof(opdsUsername));
+  memcpy(savedOpdsPassword, opdsPassword, sizeof(opdsPassword));
+
+  // Manually re-initialize each field to its in-class default. Using a
+  // copy from a default-constructed temporary is cleaner but the
+  // copy-assignment operator is `delete`d (singleton), so we rebuild
+  // explicitly. Keep this in sync with CrossPointSettings.h.
+  sleepScreen = DARK;
+  sleepScreenCoverMode = FIT;
+  sleepScreenCoverFilter = NO_FILTER;
+  sleepScreenRotate180 = 0;
+  statusBar = FULL;
+  statusBarChapterPageCount = 1;
+  statusBarBookProgressPercentage = 1;
+  statusBarProgressBar = HIDE_PROGRESS;
+  statusBarProgressBarThickness = PROGRESS_BAR_NORMAL;
+  statusBarTitle = CHAPTER_TITLE;
+  statusBarBattery = 1;
+  extraParagraphSpacing = 1;
+  textAntiAliasing = 1;
+  shortPwrBtn = IGNORE;
+  orientation = PORTRAIT;
+  frontButtonLayout = BACK_CONFIRM_LEFT_RIGHT;
+  sideButtonLayout = PREV_NEXT;
+  frontButtonBack = FRONT_HW_BACK;
+  frontButtonConfirm = FRONT_HW_CONFIRM;
+  frontButtonLeft = FRONT_HW_LEFT;
+  frontButtonRight = FRONT_HW_RIGHT;
+  fontFamily = NOTOSERIF;
+  fontSize = MEDIUM;
+  lineSpacing = NORMAL;
+  paragraphAlignment = JUSTIFIED;
+  sleepTimeout = SLEEP_10_MIN;
+  refreshFrequency = REFRESH_15;
+  hyphenationEnabled = 0;
+  readerSimplifiedToTraditional = 0;
+  readerTextLayout = TEXT_LAYOUT_HORIZONTAL;
+  screenMargin = 5;
+  hideBatteryPercentage = HIDE_NEVER;
+  longPressChapterSkip = 1;
+  uiTheme = LYRA;
+  dashboardLayout = DASHBOARD_LAYOUT_GRID;
+  fadingFix = 0;
+  embeddedStyle = 1;
+  showHiddenFiles = 0;
+  imageRendering = IMAGES_DISPLAY;
+
+  // Restore preserved fields.
+  memcpy(apiToken, savedApiToken, sizeof(apiToken));
+  memcpy(lockScreenSalt, savedLockSalt, sizeof(lockScreenSalt));
+  memcpy(lockScreenHash, savedLockHash, sizeof(lockScreenHash));
+  lockScreenEnabled = savedLockEnabled;
+  lockScreenTimeoutMinutes = savedLockTimeout;
+  lockScreenWrongCount = savedLockWrongCount;
+  lockScreenLockoutUntilEpoch = savedLockoutUntil;
+  memcpy(opdsServerUrl, savedOpdsServerUrl, sizeof(opdsServerUrl));
+  memcpy(opdsUsername, savedOpdsUsername, sizeof(opdsUsername));
+  memcpy(opdsPassword, savedOpdsPassword, sizeof(opdsPassword));
+}
+
 bool CrossPointSettings::loadFromFile() {
   // Try JSON first
   if (Storage.exists(SETTINGS_FILE_JSON)) {

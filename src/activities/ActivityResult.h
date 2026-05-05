@@ -48,6 +48,14 @@ struct BookmarkResult {
   int page = 0;
 };
 
+struct HighlightSelectionResult {
+  int startBlockIndex = -1;
+  int startTokenIndex = -1;
+  int endBlockIndex = -1;
+  int endTokenIndex = -1;
+  std::string snippet;
+};
+
 enum class NetworkMode;
 
 struct NetworkModeResult {
@@ -59,7 +67,8 @@ struct FootnoteResult {
 };
 
 using ResultVariant = std::variant<std::monostate, WifiResult, KeyboardResult, MenuResult, ChapterResult, PercentResult,
-                                   PageResult, SyncResult, BookmarkResult, NetworkModeResult, FootnoteResult>;
+                                   PageResult, SyncResult, BookmarkResult, HighlightSelectionResult, NetworkModeResult,
+                                   FootnoteResult>;
 
 struct ActivityResult {
   bool isCancelled = false;

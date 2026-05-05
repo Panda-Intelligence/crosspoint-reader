@@ -30,11 +30,13 @@ class PageElement {
 // a line from a block element
 class PageLine final : public PageElement {
   std::shared_ptr<TextBlock> block;
+  bool verticalLayout;
 
  public:
-  PageLine(std::shared_ptr<TextBlock> block, const int16_t xPos, const int16_t yPos)
-      : PageElement(xPos, yPos), block(std::move(block)) {}
+  PageLine(std::shared_ptr<TextBlock> block, const int16_t xPos, const int16_t yPos, const bool verticalLayout = false)
+      : PageElement(xPos, yPos), block(std::move(block)), verticalLayout(verticalLayout) {}
   const std::shared_ptr<TextBlock>& getBlock() const { return block; }
+  bool isVerticalLayout() const { return verticalLayout; }
   void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) override;
   bool serialize(FsFile& file) override;
   PageElementTag getTag() const override { return TAG_PageLine; }
