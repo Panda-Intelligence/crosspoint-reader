@@ -330,8 +330,158 @@ error and the physical recovery step needed before claiming verification.
 
 ---
 
+## EPUB Reader Text Pipeline Patterns
+
+These conventions come from the reader advanced wishlist implementation
+(Task: `05-05-reader-advanced-wishlist`).
+
+### Pattern: Text Conversion Hook Location
+
+**Problem**: Where to insert text transforms so search, QR, and footnote labels
+stay consistent with rendered text.
+
+**Solution**: Insert conversions at parser ingestion time
+(`ChapterHtmlSlimParser::flushPartWordBuffer`), **before** `ParsedText::addWord`.
+A late render-only conversion would make search results, QR exports, and
+footnote link labels inconsistent with on-screen text.
+
+```cpp
+// Correct — Parsed words contain already-converted text
+void ChapterHtmlSlimParser::flushPartWordBuffer() {
+    if (simplifiedToTraditional && !partWordBuffer.empty()) {
+        std::string converted = EpubTextTransform::simplifiedToTraditional(partWordBuffer);
+        // ... addWord with converted ...
+    }
+}
+
+// Wrong — converting only at render time, search/QR/footnotes see raw text
+void TextBlock::render(GfxRenderer& renderer, ...) {
+    std::string displayText = EpubTextTransform::simplifiedToTraditional(words[0].word);
+    renderer.drawText(..., displayText.c_str());
+}
+```
+
+**Why**: All downstream consumers (page render, chapter search, QR text export,
+footnote labels) read serialized `TextBlock` / `PageLine` data. The conversion
+must be baked into the serialized payload.
+
+### Pattern: Section Cache Invalidation
+
+**Problem**: When a user toggles a text-affecting setting (conversion, layout,
+font), cached chapter pages must be rebuilt or they'll show stale content.
+
+**Solution**: Add the setting field to `Section` cache header, serialize it in
+`createSectionFile`, deserialize and compare in `loadSectionFile`. Mismatch
+triggers a full cache rebuild via `Section::createSectionFile`.
+
+```cpp
+// Section.cpp — header serialization
+void Section::writeHeader(FILE* f) {
+    writeUint32(f, simplifiedToTraditional ? 1 : 0);   // setting flag
+    writeUint32(f, static_cast<uint32_t>(textLayout)); // vertical/horizontal
+    // ... font, image, markup flags ...
+}
+
+// Section.cpp — header comparison at load time
+bool Section::loadSectionFile(...) {
+    // ...
+    bool savedSimplifiedToTraditional = readUint32(f) != 0;
+    if (savedSimplifiedToTraditional != simplifiedToTraditional) {
+        // Cache mismatch — rebuild
+        fclose(f);
+        return createSectionFile(...);
+    }
+}
+```
+
+**Cache header lifetime**: New fields append to the header; bump
+`Section::kSectionVersion` when changing the header format. Old caches are
+automatically invalidated by version mismatch.
+
+### Pattern: Vertical CJK Layout
+
+**Problem**: Supporting vertical text layout where characters flow top-to-bottom
+and columns flow right-to-left.
+
+**Solution (compact, firmware-safe)**:
+1. `ParsedText::applyVerticalTokenSplit()` — split CJK words into individual
+   codepoints so each character occupies one grid cell.
+2. `TextBlock::render()` — use `drawTextRotated90CW` for each character when
+   `verticalLayout` flag is set.
+3. `ChapterHtmlSlimParser::addLineToPage()` — compute X/Y offsets with
+   RTL column placement: `pageX = pageRenderWidth - columnIndex * columnWidth`.
+4. `BlockStyle` — add `topInset` / `bottomInset` / `totalVerticalInset` for
+   vertical-aware margin calculation.
+
+```cpp
+// BlockStyle.h
+int topInset() const { return marginTop + blockVerticalSpacing; }
+int bottomInset() const { return marginBottom + blockVerticalSpacing; }
+int totalVerticalInset() const { return topInset() + bottomInset(); }
+
+// TextBlock.cpp — vertical rendering
+if (verticalLayout) {
+    renderer.drawTextRotated90CW(fontId, x, y + lineHeight, word.word.c_str());
+}
+```
+
+### Pattern: Highlight Store with Range Anchors
+
+**Problem**: Persisting highlight selections per book so they survive reboots.
+
+**Solution**: Serialize `EpubHighlight` structs as JSON to
+`.mofei/highlights/epub_<hash>.json`, using range anchors
+(`startBlockIndex`, `startTokenIndex`, `endBlockIndex`, `endTokenIndex`)
+for deduplication.
+
+```cpp
+// EpubHighlightStore.h
+struct EpubHighlight {
+    std::string snippet;
+    std::string note;
+    int startBlockIndex;   // TextBlock index in page
+    int startTokenIndex;   // word/token index within block
+    int endBlockIndex;
+    int endTokenIndex;
+};
+
+// Deduplication by range anchor
+bool hasRangeAnchor(int startBlk, int startTok, int endBlk, int endTok) const;
+```
+
+### Pattern: Full-Book Search Encoding
+
+**Problem**: Search results need to encode which chapter (spine) and which page
+they belong to, so selecting a result can navigate there.
+
+**Solution**: Encode spine index in upper 16 bits and page number in lower 16
+bits of the `EpubSearchResult::page` field.
+
+```cpp
+// Encoding in searchFullBook()
+result.page = (spineIndex << 16) | pageInSection;
+
+// Decoding at navigation time
+int targetSpine = result.page >> 16;
+int targetPage = result.page & 0xFFFF;
+```
+
+### i18n Workflow
+
+**When adding new reader UI strings**:
+1. Add keys to all three YAML files:
+   `lib/I18n/translations/{english,simplified_chinese,traditional_chinese}.yaml`
+2. Run `python3 scripts/gen_i18n.py` to regenerate `I18nKeys.h` and `I18nStrings.cpp`
+3. The generator automatically fills 22 other languages with English fallback
+
+**YAML key naming convention**: UPPER_SNAKE_CASE, e.g. `SEARCH_FULL_BOOK`,
+`FOOTNOTE_BODY_TITLE`, `HIGHLIGHT_PREFIX`.
+
 ## Code Review Checklist
 
-<!-- What reviewers should check -->
-
-(To be filled by the team)
+- [ ] Text transforms happen at parser level, not render level
+- [ ] New text-affecting settings are added to Section cache header
+- [ ] Section cache version is bumped when header format changes
+- [ ] New i18n keys exist in all 3 target YAML files
+- [ ] `pio run` passes (Flash < 95%, RAM < 35%)
+- [ ] `pio check --fail-on-defect low --fail-on-defect medium --fail-on-defect high` passes
