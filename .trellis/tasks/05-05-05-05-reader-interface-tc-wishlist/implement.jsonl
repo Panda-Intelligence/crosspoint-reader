@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/guides/index.md", "reason": "Shared pre-development thinking guide index required for scoped Reader changes."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Reader changes must search and reuse existing stores/UI utilities before adding helpers."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Reader UX changes can span EPUB parsing, state persistence, and activity rendering."}
+{"file": ".trellis/spec/open-x4-sdk/frontend/quality-guidelines.md", "reason": "Contains concrete Mofei touch/input ownership contracts relevant to Reader touch behavior."}
+{"file": ".trellis/spec/open-x4-sdk/backend/quality-guidelines.md", "reason": "Contains Mofei firmware quality and validation expectations for compile checks."}

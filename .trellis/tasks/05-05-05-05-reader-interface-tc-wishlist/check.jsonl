@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/guides/index.md", "reason": "Shared checklist for checking scope and thinking coverage."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Check that new logic follows existing Reader patterns and avoids avoidable duplication."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Check cross-layer data flow for any persisted Reader state."}
+{"file": ".trellis/spec/open-x4-sdk/frontend/quality-guidelines.md", "reason": "Check Mofei input/touch contract compliance."}
+{"file": ".trellis/spec/open-x4-sdk/backend/quality-guidelines.md", "reason": "Check Mofei build/validation expectations."}
