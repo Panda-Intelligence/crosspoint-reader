@@ -3,10 +3,8 @@ main = "src/index.ts"
 compatibility_date = "2026-05-05"
 
 # Route to your custom domain
-# Zone ID: Cloudflare Dashboard → 選域名 → 右側 API 區塊
-# 格式為 32 位十六進制字串，例如 "1a2b3c4d5e6f7890abcdef1234567890"
 routes = [
-  { pattern = "murphy.pandacat.ai/*", zone_id = "YOUR_ZONE_ID" }
+  { pattern = "murphy.pandacat.ai/*", zone_id = "db2d4484320a1f76bca405ccd4dbfaff" }
 ]
 
 # R2 bucket for firmware binaries
@@ -21,5 +19,5 @@ id = "c0188469076f46a48cc0f08bb0982002"
 
 [env.production]
 routes = [
-  { pattern = "murphy.pandacat.ai/*", zone_id = "YOUR_ZONE_ID" }
+  { pattern = "murphy.pandacat.ai/*", zone_id = "db2d4484320a1f76bca405ccd4dbfaff" }
 ]
