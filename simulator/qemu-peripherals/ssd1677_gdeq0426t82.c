@@ -100,7 +100,7 @@ struct SSD1677State {
     qemu_irq busy_out;           /* BUSY pin to guest */
 
     /* Parser state */
-    ParserMode mode;
+    uint8_t mode;  /* ParserMode, stored as uint8_t for VMSTATE_UINT8 */
     uint8_t current_cmd;
     uint8_t arg_buf[8];
     uint8_t arg_index;
@@ -498,7 +498,7 @@ static void ssd1677_realize(SSIPeripheral *d, Error **errp)
     reset_state(s);
 }
 
-static void ssd1677_class_init(ObjectClass *klass, const void *data)
+static void ssd1677_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
     SSIPeripheralClass *k = SSI_PERIPHERAL_CLASS(klass);

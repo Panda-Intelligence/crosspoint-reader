@@ -415,7 +415,7 @@ static const Property ft6336u_properties[] = {
     DEFINE_PROP_CHR("chardev", FT6336UState, chr),
 };
 
-static void ft6336u_class_init(ObjectClass *klass, const void *data)
+static void ft6336u_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass    *dc = DEVICE_CLASS(klass);
     I2CSlaveClass  *k  = I2C_SLAVE_CLASS(klass);

@@ -1,4 +1,3 @@
 config SSD1677_GDEQ0426
     bool
-    default y if XTENSA_ESP32S3
     depends on SSI

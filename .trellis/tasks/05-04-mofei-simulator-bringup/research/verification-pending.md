@@ -70,14 +70,35 @@ subagent path recovers, **before PR1 lands on `feat/murphy`** or PR2 starts.
 
 ### PR1-specific
 
-- [ ] `qemu-system-xtensa` build actually completes on macOS Apple Silicon
-  with the dependency list documented in `simulator/scripts/build-qemu.sh`.
-  This was NOT executed during PR1 implementation. The script is committed
-  as scaffolded but unverified.
+- [x] **VERIFIED 2026-05-05**: `qemu-system-xtensa` build completes on
+  macOS Apple Silicon with the dependency list in `build-qemu.sh`. Two
+  rebuild iterations needed: first added `gnutls` dep, then refactored
+  configure to pass `--disable-gnutls --disable-docs` (faster, fewer
+  optional deps).
 - [ ] An ESP-IDF `hello_world` `.elf` for ESP32-S3 is the right smoke-test
   fixture. Currently `start_sim` errors out with a clear message when the
   fixture is missing — the user is expected to provide `simulator/firmware-fixtures/hello_world.elf`
   out-of-band for now.
+
+### PR2/PR3 integration (added 2026-05-05)
+
+- [x] **VERIFIED 2026-05-05**: SSD1677 + FT6336U C source compile against
+  fork's QEMU 9.2.2 headers. `ninja` produces a clean
+  `qemu-system-xtensa-unsigned`. Required two source fixups against fork's
+  QOM API: (1) class_init signature is `void(ObjectClass*, void*)` — drop
+  `const`; (2) VMSTATE_UINT8 cannot store an `enum`, so `ParserMode mode`
+  field changed to `uint8_t mode` (cast at use sites).
+- [x] **VERIFIED 2026-05-05**: Kconfig graph is cycle-free with the
+  in-tree edits committed back to `qemu-peripherals/*.fragment`:
+  activation goes via `select` from `XTENSA_ESP32S3`, NOT `default y if
+  XTENSA_ESP32S3` from device side (which cycles via
+  `FT6336U_MOFEI depends on I2C` ← `BITBANG_I2C select I2C` ←
+  `FT6336U_MOFEI select BITBANG_I2C`).
+- [ ] SoC machine patch (`esp32s3-soc-machine.patch`) does NOT apply
+  cleanly with `git apply` — line numbers were drafted; needs hand-merge
+  to instantiate SSD1677 on a SPI2 bus + FT6336U on a bit-bang I²C bus.
+  Until merged, the firmware cannot reach either peripheral despite both
+  being linked into the binary.
 
 ## Resolution Protocol
 
